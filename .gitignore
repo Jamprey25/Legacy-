@@ -16,3 +16,13 @@ dashboard/out/
 
 # Vercel
 .vercel/
+
+# Swift / Xcode
+ios/**/.build/
+.build/
+*.xcuserstate
+xcuserdata/
+DerivedData/
+
+# claude-flow / ruflo local session state
+.claude-flow/
