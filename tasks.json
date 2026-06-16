@@ -1,14 +1,15 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-16T21:30:00Z"
+    "lastUpdated": "2026-06-16T21:45:00Z"
   },
   "decisions": [
     {
       "id": "backend-runtime",
       "kind": "decision",
       "title": "Backend language / runtime",
-      "status": "open",
+      "status": "decided",
+      "resolution": "TypeScript/Node (Hono or Fastify) + pg on Vercel Functions. Decided by Joseph 2026-06-16; unblocks the auth chain for backend to build. iOS codes to api-contract.md regardless.",
       "raisedBy": "backend",
       "needs": "joseph",
       "detail": "All auth endpoints and everything downstream need a runtime before they can be built. Now the critical path: blocks all 4 M0 auth tasks and transitively ios-auth-ui (Cursor's next task).",

@@ -1,5 +1,6 @@
 import XCTest
 @testable import APIClient
+import LegacyAPIStubs
 
 final class APIClientTests: XCTestCase {
 
@@ -81,25 +82,46 @@ final class APIClientTests: XCTestCase {
         XCTAssertNoThrow(try LegacyAPIClient.validate(status: 204, data: Data(), headers: response(204)))
     }
 
-    // MARK: - End-to-end via mock transport
+    // MARK: - End-to-end via stub transport
 
     func testScanReturnsNilOn204() async throws {
-        let transport = MockTransport(status: 204, body: Data())
+        let transport = StubHTTPTransport()
+        transport.enqueue("/v1/discovery/scan", .noContent)
         let client = LegacyAPIClient(configuration: makeConfig(), transport: transport, tokenProvider: { "t" })
 
         let result = try await client.scan(LocationRequest(lat: 1, lng: 2, accuracyM: 8))
         XCTAssertNil(result)
     }
 
-    func testScanDecodesTeasers() async throws {
-        let json = #"{"teasers":[{"memory_id":"m1","thumbnail_url":null,"drop_date":"2024-09-01","owner_display":"you","is_own":true,"in_range":true,"warmth":"in_bubble","scan_status":"clear"}]}"#
-        let transport = MockTransport(status: 200, body: Data(json.utf8))
-        let client = LegacyAPIClient(configuration: makeConfig(), transport: transport, tokenProvider: { "t" })
-
+    func testScanDecodesTeasersFromFixture() async throws {
+        let client = LegacyAPIClient.stubbed()
         let result = try await client.scan(LocationRequest(lat: 1, lng: 2, accuracyM: 8))
         XCTAssertEqual(result?.teasers.count, 1)
         XCTAssertEqual(result?.teasers.first?.warmth, "in_bubble")
         XCTAssertEqual(result?.teasers.first?.isOwn, true)
+    }
+
+    func testHappyPathUnlockModelsDwellThenSuccess() async throws {
+        let client = LegacyAPIClient.stubbed()
+        let body = LocationRequest(lat: 1, lng: 2, accuracyM: 8)
+
+        // First unlock attempt: dwell required (423).
+        do {
+            _ = try await client.unlock(memoryID: "m1", body)
+            XCTFail("expected dwell lock on first attempt")
+        } catch let LegacyAPIError.locked(code, _, info) {
+            XCTAssertEqual(code, "dwell_required")
+            XCTAssertEqual(info.retryAfterSeconds, 20)
+        }
+
+        // Second attempt: unlocked.
+        let unlocked = try await client.unlock(memoryID: "m1", body)
+        XCTAssertEqual(unlocked.returnCount, 3)
+        XCTAssertEqual(unlocked.media.first?.type, "photo")
+    }
+
+    func testFixturesDecodeAgainstContractModels() throws {
+        XCTAssertNoThrow(try LegacyFixtures.validateAll())
     }
 
     // MARK: - Helpers
@@ -111,20 +133,5 @@ final class APIClientTests: XCTestCase {
             httpVersion: nil,
             headerFields: nil
         )!
-    }
-}
-
-private struct MockTransport: HTTPTransport {
-    let status: Int
-    let body: Data
-
-    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
-        let response = HTTPURLResponse(
-            url: request.url!,
-            statusCode: status,
-            httpVersion: nil,
-            headerFields: nil
-        )!
-        return (body, response)
     }
 }

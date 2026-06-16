@@ -30,6 +30,8 @@ Both sides append here. Joseph relays updates between sessions.
 | 2026-06-16 | `X-App-Version` header name **confirmed** (semver). Plus `X-Device-Id` (per-install UUID) required for App Attest + APNs binding. | backend |
 | 2026-06-16 | `/discovery/scan` returns `200 + { teasers: [...] }`; the `in_range:true` teaser doubles as dwell check #1. `204` only when nothing nearby. | backend |
 | 2026-06-16 | DB schema: `geohash` stored at precision 9; coarse zone = `left(geohash,5)`. Tunable bubble numbers live in a `config` table, not hardcoded. | backend |
+| 2026-06-16 | **Backend runtime LOCKED: TypeScript/Node (Hono or Fastify) + `pg` on Vercel Functions.** Decided by Joseph. Unblocks the auth chain. iOS unaffected (codes to the contract). | joseph |
+| 2026-06-16 | iOS adds a `LegacyAPIStubs` library (StubHTTPTransport + contract-shaped fixtures) — debug/test/preview only, not linked by the app. Enables offline previews + UI tests + drift checks vs live responses. | ios |
 
 ---
 
