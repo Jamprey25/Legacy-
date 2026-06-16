@@ -84,7 +84,9 @@ extension StubHTTPTransport {
     /// sequence on `/unlock` (first call 423, second call 200) for the core loop.
     public static func happyPath() -> StubHTTPTransport {
         let transport = StubHTTPTransport()
-        transport.enqueue("/v1/auth/social", .ok(LegacyFixtures.authSocial))
+        transport.enqueue("/v1/auth/social", .json(201, LegacyFixtures.authSocial))
+        transport.enqueue("/v1/auth/email/start", .noContent)
+        transport.enqueue("/v1/auth/email/verify", .json(201, LegacyFixtures.authSocial))
         transport.enqueue("/v1/memories", .json(201, LegacyFixtures.createMemory))
         transport.enqueue("/v1/discovery/scan", .ok(LegacyFixtures.scanWithTeasers))
         transport.enqueue("/unlock", .json(423, LegacyFixtures.lockedDwell), .ok(LegacyFixtures.unlock))

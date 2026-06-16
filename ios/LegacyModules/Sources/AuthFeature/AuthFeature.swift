@@ -1,0 +1,268 @@
+import DesignSystem
+import SwiftUI
+
+#if os(iOS)
+import AuthenticationServices
+
+public enum AuthFeature {
+    public static let version = "0.1.0"
+}
+
+public struct AuthFeatureRootView: View {
+    public init(coordinator: AuthCoordinator) {
+        self.coordinator = coordinator
+    }
+
+    @Bindable private var coordinator: AuthCoordinator
+
+    public var body: some View {
+        ZStack {
+            LegacyColor.background.ignoresSafeArea()
+
+            switch coordinator.route {
+            case .welcome:
+                AuthWelcomeView(coordinator: coordinator)
+            case .dobGate:
+                DOBGateView(coordinator: coordinator)
+            case .emailEntry:
+                EmailEntryView(coordinator: coordinator)
+            case .emailOTP:
+                EmailOTPView(coordinator: coordinator)
+            case .ageRestricted:
+                AgeGateView(onDismiss: coordinator.backToWelcome)
+            }
+
+            if coordinator.isLoading {
+                ProgressView()
+                    .tint(LegacyColor.accent)
+                    .scaleEffect(1.2)
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+}
+
+// MARK: - Welcome
+
+private struct AuthWelcomeView: View {
+    @Bindable var coordinator: AuthCoordinator
+
+    var body: some View {
+        VStack(spacing: LegacySpacing.xl) {
+            Spacer()
+
+            VStack(spacing: LegacySpacing.sm) {
+                Text("Legacy")
+                    .font(LegacyFont.largeTitle)
+                    .foregroundStyle(LegacyColor.textPrimary)
+                Text("The places remember you.")
+                    .font(LegacyFont.body)
+                    .foregroundStyle(LegacyColor.textSecondary)
+            }
+
+            VStack(spacing: LegacySpacing.md) {
+                SignInWithAppleButton(.signIn) { request in
+                    request.requestedScopes = [.email, .fullName]
+                } onCompletion: { result in
+                    switch result {
+                    case let .success(authorization):
+                        guard
+                            let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                            let tokenData = credential.identityToken,
+                            let token = String(data: tokenData, encoding: .utf8)
+                        else {
+                            coordinator.errorMessage = "Could not read Apple identity token."
+                            return
+                        }
+                        coordinator.appleSignInCompleted(identityToken: token)
+                    case let .failure(error):
+                        if (error as NSError).code != ASAuthorizationError.canceled.rawValue {
+                            coordinator.errorMessage = error.localizedDescription
+                        }
+                    }
+                }
+                .signInWithAppleButtonStyle(.white)
+                .frame(height: 50)
+                .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.md, style: .continuous))
+
+                Button("Continue with Google") {
+                    coordinator.googleSignInTapped()
+                }
+                .buttonStyle(.legacySecondary)
+                .opacity(0.55)
+
+                Button("Continue with Email") {
+                    coordinator.beginEmailSignIn()
+                }
+                .buttonStyle(.legacySecondary)
+            }
+            .padding(.horizontal, LegacySpacing.xl)
+
+            if let error = coordinator.errorMessage {
+                Text(error)
+                    .font(LegacyFont.caption)
+                    .foregroundStyle(LegacyColor.danger)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, LegacySpacing.xl)
+            }
+
+            Spacer()
+        }
+    }
+}
+
+// MARK: - DOB
+
+private struct DOBGateView: View {
+    @Bindable var coordinator: AuthCoordinator
+
+    var body: some View {
+        VStack(spacing: LegacySpacing.lg) {
+            Text("Date of birth")
+                .font(LegacyFont.title2)
+                .foregroundStyle(LegacyColor.textPrimary)
+
+            Text("Required on first sign-in. Legacy is not available to users under 13.")
+                .font(LegacyFont.callout)
+                .foregroundStyle(LegacyColor.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, LegacySpacing.xl)
+
+            DatePicker(
+                "Date of birth",
+                selection: $coordinator.dob,
+                in: ...Date(),
+                displayedComponents: .date
+            )
+            .datePickerStyle(.wheel)
+            .labelsHidden()
+            .colorScheme(.dark)
+
+            Button("Continue") {
+                Task { await coordinator.confirmDOB() }
+            }
+            .buttonStyle(.legacyPrimary)
+            .padding(.horizontal, LegacySpacing.xl)
+            .disabled(coordinator.isLoading)
+
+            Button("Back") { coordinator.backToWelcome() }
+                .font(LegacyFont.callout)
+                .foregroundStyle(LegacyColor.textSecondary)
+        }
+        .padding(LegacySpacing.lg)
+    }
+}
+
+// MARK: - Email
+
+private struct EmailEntryView: View {
+    @Bindable var coordinator: AuthCoordinator
+
+    var body: some View {
+        VStack(spacing: LegacySpacing.lg) {
+            Text("Sign in with email")
+                .font(LegacyFont.title2)
+                .foregroundStyle(LegacyColor.textPrimary)
+
+            TextField("you@example.com", text: $coordinator.email)
+                .textContentType(.emailAddress)
+                .keyboardType(.emailAddress)
+                .autocapitalization(.none)
+                .padding(LegacySpacing.md)
+                .background(LegacyColor.surface)
+                .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.md, style: .continuous))
+                .padding(.horizontal, LegacySpacing.xl)
+
+            Button("Send code") {
+                Task { await coordinator.sendEmailCode() }
+            }
+            .buttonStyle(.legacyPrimary)
+            .padding(.horizontal, LegacySpacing.xl)
+            .disabled(coordinator.isLoading)
+
+            Button("Back") { coordinator.backToWelcome() }
+                .font(LegacyFont.callout)
+                .foregroundStyle(LegacyColor.textSecondary)
+        }
+    }
+}
+
+private struct EmailOTPView: View {
+    @Bindable var coordinator: AuthCoordinator
+
+    var body: some View {
+        VStack(spacing: LegacySpacing.lg) {
+            Text("Enter code")
+                .font(LegacyFont.title2)
+                .foregroundStyle(LegacyColor.textPrimary)
+
+            Text("We sent a 6-digit code to \(coordinator.email)")
+                .font(LegacyFont.callout)
+                .foregroundStyle(LegacyColor.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, LegacySpacing.xl)
+
+            TextField("000000", text: $coordinator.otpCode)
+                .keyboardType(.numberPad)
+                .multilineTextAlignment(.center)
+                .font(LegacyFont.metric)
+                .padding(LegacySpacing.md)
+                .background(LegacyColor.surface)
+                .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.md, style: .continuous))
+                .padding(.horizontal, LegacySpacing.xxxl)
+
+            Button("Verify") {
+                Task { await coordinator.verifyEmailCode() }
+            }
+            .buttonStyle(.legacyPrimary)
+            .padding(.horizontal, LegacySpacing.xl)
+            .disabled(coordinator.isLoading || coordinator.otpCode.count < 6)
+
+            Button("Back") { coordinator.backToWelcome() }
+                .font(LegacyFont.callout)
+                .foregroundStyle(LegacyColor.textSecondary)
+        }
+    }
+}
+
+// MARK: - Age gate
+
+private struct AgeGateView: View {
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(spacing: LegacySpacing.lg) {
+            Image(systemName: "person.crop.circle.badge.xmark")
+                .font(.system(size: 48))
+                .foregroundStyle(LegacyColor.danger)
+
+            Text("Not eligible yet")
+                .font(LegacyFont.title2)
+                .foregroundStyle(LegacyColor.textPrimary)
+
+            Text("Legacy is not available to users under 13.")
+                .font(LegacyFont.body)
+                .foregroundStyle(LegacyColor.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, LegacySpacing.xl)
+
+            Button("Back") { onDismiss() }
+                .buttonStyle(.legacySecondary)
+                .padding(.horizontal, LegacySpacing.xl)
+        }
+        .padding(LegacySpacing.xl)
+    }
+}
+
+#else
+
+public enum AuthFeature {
+    public static let version = "0.1.0"
+}
+
+public struct AuthFeatureRootView: View {
+    public init(coordinator: Any) {}
+    public var body: some View { EmptyView() }
+}
+
+#endif

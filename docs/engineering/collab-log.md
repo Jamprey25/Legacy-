@@ -52,7 +52,8 @@ Do not use interactive choice prompts or "which do you prefer?" in chat without 
 | 2026-06-16 | `/discovery/scan` returns `200 + { teasers: [...] }`; the `in_range:true` teaser doubles as dwell check #1. `204` only when nothing nearby. | backend |
 | 2026-06-16 | DB schema: `geohash` stored at precision 9; coarse zone = `left(geohash,5)`. Tunable bubble numbers live in a `config` table, not hardcoded. | backend |
 | 2026-06-16 | **Backend runtime LOCKED: TypeScript/Node (Hono or Fastify) + `pg` on Vercel Functions.** Decided by Joseph. Unblocks the auth chain. iOS unaffected (codes to the contract). | joseph |
-| 2026-06-16 | iOS adds a `LegacyAPIStubs` library (StubHTTPTransport + contract-shaped fixtures) — debug/test/preview only, not linked by the app. Enables offline previews + UI tests + drift checks vs live responses. | ios |
+| 2026-06-16 | iOS adds a `LegacyAPIStubs` library (StubHTTPTransport + contract-shaped fixtures) — debug/test/preview only, not linked by the app. | ios |
+| 2026-06-16 | **`AuthFeature` SPM module** for M0 auth UI. Apple native; Google button UI-only until OAuth client ID + backend ready; email OTP wired. | ios |
 
 ---
 
@@ -78,21 +79,22 @@ Things Cursor needs to know before writing `APIClient` or feature code.
 
 Things Claude Code needs to know before finalizing API shapes or DB schema.
 
-- **`docs/engineering/api-contract.md` is missing** (task `api-contract-doc` still `todo`). This blocks `ios-apiclient-base`. Engineering plan §3 has endpoint sketches; need exact request/response JSON, error codes, and header list before implementing typed endpoints.
-- **401 handling preference (iOS):** Surface `LegacyAPIError.unauthorized` to callers; do not auto-refresh. Session tokens are opaque bearer JWTs with no refresh token in the contract — caller should route to auth flow. Confirm if backend will ever issue refresh tokens.
-- **`X-App-Version`:** iOS will send `CFBundleShortVersionString` (semver, e.g. `0.1.0`) on every request once contract confirms the header name. Already wired in `LegacyAPIConfiguration.appVersion`.
 - **Module dependency graph for reference:**
 
 ```
 DesignSystem          (no deps)
 APIClient             (no deps — includes KeychainSessionStore)
 LocationEngine        (no deps)
+AuthFeature           → DesignSystem, APIClient
+LegacyAPIStubs        → APIClient          [debug/test/preview ONLY]
 DropFeature           → DesignSystem, APIClient, LocationEngine
 WanderFeature         → DesignSystem, APIClient, LocationEngine
 MemoryLaneFeature     → DesignSystem, APIClient
 ImportFeature         → DesignSystem, APIClient, LocationEngine
-Legacy app            → WanderFeature (+ transitive)
+Legacy app            → AuthFeature, WanderFeature, LegacyAPIStubs (DEBUG)
 ```
+
+- **M0 auth UI shipped (`ios-auth-ui` done):** `AuthFeature` module. Sign in → Keychain → empty Wander map. Email OTP + DOB + age gate wired to contract. Google deferred (see brainstorm). DEBUG builds use stubbed API client for offline demo.
 
 - **Open in Xcode:** `ios/Legacy.xcodeproj` (local package ref to `ios/LegacyModules`). Set development team before running on device.
 - **Ruflo task tracking (2026-06-16):** Cursor syncs iOS work to ruflo via CLI (`npx @claude-flow/cli@latest task create/list`) + AgentDB memory (`namespace: legacy`). `tasks.json` remains dashboard source of truth. Ruflo session: `legacy-ios-cursor`. Active ruflo tasks: `task-1781641270028-pdoaek` (ios-design-system), `task-1781641273869-92k6cd` (ios-keychain-session), `task-1781641280362-ppoul1` (ios-apiclient-base, blocked).
@@ -131,4 +133,17 @@ Contract currently sends `warmth: coarse|approaching|in_bubble` (3 bands). Curso
 
 ### [ios] Mock transport + fixture server for previews and UI tests
 `APIClient` now has an injectable `HTTPTransport` seam, so iOS can build the whole app (auth → drop → wander → unlock) against canned JSON fixtures before any endpoint exists — SwiftUI previews, GPX-driven UI tests, and demos all run offline. Proposal: keep a `Fixtures/` set of contract-shaped JSON responses checked into the iOS side, generated from the same examples in `api-contract.md`. Bonus: when backend ships an endpoint, we diff the live response against the fixture to catch drift early. No backend action needed — flagging so the fixtures and the contract examples stay in lockstep.
+
+### [ios] AuthFeature module + Google Sign-In deferral (M0 auth UI)
+Building `ios-auth-ui` now against `LegacyAPIClient.stubbed()` while backend auth endpoints are in flight.
+
+**Decision (iOS, routine — logged for backend):**
+- New **`AuthFeature`** SPM target (`DesignSystem` + `APIClient`). Matches other feature modules; keeps `LegacyApp` as composition root only.
+- **Apple Sign In:** native `AuthenticationServices` (`SignInWithAppleButton`). Requires Sign in with Apple capability + backend `auth-apple-oauth`.
+- **Google Sign In:** button present in UI; **token exchange deferred** until backend `auth-google-oauth` ships *and* Joseph adds a Google OAuth client ID to the Xcode project. M0 uses a disabled-style secondary button with copy "Coming soon" rather than bundling GoogleSignIn SDK prematurely (extra dependency + client secret handling). Alternative later: `ASWebAuthenticationSession` against Google's web flow — no SDK.
+- **Email OTP:** fully wired to `/v1/auth/email/start` + `/v1/auth/email/verify` (works with stubs today).
+- **DOB picker:** shown before first token exchange for social + email paths (`dob` required on first sign-in per contract §2).
+- **Age gate screen:** shown on `403 age_restricted` / `forbidden(code: "age_restricted")`.
+
+No Joseph action needed unless he wants Google live in M0 (would need OAuth client ID in docs + Xcode).
 

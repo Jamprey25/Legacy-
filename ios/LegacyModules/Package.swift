@@ -14,6 +14,7 @@ let package = Package(
         .library(name: "WanderFeature", targets: ["WanderFeature"]),
         .library(name: "MemoryLaneFeature", targets: ["MemoryLaneFeature"]),
         .library(name: "ImportFeature", targets: ["ImportFeature"]),
+        .library(name: "AuthFeature", targets: ["AuthFeature"]),
         // Debug/test/preview support only — intentionally NOT a dependency of the app target.
         .library(name: "LegacyAPIStubs", targets: ["LegacyAPIStubs"]),
     ],
@@ -45,6 +46,10 @@ let package = Package(
         .target(
             name: "ImportFeature",
             dependencies: ["DesignSystem", "APIClient", "LocationEngine"]
+        ),
+        .target(
+            name: "AuthFeature",
+            dependencies: ["DesignSystem", "APIClient"]
         ),
         .testTarget(
             name: "DesignSystemTests",

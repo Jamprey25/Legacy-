@@ -275,7 +275,7 @@ cd dashboard && npm run build
 | KeychainSessionStore | Done |
 | LocationEngine + ScanMovementGate | Done |
 | LegacyAPIStubs harness | Done |
-| Auth UI | Blocked on backend auth endpoints |
+| `ios-auth-ui` (AuthFeature) | Done — stubs in DEBUG; live Apple needs backend |
 | Drop / Wander / Import flows | M1–M3 |
 
 See `tasks.json` and the [dashboard](https://dashboard-two-orpin-63.vercel.app) for live status.

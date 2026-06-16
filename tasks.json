@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-16T21:45:00Z"
+    "lastUpdated": "2026-06-16T22:00:00Z"
   },
   "decisions": [
     {
@@ -191,12 +191,12 @@
     {
       "id": "ios-auth-ui",
       "title": "iOS: Auth screens — Apple/Google sign-in buttons, email OTP entry, DOB picker, age gate rejection screen",
-      "status": "todo",
+      "status": "done",
       "owner": "ios",
       "phase": 0,
       "milestone": "M0",
-      "blockedBy": ["ios-apiclient-base", "ios-keychain-session", "auth-session-tokens"],
-      "notes": "Demo milestone: sign in, land on empty Wander map."
+      "blockedBy": [],
+      "notes": "AuthFeature module: Apple (AuthenticationServices), email OTP, DOB gate, age-restricted screen. Google button UI-only until OAuth client ID + backend. DEBUG uses LegacyAPIClient.stubbed(); live Apple needs Sign in with Apple capability + auth-apple-oauth."
     },
     {
       "id": "endpoint-memories-post",

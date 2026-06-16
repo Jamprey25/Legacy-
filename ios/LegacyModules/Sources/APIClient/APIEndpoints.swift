@@ -68,6 +68,28 @@ public struct AuthResponse: Decodable, Sendable, Equatable {
     }
 }
 
+public struct EmailStartRequest: Encodable, Sendable {
+    public let email: String
+
+    public init(email: String) {
+        self.email = email
+    }
+}
+
+public struct EmailVerifyRequest: Encodable, Sendable {
+    public let email: String
+    public let code: String
+    public let dob: String?
+    public let device: DeviceInfo
+
+    public init(email: String, code: String, dob: String?, device: DeviceInfo) {
+        self.email = email
+        self.code = code
+        self.dob = dob
+        self.device = device
+    }
+}
+
 // MARK: - Memory creation (§3)
 
 public struct CreateMemoryRequest: Encodable, Sendable {
@@ -226,6 +248,16 @@ public struct UnlockResponse: Decodable, Sendable, Equatable {
 extension LegacyAPIClient {
     public func authSocial(_ body: SocialAuthRequest) async throws -> AuthResponse {
         try await send(request(.post, "/v1/auth/social", body, requiresAuth: false), as: AuthResponse.self)
+    }
+
+    public func authEmailStart(_ email: String) async throws {
+        try await sendNoContent(
+            try request(.post, "/v1/auth/email/start", EmailStartRequest(email: email), requiresAuth: false)
+        )
+    }
+
+    public func authEmailVerify(_ body: EmailVerifyRequest) async throws -> AuthResponse {
+        try await send(request(.post, "/v1/auth/email/verify", body, requiresAuth: false), as: AuthResponse.self)
     }
 
     public func createMemory(_ body: CreateMemoryRequest) async throws -> CreateMemoryResponse {

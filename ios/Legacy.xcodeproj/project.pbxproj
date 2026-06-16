@@ -12,6 +12,8 @@
 		B10000000000000000000003 /* DesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = P10000000000000000000002 /* DesignSystem */; };
 		B10000000000000000000004 /* APIClient in Frameworks */ = {isa = PBXBuildFile; productRef = P10000000000000000000003 /* APIClient */; };
 		B10000000000000000000005 /* LocationEngine in Frameworks */ = {isa = PBXBuildFile; productRef = P10000000000000000000004 /* LocationEngine */; };
+		B10000000000000000000006 /* AuthFeature in Frameworks */ = {isa = PBXBuildFile; productRef = P10000000000000000000005 /* AuthFeature */; };
+		B10000000000000000000007 /* LegacyAPIStubs in Frameworks */ = {isa = PBXBuildFile; productRef = P10000000000000000000006 /* LegacyAPIStubs */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -29,6 +31,8 @@
 				B10000000000000000000003 /* DesignSystem in Frameworks */,
 				B10000000000000000000004 /* APIClient in Frameworks */,
 				B10000000000000000000005 /* LocationEngine in Frameworks */,
+				B10000000000000000000006 /* AuthFeature in Frameworks */,
+				B10000000000000000000007 /* LegacyAPIStubs in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -81,6 +85,8 @@
 				P10000000000000000000002 /* DesignSystem */,
 				P10000000000000000000003 /* APIClient */,
 				P10000000000000000000004 /* LocationEngine */,
+				P10000000000000000000005 /* AuthFeature */,
+				P10000000000000000000006 /* LegacyAPIStubs */,
 			);
 			productName = Legacy;
 			productReference = F10000000000000000000003 /* Legacy.app */;
@@ -187,6 +193,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = LegacyApp/Legacy.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
@@ -214,6 +221,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = LegacyApp/Legacy.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
@@ -283,6 +291,14 @@
 		P10000000000000000000004 /* LocationEngine */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = LocationEngine;
+		};
+		P10000000000000000000005 /* AuthFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AuthFeature;
+		};
+		P10000000000000000000006 /* LegacyAPIStubs */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LegacyAPIStubs;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

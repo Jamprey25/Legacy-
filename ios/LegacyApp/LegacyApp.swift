@@ -1,42 +1,93 @@
 import SwiftUI
 import UIKit
+import AuthFeature
 import WanderFeature
 import APIClient
 import LocationEngine
+#if DEBUG
+import LegacyAPIStubs
+#endif
+
+@MainActor
+@Observable
+final class AppModel {
+    var isAuthenticated = false
+
+    func refreshSession() {
+        isAuthenticated = (try? KeychainSessionStore.read()) != nil
+    }
+
+    func signOut() {
+        try? KeychainSessionStore.delete()
+        isAuthenticated = false
+    }
+}
 
 @main
 struct LegacyApp: App {
+    private let apiClient: LegacyAPIClient
+    private let locationEngine = LocationEngine()
+    @State private var appModel = AppModel()
+
     private static var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
     }
 
-    /// Stable per-install identifier (resets only when all vendor apps are removed) — used
-    /// for `X-Device-Id`. Phase 1 device binding; App Attest hardens this at M5.
     private static var deviceID: String {
         UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
     }
 
-    private let apiClient = LegacyAPIClient(
-        configuration: LegacyAPIConfiguration(
-            baseURL: URL(string: "https://api.legacy.app")!,
-            appVersion: appVersion,
-            deviceID: deviceID
-        )
-    )
-    private let locationEngine = LocationEngine()
-    private let wanderCoordinator: WanderCoordinator
-
     init() {
-        wanderCoordinator = WanderCoordinator(
-            apiClient: apiClient,
-            locationEngine: locationEngine
+        #if DEBUG
+        apiClient = LegacyAPIClient.stubbed()
+        #else
+        apiClient = LegacyAPIClient(
+            configuration: LegacyAPIConfiguration(
+                baseURL: URL(string: "https://api.legacy.app")!,
+                appVersion: Self.appVersion,
+                deviceID: Self.deviceID
+            )
         )
+        #endif
     }
 
     var body: some Scene {
         WindowGroup {
-            WanderFeatureRootView(coordinator: wanderCoordinator)
-                .preferredColorScheme(.dark)
+            RootView(
+                appModel: appModel,
+                apiClient: apiClient,
+                locationEngine: locationEngine,
+                deviceID: Self.deviceID
+            )
+            .onAppear { appModel.refreshSession() }
+        }
+    }
+}
+
+private struct RootView: View {
+    @Bindable var appModel: AppModel
+    let apiClient: LegacyAPIClient
+    let locationEngine: LocationEngine
+    let deviceID: String
+
+    var body: some View {
+        Group {
+            if appModel.isAuthenticated {
+                WanderFeatureRootView(
+                    coordinator: WanderCoordinator(
+                        apiClient: apiClient,
+                        locationEngine: locationEngine
+                    )
+                )
+            } else {
+                AuthFeatureRootView(
+                    coordinator: AuthCoordinator(
+                        apiClient: apiClient,
+                        deviceID: deviceID,
+                        onAuthenticated: { appModel.refreshSession() }
+                    )
+                )
+            }
         }
     }
 }
