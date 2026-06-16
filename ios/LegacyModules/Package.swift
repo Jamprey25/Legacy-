@@ -67,5 +67,13 @@ let package = Package(
             name: "LocationEngineTests",
             dependencies: ["LocationEngine"]
         ),
+        .testTarget(
+            name: "DropFeatureTests",
+            dependencies: ["DropFeature"]
+        ),
+        .testTarget(
+            name: "WanderFeatureTests",
+            dependencies: ["WanderFeature", "APIClient", "DesignSystem"]
+        ),
     ]
 )

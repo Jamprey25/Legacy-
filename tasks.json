@@ -261,12 +261,12 @@
     {
       "id": "ios-exif-strip",
       "title": "iOS: Client-side EXIF strip — rewrite image via ImageIO, remove all metadata before upload",
-      "status": "todo",
+      "status": "done",
       "owner": "ios",
       "phase": 1,
       "milestone": "M1",
-      "blockedBy": ["ios-v1-camera-picker"],
-      "notes": "Privacy guarantee. Strip before any data leaves the device. Synchronous via ImageIO."
+      "blockedBy": [],
+      "notes": "Privacy guarantee. Core ImageIO rewrite host-verifiable without Xcode; picker wiring follows ios-v1-camera-picker."
     },
     {
       "id": "ios-background-upload",
@@ -276,7 +276,7 @@
       "phase": 1,
       "milestone": "M1",
       "blockedBy": ["ios-exif-strip", "s3-signed-put-url"],
-      "notes": "Memory record created first (POST /memories), upload after. Background URLSession persists across app restarts."
+      "notes": "Memory record created first (POST /memories), upload after. `URLSessionMediaUploader` scaffold in DropFeature; Background URLSession + progress UI still TODO."
     },
     {
       "id": "ios-draft-store",
@@ -401,7 +401,7 @@
     {
       "id": "ios-wander-foreground-scan",
       "title": "iOS: Wander mode — foreground scan loop: movement-gated POST /scan calls, parse teaser response, surface pins",
-      "status": "todo",
+      "status": "done",
       "owner": "ios",
       "phase": 1,
       "milestone": "M2",
@@ -411,7 +411,7 @@
     {
       "id": "ios-warmth-cue",
       "title": "iOS: Warmth cue — non-directional screen-edge ambient gradient + haptic feedback. No arrow, no compass, no direction.",
-      "status": "todo",
+      "status": "in-progress",
       "owner": "ios",
       "phase": 1,
       "milestone": "M2",
@@ -421,12 +421,12 @@
     {
       "id": "ios-wander-unlock-flow",
       "title": "iOS: Wander unlock flow — tap pin → proximity check → if in range POST /unlock → show media; if not show teaser + walk closer",
-      "status": "todo",
+      "status": "in-progress",
       "owner": "ios",
       "phase": 1,
       "milestone": "M2",
       "blockedBy": ["ios-warmth-cue", "endpoint-unlock-signed-get-url"],
-      "notes": "Dwell: first scan is check #1, unlock call is check #2. 423 Locked → show 'stay here a moment' UI."
+      "notes": "Coordinator + teaser row UI shipped. Dwell/423 UX wired. Full media viewer + walk-closer map affordances need Xcode."
     },
     {
       "id": "ios-memory-lane",

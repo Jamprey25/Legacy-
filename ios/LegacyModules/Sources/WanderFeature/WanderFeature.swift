@@ -1,4 +1,5 @@
 import APIClient
+import CoreLocation
 import DesignSystem
 import LocationEngine
 import SwiftUI
@@ -23,8 +24,87 @@ public final class WanderCoordinator {
     private let apiClient: LegacyAPIClient
     private let locationEngine: LocationEngine
 
+    /// Teasers from the latest scan — no coordinates (contract §4).
+    public private(set) var teasers: [Teaser] = []
+    public private(set) var isScanning = false
+    public private(set) var isUnlocking = false
+    public private(set) var statusMessage: String?
+    public private(set) var unlockedMediaURL: URL?
+
     /// Ambient warmth intensity 0…1. No directional component.
     public var warmthIntensity: Double = 0
+
+    /// Movement-gated foreground scan. Safe to call on appear and after significant movement.
+    public func scanIfNeeded(force: Bool = false) async {
+        guard !isScanning else { return }
+
+        isScanning = true
+        statusMessage = nil
+        defer { isScanning = false }
+
+        do {
+            let fix = try await locationEngine.acquireFix()
+
+            if !force, !locationEngine.shouldScan(for: fix) {
+                return
+            }
+
+            let body = LocationRequest(lat: fix.lat, lng: fix.lng, accuracyM: fix.accuracyM)
+
+            if let response = try await apiClient.scan(body) {
+                teasers = response.teasers
+            } else {
+                teasers = []
+            }
+
+            warmthIntensity = WanderScanPolicy.maxWarmthLevel(from: teasers).intensity
+
+            locationEngine.recordScan(
+                at: CLLocation(latitude: fix.lat, longitude: fix.lng)
+            )
+        } catch {
+            statusMessage = "Scan failed. Check location permission and connectivity."
+        }
+    }
+
+    /// Attempt unlock for a teaser pin. Handles dwell-required UX messaging.
+    public func unlock(teaser: Teaser) async {
+        guard !isUnlocking else { return }
+
+        isUnlocking = true
+        statusMessage = nil
+        unlockedMediaURL = nil
+        defer { isUnlocking = false }
+
+        do {
+            let fix = try await locationEngine.acquireFix()
+            let body = LocationRequest(lat: fix.lat, lng: fix.lng, accuracyM: fix.accuracyM)
+            let response = try await apiClient.unlock(memoryID: teaser.memoryID, body)
+
+            if let urlString = response.media.first?.url, let url = URL(string: urlString) {
+                unlockedMediaURL = url
+            }
+            statusMessage = response.caption
+        } catch let LegacyAPIError.locked(code, message, info) {
+            switch code {
+            case "dwell_required":
+                statusMessage = message.isEmpty
+                    ? "Stay here a moment longer."
+                    : message
+                if let seconds = info.retryAfterSeconds {
+                    statusMessage? += " (~\(seconds)s)"
+                }
+            case "not_in_range":
+                statusMessage = "Walk closer to open this memory."
+            case "sealed", "condition_unmet":
+                statusMessage = message
+            default:
+                statusMessage = message
+            }
+        } catch {
+            statusMessage = "Could not unlock. Try again when you have a signal."
+        }
+    }
 }
 
 public struct WanderFeatureRootView: View {
@@ -39,14 +119,69 @@ public struct WanderFeatureRootView: View {
             LegacyColor.background
                 .ignoresSafeArea()
 
-            ContentUnavailableView(
-                "Wander",
-                systemImage: "map",
-                description: Text("Empty map — M0 demo target")
-            )
+            VStack(spacing: LegacySpacing.lg) {
+                if coordinator.teasers.isEmpty {
+                    ContentUnavailableView(
+                        "Wander",
+                        systemImage: "map",
+                        description: Text("Walk to discover memories nearby.")
+                    )
+                } else {
+                    List(coordinator.teasers, id: \.memoryID) { teaser in
+                        TeaserRow(teaser: teaser) {
+                            Task { await coordinator.unlock(teaser: teaser) }
+                        }
+                    }
+                    .scrollContentBackground(.hidden)
+                }
+
+                if coordinator.isScanning || coordinator.isUnlocking {
+                    ProgressView()
+                        .tint(LegacyColor.accent)
+                }
+
+                if let message = coordinator.statusMessage {
+                    Text(message)
+                        .font(LegacyFont.callout)
+                        .foregroundStyle(LegacyColor.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, LegacySpacing.lg)
+                }
+            }
 
             WarmthCueOverlay(intensity: coordinator.warmthIntensity)
                 .ignoresSafeArea()
         }
+        .task {
+            await coordinator.scanIfNeeded(force: true)
+        }
+    }
+}
+
+private struct TeaserRow: View {
+    let teaser: Teaser
+    let onUnlock: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: LegacySpacing.xs) {
+            Text(teaser.ownerDisplay == "you" ? "Your memory" : teaser.ownerDisplay)
+                .font(LegacyFont.headline)
+                .foregroundStyle(LegacyColor.textPrimary)
+            Text(teaser.dropDate)
+                .font(LegacyFont.caption)
+                .foregroundStyle(LegacyColor.textSecondary)
+            HStack {
+                Text(teaser.inRange ? "In range" : "Nearby")
+                    .font(LegacyFont.caption)
+                    .foregroundStyle(teaser.inRange ? LegacyColor.accent : LegacyColor.textSecondary)
+                Spacer()
+                if teaser.inRange {
+                    Button("Open", action: onUnlock)
+                        .buttonStyle(.legacyPrimary)
+                        .frame(maxWidth: 120)
+                }
+            }
+        }
+        .listRowBackground(LegacyColor.surface)
     }
 }

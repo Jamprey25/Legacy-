@@ -1,255 +1,111 @@
-import type { TasksFile, Task, Status, Owner, Decision } from "./types";
+"use client";
+import { useState, useEffect, useCallback } from "react";
+import type { TasksFile, Task, Owner } from "./types";
+import TaskCard from "./components/TaskCard";
+import MilestoneGroup from "./components/MilestoneGroup";
+import DecisionsPanel from "./components/DecisionsPanel";
 
 const GITHUB_RAW =
   "https://raw.githubusercontent.com/Jamprey25/Legacy-/main/tasks.json";
+const POLL_INTERVAL = 30;
 
-async function getTasks(): Promise<TasksFile> {
-  const res = await fetch(GITHUB_RAW, { next: { revalidate: 30 } });
-  if (!res.ok) throw new Error(`Failed to fetch tasks: ${res.status}`);
-  return res.json();
-}
+const ANIMATIONS = `
+  @keyframes pulse-ring {
+    0%   { box-shadow: 0 0 0 0 #d9770688; }
+    70%  { box-shadow: 0 0 0 5px #d9770600; }
+    100% { box-shadow: 0 0 0 0 #d9770600; }
+  }
+  .pulse-dot { animation: pulse-ring 1.5s ease-out infinite; }
 
-const STATUS_LABEL: Record<Status, string> = {
-  todo: "Todo",
-  "in-progress": "In Progress",
-  done: "Done",
-};
+  @keyframes shimmer-move {
+    0%   { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  .shimmer-bar {
+    background: linear-gradient(90deg,#d97706 30%,#fbbf24 50%,#d97706 70%) !important;
+    background-size: 300% 100% !important;
+    animation: shimmer-move 2s linear infinite !important;
+  }
 
-const OWNER_LABEL: Record<Owner, string> = {
-  backend: "Backend",
-  ios: "iOS",
-  either: "Either",
-};
+  @keyframes header-flash {
+    0%   { box-shadow: none; }
+    20%  { box-shadow: 0 0 0 3px #16a34a55; }
+    100% { box-shadow: none; }
+  }
+  .flash-anim { animation: header-flash 1.2s ease-out; }
 
-function statusColor(s: Status) {
-  if (s === "done") return "#16a34a";
-  if (s === "in-progress") return "#d97706";
-  return "#444";
-}
+  @keyframes live-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.25; }
+  }
+  .live-dot { animation: live-pulse 1.8s ease-in-out infinite; }
+`;
 
-function ownerColor(o: Owner) {
+function ownerColor(o: Owner | string) {
   if (o === "backend") return "#6366f1";
   if (o === "ios") return "#0ea5e9";
   return "#8b5cf6";
 }
 
-function Badge({ label, color }: { label: string; color: string }) {
+function OwnerBar({ label, owner, tasks }: { label: string; owner: Owner; tasks: Task[] }) {
+  const ownerTasks = tasks.filter((t) => t.owner === owner);
+  const done = ownerTasks.filter((t) => t.status === "done").length;
+  const pct = ownerTasks.length > 0 ? Math.round((done / ownerTasks.length) * 100) : 0;
+  const color = ownerColor(owner);
   return (
-    <span
-      style={{
-        background: color + "22",
-        color,
-        border: `1px solid ${color}44`,
-        borderRadius: 4,
-        padding: "1px 8px",
-        fontSize: 11,
-        fontWeight: 600,
-        letterSpacing: 0.3,
-        whiteSpace: "nowrap",
-      }}
-    >
-      {label}
-    </span>
-  );
-}
-
-function TaskCard({ task, allTasks }: { task: Task; allTasks: Task[] }) {
-  const blockers = task.blockedBy
-    .map((id) => allTasks.find((t) => t.id === id))
-    .filter(Boolean) as Task[];
-  const isBlocked = blockers.some((b) => b.status !== "done");
-
-  return (
-    <div
-      style={{
-        background: "#141414",
-        border: "1px solid #242424",
-        borderRadius: 8,
-        padding: "14px 16px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 8,
-        opacity: task.status === "done" ? 0.5 : 1,
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 10, justifyContent: "space-between" }}>
-        <span style={{ fontWeight: 500, lineHeight: 1.4, flex: 1 }}>{task.title}</span>
-        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-          <Badge label={STATUS_LABEL[task.status]} color={statusColor(task.status)} />
-          <Badge label={OWNER_LABEL[task.owner]} color={ownerColor(task.owner)} />
-        </div>
+    <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12 }}>
+      <span style={{ color: "#aaa", width: 56, flexShrink: 0 }}>{label}</span>
+      <div style={{ flex: 1, height: 6, background: "#242424", borderRadius: 3, maxWidth: 180, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 3, transition: "width 0.4s" }} />
       </div>
-
-      {task.notes && (
-        <p style={{ color: "#888", fontSize: 12, lineHeight: 1.5 }}>{task.notes}</p>
-      )}
-
-      {isBlocked && (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-          <span style={{ color: "#666", fontSize: 11 }}>Blocked by:</span>
-          {blockers
-            .filter((b) => b.status !== "done")
-            .map((b) => (
-              <span
-                key={b.id}
-                style={{
-                  background: "#ff444411",
-                  color: "#ff6b6b",
-                  border: "1px solid #ff444433",
-                  borderRadius: 4,
-                  padding: "1px 7px",
-                  fontSize: 11,
-                }}
-              >
-                {b.id}
-              </span>
-            ))}
-        </div>
-      )}
+      <span style={{ color, fontWeight: 700, width: 34 }}>{pct}%</span>
+      <span style={{ color: "#555" }}>({done}/{ownerTasks.length})</span>
     </div>
   );
 }
 
-function MilestoneGroup({ milestone, tasks, allTasks }: { milestone: string; tasks: Task[]; allTasks: Task[] }) {
-  const done = tasks.filter((t) => t.status === "done").length;
-  const pct = Math.round((done / tasks.length) * 100);
+export default function Dashboard() {
+  const [data, setData] = useState<TasksFile | null>(null);
+  const [fetchFailed, setFetchFailed] = useState(false);
+  const [countdown, setCountdown] = useState(POLL_INTERVAL);
+  const [flashKey, setFlashKey] = useState(0);
+  const [readyOpen, setReadyOpen] = useState(false);
 
-  return (
-    <div style={{ marginBottom: 40 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-        <h2 style={{ fontSize: 16, fontWeight: 700, color: "#e8e8e8" }}>{milestone}</h2>
-        <span style={{ color: "#666", fontSize: 12 }}>
-          {done}/{tasks.length} done
-        </span>
-        <div style={{ flex: 1, height: 3, background: "#242424", borderRadius: 2, maxWidth: 120 }}>
-          <div
-            style={{
-              height: "100%",
-              width: `${pct}%`,
-              background: pct === 100 ? "#16a34a" : "#d97706",
-              borderRadius: 2,
-              transition: "width 0.3s",
-            }}
-          />
-        </div>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {tasks.map((t) => (
-          <TaskCard key={t.id} task={t} allTasks={allTasks} />
-        ))}
-      </div>
-    </div>
-  );
-}
+  const fetchTasks = useCallback(async () => {
+    try {
+      const res = await fetch(`${GITHUB_RAW}?t=${Date.now()}`, { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json: TasksFile = await res.json();
+      setData(json);
+      setFetchFailed(false);
+      setFlashKey((k) => k + 1);
+      setCountdown(POLL_INTERVAL);
+    } catch {
+      setFetchFailed(true);
+    }
+  }, []);
 
-function DecisionsPanel({ decisions, tasks }: { decisions: Decision[]; tasks: Task[] }) {
-  const open = decisions.filter((d) => d.status === "open");
-  if (open.length === 0) return null;
+  useEffect(() => { fetchTasks(); }, [fetchTasks]);
 
-  return (
-    <div style={{ marginBottom: 40 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-        <span style={{ fontSize: 16 }}>⚠️</span>
-        <h2 style={{ fontSize: 16, fontWeight: 700, color: "#e8e8e8" }}>
-          Needs a decision
-        </h2>
-        <span style={{ color: "#666", fontSize: 12 }}>{open.length} open</span>
-      </div>
+  useEffect(() => {
+    const id = setInterval(fetchTasks, POLL_INTERVAL * 1000);
+    return () => clearInterval(id);
+  }, [fetchTasks]);
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {open.map((d) => {
-          const blockedTasks = d.blocks
-            .map((id) => tasks.find((t) => t.id === id))
-            .filter(Boolean) as Task[];
-          const accent = d.kind === "blocker" ? "#ff6b6b" : "#d97706";
+  useEffect(() => {
+    const id = setInterval(() => setCountdown((c) => (c > 0 ? c - 1 : 0)), 1000);
+    return () => clearInterval(id);
+  }, []);
 
-          return (
-            <div
-              key={d.id}
-              style={{
-                background: "#161310",
-                border: `1px solid ${accent}55`,
-                borderLeft: `3px solid ${accent}`,
-                borderRadius: 8,
-                padding: "14px 16px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
-                <span style={{ fontWeight: 600, lineHeight: 1.4 }}>{d.title}</span>
-                <span
-                  style={{
-                    background: accent + "22",
-                    color: accent,
-                    border: `1px solid ${accent}44`,
-                    borderRadius: 4,
-                    padding: "1px 8px",
-                    fontSize: 11,
-                    fontWeight: 600,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {d.needs === "joseph" ? "Joseph" : d.needs} to act
-                </span>
-              </div>
-
-              <p style={{ color: "#aaa", fontSize: 13, lineHeight: 1.5 }}>{d.detail}</p>
-
-              {d.recommendation && (
-                <p style={{ color: "#16a34a", fontSize: 12, lineHeight: 1.5 }}>
-                  <strong>Recommendation:</strong> {d.recommendation}
-                </p>
-              )}
-
-              {blockedTasks.length > 0 && (
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                  <span style={{ color: "#666", fontSize: 11 }}>Blocks {blockedTasks.length}:</span>
-                  {blockedTasks.slice(0, 6).map((t) => (
-                    <span
-                      key={t.id}
-                      style={{
-                        background: "#ff444411",
-                        color: "#ff6b6b",
-                        border: "1px solid #ff444433",
-                        borderRadius: 4,
-                        padding: "1px 7px",
-                        fontSize: 11,
-                      }}
-                    >
-                      {t.id}
-                    </span>
-                  ))}
-                  {blockedTasks.length > 6 && (
-                    <span style={{ color: "#666", fontSize: 11 }}>+{blockedTasks.length - 6} more</span>
-                  )}
-                </div>
-              )}
-
-              <div style={{ display: "flex", gap: 8, fontSize: 11, color: "#555" }}>
-                <span>raised by {d.raisedBy}</span>
-                <span>·</span>
-                <span>{d.kind}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-export default async function Dashboard() {
-  let data: TasksFile;
-  try {
-    data = await getTasks();
-  } catch {
+  if (!data && fetchFailed) {
     return (
       <main style={{ padding: 40, color: "#ff6b6b" }}>
-        Failed to load tasks.json from GitHub. Make sure the repo is public and tasks.json is on the main branch.
+        Failed to load tasks.json from GitHub. Make sure the repo is public and tasks.json is on main.
       </main>
     );
+  }
+  if (!data) {
+    return <main style={{ padding: 40, color: "#666" }}>Loading…</main>;
   }
 
   const { tasks, meta } = data;
@@ -257,79 +113,250 @@ export default async function Dashboard() {
   const total = tasks.length;
   const done = tasks.filter((t) => t.status === "done").length;
   const inProgress = tasks.filter((t) => t.status === "in-progress").length;
+  const todoCount = total - done - inProgress;
+  const donePct = total > 0 ? Math.round((done / total) * 100) : 0;
+  const inProgPct = total > 0 ? Math.round((inProgress / total) * 100) : 0;
 
-  // Group by milestone, preserving order
+  const blockedCount = tasks.filter(
+    (t) =>
+      t.status !== "done" &&
+      t.blockedBy.some((id) => {
+        const dep = tasks.find((x) => x.id === id);
+        return dep && dep.status !== "done";
+      })
+  ).length;
+
+  const readyTasks = tasks.filter(
+    (t) =>
+      t.status === "todo" &&
+      t.blockedBy.every((id) => {
+        const dep = tasks.find((x) => x.id === id);
+        return !dep || dep.status === "done";
+      })
+  );
+
+  const phases = ([0, 1, 2, 3] as const)
+    .map((p) => {
+      const pt = tasks.filter((t) => t.phase === p);
+      const pd = pt.filter((t) => t.status === "done").length;
+      return { phase: p, total: pt.length, done: pd };
+    })
+    .filter((p) => p.total > 0);
+
   const milestoneOrder = [...new Set(tasks.map((t) => t.milestone))];
   const byMilestone = milestoneOrder.map((m) => ({
     milestone: m,
     tasks: tasks.filter((t) => t.milestone === m),
   }));
 
-  return (
-    <main style={{ maxWidth: 860, margin: "0 auto", padding: "40px 24px" }}>
-      {/* Header */}
-      <div style={{ marginBottom: 40 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: -0.5, marginBottom: 4 }}>
-          Legacy
-        </h1>
-        <p style={{ color: "#666", fontSize: 13 }}>
-          Last updated: {meta.lastUpdated} · auto-refreshes every 30s
-        </p>
+  const readyByOwner: { owner: Owner; label: string }[] = [
+    { owner: "backend", label: "Backend" },
+    { owner: "ios", label: "iOS" },
+    { owner: "either", label: "Either" },
+  ];
 
-        {/* Summary row */}
-        <div style={{ display: "flex", gap: 24, marginTop: 24 }}>
+  return (
+    <>
+      <style>{ANIMATIONS}</style>
+      <main style={{ maxWidth: 860, margin: "0 auto", padding: "40px 24px" }}>
+
+        {/* ── Header ── */}
+        <div style={{ marginBottom: 32 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+            <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: -0.5 }}>Legacy</h1>
+            {/* Live / Stale indicator */}
+            <div style={{ display: "flex", alignItems: "center", gap: 5, marginLeft: 6 }}>
+              <span
+                className="live-dot"
+                style={{
+                  width: 7, height: 7, borderRadius: "50%",
+                  background: fetchFailed ? "#ff6b6b" : "#16a34a",
+                  display: "inline-block",
+                }}
+              />
+              <span style={{ fontSize: 11, color: fetchFailed ? "#ff6b6b" : "#16a34a", fontWeight: 600 }}>
+                {fetchFailed ? "Stale" : "Live"}
+              </span>
+            </div>
+          </div>
+          <p style={{ color: "#666", fontSize: 13 }}>
+            Last updated: {meta.lastUpdated} · ↻ Refreshing in {countdown}s…
+          </p>
+
+          {/* Stats block — flashes green on each successful refresh */}
+          <div
+            key={`flash-${flashKey}`}
+            className={flashKey > 0 ? "flash-anim" : ""}
+            style={{
+              display: "flex", gap: 28, marginTop: 20,
+              padding: "16px 20px", background: "#141414",
+              border: "1px solid #242424", borderRadius: 10,
+            }}
+          >
+            {[
+              { label: "Total",       value: total,      color: "#e8e8e8" },
+              { label: "Done",        value: done,       color: "#16a34a" },
+              { label: "In Progress", value: inProgress, color: "#d97706" },
+              { label: "Todo",        value: todoCount,  color: "#666"    },
+            ].map(({ label, value, color }) => (
+              <div key={label}>
+                <div style={{ fontSize: 28, fontWeight: 700, color }}>{value}</div>
+                <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>{label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Segmented progress bar */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14 }}>
+            <div
+              style={{
+                flex: 1, height: 6, background: "#242424", borderRadius: 3,
+                display: "flex", overflow: "hidden",
+              }}
+            >
+              <div style={{ height: "100%", width: `${donePct}%`, background: "#16a34a", transition: "width 0.5s" }} />
+              <div style={{ height: "100%", width: `${inProgPct}%`, background: "#d97706", transition: "width 0.5s" }} />
+            </div>
+            <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 700, whiteSpace: "nowrap" }}>
+              {donePct}% done
+            </span>
+          </div>
+
+          {/* Per-owner progress bars */}
+          <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 7 }}>
+            <OwnerBar label="Backend" owner="backend" tasks={tasks} />
+            <OwnerBar label="iOS"     owner="ios"     tasks={tasks} />
+          </div>
+
+          {/* Blocked task warning */}
+          {blockedCount > 0 && (
+            <div
+              style={{
+                marginTop: 12, display: "flex", alignItems: "center", gap: 7,
+                padding: "8px 12px", background: "#d9770611",
+                border: "1px solid #d9770633", borderRadius: 6,
+                fontSize: 12, color: "#d97706",
+              }}
+            >
+              <span>⚠</span>
+              <span>{blockedCount} task{blockedCount !== 1 ? "s" : ""} blocked by incomplete dependencies</span>
+            </div>
+          )}
+        </div>
+
+        {/* ── Phase swimlane ── */}
+        {phases.length > 0 && (
+          <div
+            style={{
+              display: "flex", gap: 10, marginBottom: 28,
+              padding: "14px 16px", background: "#141414",
+              border: "1px solid #242424", borderRadius: 8,
+            }}
+          >
+            {phases.map(({ phase, total: pt, done: pd }) => {
+              const pct = pt > 0 ? Math.round((pd / pt) * 100) : 0;
+              const isPhaseComplete = pct === 100;
+              return (
+                <div key={phase} style={{ flex: 1 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+                    <span style={{ fontSize: 11, color: "#888", fontWeight: 600 }}>Phase {phase}</span>
+                    <span style={{ fontSize: 11, color: isPhaseComplete ? "#16a34a" : "#555" }}>{pct}%</span>
+                  </div>
+                  <div style={{ height: 4, background: "#242424", borderRadius: 2, overflow: "hidden" }}>
+                    <div
+                      style={{
+                        height: "100%", width: `${pct}%`,
+                        background: isPhaseComplete ? "#16a34a" : "#6366f1",
+                        borderRadius: 2, transition: "width 0.5s",
+                      }}
+                    />
+                  </div>
+                  <div style={{ fontSize: 10, color: "#555", marginTop: 3 }}>{pd}/{pt}</div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── Legend ── */}
+        <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
           {[
-            { label: "Total", value: total, color: "#e8e8e8" },
-            { label: "Done", value: done, color: "#16a34a" },
-            { label: "In Progress", value: inProgress, color: "#d97706" },
-            { label: "Todo", value: total - done - inProgress, color: "#666" },
-          ].map(({ label, value, color }) => (
-            <div key={label}>
-              <div style={{ fontSize: 28, fontWeight: 700, color }}>{value}</div>
-              <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>{label}</div>
+            { label: "Backend (Claude)", color: "#6366f1" },
+            { label: "iOS (Cursor)",     color: "#0ea5e9" },
+            { label: "Either",           color: "#8b5cf6" },
+          ].map(({ label, color }) => (
+            <div key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
+              <span style={{ fontSize: 12, color: "#888" }}>{label}</span>
             </div>
           ))}
         </div>
 
-        {/* Overall progress bar */}
-        <div style={{ height: 4, background: "#242424", borderRadius: 2, marginTop: 20 }}>
-          <div
-            style={{
-              height: "100%",
-              width: `${Math.round((done / total) * 100)}%`,
-              background: "#16a34a",
-              borderRadius: 2,
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Legend */}
-      <div style={{ display: "flex", gap: 16, marginBottom: 32, flexWrap: "wrap" }}>
-        {[
-          { label: "Backend (Claude)", color: "#6366f1" },
-          { label: "iOS (Cursor)", color: "#0ea5e9" },
-          { label: "Either", color: "#8b5cf6" },
-        ].map(({ label, color }) => (
-          <div key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
-            <span style={{ fontSize: 12, color: "#888" }}>{label}</span>
+        {/* ── Ready to build ── */}
+        {readyTasks.length > 0 && (
+          <div style={{ marginBottom: 32 }}>
+            <button
+              onClick={() => setReadyOpen((o) => !o)}
+              style={{
+                display: "flex", alignItems: "center", gap: 8,
+                background: "#16a34a11", border: "1px solid #16a34a33",
+                borderRadius: 6, padding: "8px 14px", cursor: "pointer",
+                color: "#16a34a", fontSize: 13, fontWeight: 600,
+                width: "100%", textAlign: "left",
+              }}
+            >
+              <span>✓ Ready to build ({readyTasks.length} task{readyTasks.length !== 1 ? "s" : ""})</span>
+              <span style={{ marginLeft: "auto", fontSize: 10 }}>{readyOpen ? "▲" : "▼"}</span>
+            </button>
+            {readyOpen && (
+              <div style={{ marginTop: 12 }}>
+                {readyByOwner.map(({ owner, label }) => {
+                  const group = readyTasks.filter((t) => t.owner === owner);
+                  if (group.length === 0) return null;
+                  return (
+                    <div key={owner} style={{ marginBottom: 10 }}>
+                      <div style={{ fontSize: 11, color: "#666", fontWeight: 600, marginBottom: 5 }}>{label}</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {group.map((t) => (
+                          <span
+                            key={t.id}
+                            title={t.title}
+                            style={{
+                              background: "#141414", border: "1px solid #242424",
+                              borderRadius: 4, padding: "3px 10px",
+                              fontSize: 11, color: "#ccc",
+                              display: "flex", alignItems: "center", gap: 5,
+                              maxWidth: 240, overflow: "hidden", whiteSpace: "nowrap",
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: 6, height: 6, borderRadius: "50%",
+                                background: ownerColor(owner), flexShrink: 0, display: "inline-block",
+                              }}
+                            />
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {t.title.length > 38 ? t.title.slice(0, 38) + "…" : t.title}
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
+        )}
+
+        {/* ── Decisions / blockers ── */}
+        <DecisionsPanel decisions={decisions} tasks={tasks} />
+
+        {/* ── Milestones ── */}
+        {byMilestone.map(({ milestone, tasks: mt }) => (
+          <MilestoneGroup key={milestone} milestone={milestone} tasks={mt} allTasks={tasks} />
         ))}
-      </div>
-
-      {/* Decisions & blockers */}
-      <DecisionsPanel decisions={decisions} tasks={tasks} />
-
-      {/* Milestones */}
-      {byMilestone.map(({ milestone, tasks: milestoneTasks }) => (
-        <MilestoneGroup
-          key={milestone}
-          milestone={milestone}
-          tasks={milestoneTasks}
-          allTasks={tasks}
-        />
-      ))}
-    </main>
+      </main>
+    </>
   );
 }

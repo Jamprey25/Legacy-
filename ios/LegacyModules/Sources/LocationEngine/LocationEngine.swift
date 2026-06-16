@@ -123,6 +123,13 @@ public final class LocationEngine: NSObject, LocationEngineProtocol {
         )
     }
 
+    public func shouldScan(for fix: LocationFix, now: Date = Date()) -> Bool {
+        shouldScan(
+            for: CLLocation(latitude: fix.lat, longitude: fix.lng),
+            now: now
+        )
+    }
+
     /// Record that a scan was performed at this location (resets the movement gate).
     public func recordScan(at location: CLLocation, date: Date = Date()) {
         lastScanLocation = location
