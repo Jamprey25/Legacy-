@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-16T22:00:00Z"
+    "lastUpdated": "2026-06-16T22:15:00Z"
   },
   "decisions": [
     {
@@ -101,52 +101,52 @@
     {
       "id": "auth-apple-oauth",
       "title": "Auth: Apple Sign In — validate identity token, extract sub + email, create/fetch user",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 0,
       "milestone": "M0",
       "blockedBy": ["schema-users-sessions"],
-      "notes": "Verify JWT against Apple's public keys. Check aud matches bundle ID."
+      "notes": "Done: verifyAppleToken (JWKS RS256, iss+aud check) in src/lib/jwt.ts; user find-or-create in src/db/users.ts."
     },
     {
       "id": "auth-google-oauth",
       "title": "Auth: Google Sign In — validate ID token, extract sub + email, create/fetch user",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 0,
       "milestone": "M0",
       "blockedBy": ["schema-users-sessions"],
-      "notes": "Verify against Google's tokeninfo endpoint or public keys."
+      "notes": "Done: verifyGoogleToken (JWKS RS256, iss+aud check) in src/lib/jwt.ts."
     },
     {
       "id": "auth-email-otp",
       "title": "Auth: email OTP — generate 6-digit code, send via email, verify within 10min window",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 0,
       "milestone": "M0",
       "blockedBy": ["schema-users-sessions"],
-      "notes": "Rate-limit OTP sends per email. Code hashed at rest. Single-use."
+      "notes": "Done: src/db/otp.ts (sha-256 hashed, single-use, attempt-capped, 10min TTL) + src/lib/email.ts (Resend or dev console). Migration 0007_email_otp.sql. Send rate-limit still TODO (M5 rate-limiting task)."
     },
     {
       "id": "auth-age-gate",
       "title": "Auth: age gate — collect DOB at token exchange, reject under-13, flag 13-15 for parental consent path",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 0,
       "milestone": "M0",
       "blockedBy": ["auth-apple-oauth", "auth-google-oauth", "auth-email-otp"],
-      "notes": "DOB stored. Under-13: hard reject. 13-15: flag user record (parental consent flow Phase 2). Public content requires 16+."
+      "notes": "Done: src/lib/age.ts resolveAgeTier — under-13 throws 403 age_restricted (never created); 13-15 minor; 16+ adult. 8 unit tests in test/age.test.ts. Parental-consent flow for minors deferred to Phase 2."
     },
     {
       "id": "auth-session-tokens",
       "title": "Auth: session token issuance + validation middleware — JWT, expiry, clock-skew tolerance",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 0,
       "milestone": "M0",
       "blockedBy": ["auth-age-gate"],
-      "notes": "All endpoints require Authorization: Bearer <token>. X-Request-Timestamp within ±5min. Token stored in Keychain on iOS."
+      "notes": "Done: signSession/verifySession (HS256, ~30d) in src/lib/jwt.ts; requireAuth + clockSkew (±5min) middleware in src/middleware/auth.ts. Full auth routes in src/routes/auth.ts. typecheck + tests green."
     },
     {
       "id": "spm-scaffold",

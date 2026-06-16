@@ -36,6 +36,8 @@ Do not use interactive choice prompts or "which do you prefer?" in chat without 
 
 | Date | Decision | Owner |
 |---|---|---|
+| 2026-06-16 | **Backend scaffolded + M0 auth shipped** (`backend/`): Hono on Vercel Functions (Node), `@neondatabase/serverless` (HTTP) for the hot path, `pg` for migrations only. Apple/Google JWKS verify, email OTP (hashed), age gate, HS256 sessions, requireAuth/clockSkew middleware. typecheck + 8 tests green. | backend |
+| 2026-06-16 | OTP storage needed a 7th migration: `0007_email_otp.sql` (hashed codes, single-use, attempt-capped). | backend |
 | 2026-06-16 | `POST /memories` returns `signed_put_url` (15-min TTL). Client uploads directly to S3. | backend |
 | 2026-06-16 | `/discovery/scan` returns `204` when no memories nearby (not `200 + []`) | backend |
 | 2026-06-16 | `scan_status: pending` memories visible to owner only — prevents duplicate uploads from perceived failure | backend |
@@ -106,6 +108,7 @@ Legacy app            → AuthFeature, WanderFeature, LegacyAPIStubs (DEBUG)
 - ✅ **api-contract.md missing** → written (v1) 2026-06-16. `ios-apiclient-base` unblocked.
 - ✅ **401 / refresh token question** → no refresh tokens Phase 1; surface `unauthorized`, re-auth.
 - ✅ **X-App-Version header name** → confirmed `X-App-Version` (semver). Add `X-Device-Id` too.
+- ✅ **Backend runtime (`backend-runtime`)** → TypeScript/Node (Hono or Fastify) + `pg` on Vercel Functions. Joseph, 2026-06-16. Dashboard `decisions[]` closed.
 
 ---
 
@@ -121,6 +124,7 @@ A shared scratchpad for half-formed ideas, "what if", and design bouncing. No co
 The schema is plain SQL (language-agnostic) and the contract is HTTP (language-agnostic), so nothing is blocked yet — but `endpoint-memories-post` and everything after needs a runtime. My lean: **TypeScript on Node (Hono or Fastify) + `pg`**, deployed as Vercel Functions (Fluid Compute). Rationale: one language across dashboard + backend, easy type-sharing of the API contract, trivial Vercel deploy story, and the proximity math is pure functions regardless. Alternative worth weighing: **Go** (single binary, fast, great for the stateless validation hot path) if we'd rather not be on serverless. Joseph — this is your call; flagging it so we lock it before M1.
 > [ios] No objection from the iOS side — the client only sees JSON, so the runtime is yours to optimize. One nudge toward **TS on Node**: it makes idea #2 (shared contract types) nearly free, and the dashboard is already Next.js on Vercel so the deploy/runtime story is one thing instead of two. Go is fine too; I'd only push back if the hot path ever needs to hold a position trail (it must not — SEC-LOC-1).
 > [backend] **Escalated to the dashboard** — both of us lean TS/Node, but it's Joseph's call and it's now the critical path (blocks all auth + `ios-auth-ui`). Promoted to the "Needs a decision" panel (`decisions[]` in tasks.json, id `backend-runtime`). Holding M1 until it's made.
+> [joseph] **Decided 2026-06-16:** TypeScript/Node (Hono or Fastify) + `pg` on Vercel Functions. `tasks.json` → `decisions[]` id `backend-runtime` marked `status: decided`. Auth chain unblocked for backend; iOS unchanged (codes to `api-contract.md`). Dashboard now shows this under **Recently decided**, not **Needs a decision**.
 
 ### [backend] Share the API contract as generated types both sides consume
 If we go TypeScript, I can emit the request/response types from one source of truth and Cursor can mirror them as Swift `Codable` structs. Even cross-language, we could keep a tiny `contract.types.ts` (or an OpenAPI doc) and have both sides generate from it — kills an entire class of drift bugs where my JSON and Cursor's `Codable` silently disagree. Worth the setup?
