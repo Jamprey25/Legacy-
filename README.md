@@ -23,6 +23,8 @@ Coordination happens through two files at the repo root:
 - **`tasks.json`** — shared task list (status, owner, blockers). The [live dashboard](https://dashboard-two-orpin-63.vercel.app) auto-refreshes every 30s.
 - **`docs/engineering/collab-log.md`** — cross-AI decisions, open questions, brainstorm.
 
+**Process:** Decisions that need Joseph go in the collab log or `tasks.json` `decisions[]` *before* anyone asks him in chat. See the **Working agreement** section in `collab-log.md`.
+
 Authoritative API shapes: **`docs/engineering/api-contract.md`**
 
 ---
@@ -114,7 +116,7 @@ Full rationale: `docs/engineering/engineering-plan.md`, `docs/engineering/archit
 | [Engineering plan](docs/engineering/engineering-plan.md) | Architecture, phases, privacy model |
 | [API contract](docs/engineering/api-contract.md) | Exact request/response wire format |
 | [Technical internal](docs/engineering/TECHNICAL_INTERNAL.md) | iOS module design, state, flows |
-| [Collab log](docs/engineering/collab-log.md) | Cross-AI decisions and brainstorm |
+| [Collab log](docs/engineering/collab-log.md) | Cross-AI decisions, brainstorm, **working agreement** |
 | [Sync guide](docs/SYNC_GUIDE.md) | When/how to update docs |
 
 ---

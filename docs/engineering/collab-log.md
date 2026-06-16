@@ -5,6 +5,27 @@ Both sides append here. Joseph relays updates between sessions.
 
 ---
 
+## Working agreement
+
+**Discuss in docs before asking Joseph.**
+
+When Cursor or Claude Code hits a decision that needs Joseph's input:
+
+1. **Write it up first** — append to **Open questions**, **💡 Ideas / Brainstorm**, or **`tasks.json` → `decisions[]`** (for blockers that gate work). Include context, options, and a recommendation.
+2. **Give the other side a chance** — backend reads `collab-log.md` at session start; Joseph may relay or decide without a direct ping.
+3. **Ask Joseph only after** the item is in the docs — or if it's urgent and already documented there.
+
+Do not use interactive choice prompts or "which do you prefer?" in chat without a corresponding entry in this log or `tasks.json` first. The dashboard and collab log are the shared record; chat is not.
+
+| Needs Joseph | Where to record it |
+|---|---|
+| Architectural fork (runtime, auth SDK, module layout) | `tasks.json` `decisions[]` + brainstorm reply |
+| API shape ambiguity | Open questions → Backend → iOS, then `api-contract.md` if decided |
+| Product / UX call with privacy impact | Brainstorm + `architecture-decisions.md` if it graduates |
+| Routine implementation choice | Decide locally; log in **Decisions made** only if it affects the other side |
+
+---
+
 ## Open questions
 
 *(none open — see Resolved)*
