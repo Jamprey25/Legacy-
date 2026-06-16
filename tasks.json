@@ -1,8 +1,21 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-16T21:00:00Z"
+    "lastUpdated": "2026-06-16T21:30:00Z"
   },
+  "decisions": [
+    {
+      "id": "backend-runtime",
+      "kind": "decision",
+      "title": "Backend language / runtime",
+      "status": "open",
+      "raisedBy": "backend",
+      "needs": "joseph",
+      "detail": "All auth endpoints and everything downstream need a runtime before they can be built. Now the critical path: blocks all 4 M0 auth tasks and transitively ios-auth-ui (Cursor's next task).",
+      "recommendation": "TypeScript/Node (Hono or Fastify) + pg on Vercel Functions — one language across dashboard + backend, easy contract type-sharing, trivial deploy. Alternative: Go for a single fast binary off serverless.",
+      "blocks": ["auth-apple-oauth", "auth-google-oauth", "auth-email-otp", "auth-age-gate", "auth-session-tokens", "ios-auth-ui"]
+    }
+  ],
   "tasks": [
     {
       "id": "csam-vendor-apply",
@@ -377,7 +390,7 @@
     {
       "id": "ios-location-engine",
       "title": "iOS: LocationEngine module — CLLocationManager wrapper, foreground fix acquisition, accuracy reporting, movement gate (>25m or >30s)",
-      "status": "todo",
+      "status": "done",
       "owner": "ios",
       "phase": 1,
       "milestone": "M2",

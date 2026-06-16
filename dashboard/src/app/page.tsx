@@ -1,4 +1,4 @@
-import type { TasksFile, Task, Status, Owner } from "./types";
+import type { TasksFile, Task, Status, Owner, Decision } from "./types";
 
 const GITHUB_RAW =
   "https://raw.githubusercontent.com/Jamprey25/Legacy-/main/tasks.json";
@@ -142,6 +142,104 @@ function MilestoneGroup({ milestone, tasks, allTasks }: { milestone: string; tas
   );
 }
 
+function DecisionsPanel({ decisions, tasks }: { decisions: Decision[]; tasks: Task[] }) {
+  const open = decisions.filter((d) => d.status === "open");
+  if (open.length === 0) return null;
+
+  return (
+    <div style={{ marginBottom: 40 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+        <span style={{ fontSize: 16 }}>⚠️</span>
+        <h2 style={{ fontSize: 16, fontWeight: 700, color: "#e8e8e8" }}>
+          Needs a decision
+        </h2>
+        <span style={{ color: "#666", fontSize: 12 }}>{open.length} open</span>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {open.map((d) => {
+          const blockedTasks = d.blocks
+            .map((id) => tasks.find((t) => t.id === id))
+            .filter(Boolean) as Task[];
+          const accent = d.kind === "blocker" ? "#ff6b6b" : "#d97706";
+
+          return (
+            <div
+              key={d.id}
+              style={{
+                background: "#161310",
+                border: `1px solid ${accent}55`,
+                borderLeft: `3px solid ${accent}`,
+                borderRadius: 8,
+                padding: "14px 16px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                <span style={{ fontWeight: 600, lineHeight: 1.4 }}>{d.title}</span>
+                <span
+                  style={{
+                    background: accent + "22",
+                    color: accent,
+                    border: `1px solid ${accent}44`,
+                    borderRadius: 4,
+                    padding: "1px 8px",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {d.needs === "joseph" ? "Joseph" : d.needs} to act
+                </span>
+              </div>
+
+              <p style={{ color: "#aaa", fontSize: 13, lineHeight: 1.5 }}>{d.detail}</p>
+
+              {d.recommendation && (
+                <p style={{ color: "#16a34a", fontSize: 12, lineHeight: 1.5 }}>
+                  <strong>Recommendation:</strong> {d.recommendation}
+                </p>
+              )}
+
+              {blockedTasks.length > 0 && (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                  <span style={{ color: "#666", fontSize: 11 }}>Blocks {blockedTasks.length}:</span>
+                  {blockedTasks.slice(0, 6).map((t) => (
+                    <span
+                      key={t.id}
+                      style={{
+                        background: "#ff444411",
+                        color: "#ff6b6b",
+                        border: "1px solid #ff444433",
+                        borderRadius: 4,
+                        padding: "1px 7px",
+                        fontSize: 11,
+                      }}
+                    >
+                      {t.id}
+                    </span>
+                  ))}
+                  {blockedTasks.length > 6 && (
+                    <span style={{ color: "#666", fontSize: 11 }}>+{blockedTasks.length - 6} more</span>
+                  )}
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: 8, fontSize: 11, color: "#555" }}>
+                <span>raised by {d.raisedBy}</span>
+                <span>·</span>
+                <span>{d.kind}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default async function Dashboard() {
   let data: TasksFile;
   try {
@@ -155,6 +253,7 @@ export default async function Dashboard() {
   }
 
   const { tasks, meta } = data;
+  const decisions = data.decisions ?? [];
   const total = tasks.length;
   const done = tasks.filter((t) => t.status === "done").length;
   const inProgress = tasks.filter((t) => t.status === "in-progress").length;
@@ -218,6 +317,9 @@ export default async function Dashboard() {
           </div>
         ))}
       </div>
+
+      {/* Decisions & blockers */}
+      <DecisionsPanel decisions={decisions} tasks={tasks} />
 
       {/* Milestones */}
       {byMilestone.map(({ milestone, tasks: milestoneTasks }) => (

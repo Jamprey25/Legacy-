@@ -184,7 +184,7 @@ Submit current location; get teasers for eligible nearby memories. **Location is
 
 **Response `204`** — no eligible memories nearby. Empty body. (Decided: 204, not `200 + []`.)
 
-- Coordinates **never** appear in the response. `warmth` is the only proximity signal, and it is **non-directional** by contract — there is no bearing/heading/distance field. Do not add one.
+- Coordinates **never** appear in the response. `warmth` is the only proximity signal, and it is restricted to the **3 coarse bands** above — **never a continuous scalar** (no `warmth_level`, distance, bearing, or heading field). Rationale (resolved with iOS, collab-log Ideas): a responsive 0–1 distance proxy is a trilateration oracle — sampled from 2–3 spots it back-solves the pin with no proximity check, defeating DEC-15. The smooth gradient UX is achieved by the **client** easing animation *between* band transitions; the server only ever emits the 3 bands. Bands should be **debounced server-side** so boundary jitter can't be sampled as a fine signal. Do not add a finer field.
 - This call counts as **dwell check #1** for any memory it returns `in_range: true` for (see unlock).
 - `400 invalid_coordinates` on accuracy sanity failure.
 
