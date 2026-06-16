@@ -3,7 +3,9 @@ import PackageDescription
 
 let package = Package(
     name: "LegacyModules",
-    platforms: [.iOS(.v17)],
+    // iOS is the only shipping platform; macOS is declared solely so `swift build`
+    // can host-compile the non-UI modules in CI without full Xcode.
+    platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
         .library(name: "DesignSystem", targets: ["DesignSystem"]),
         .library(name: "APIClient", targets: ["APIClient"]),

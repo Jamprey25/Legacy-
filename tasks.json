@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-16T20:55:00Z"
+    "lastUpdated": "2026-06-16T21:00:00Z"
   },
   "tasks": [
     {
@@ -147,7 +147,7 @@
     {
       "id": "ios-design-system",
       "title": "iOS: DesignSystem module — typography, colors, spacing tokens, warmth gradient component, button styles",
-      "status": "todo",
+      "status": "done",
       "owner": "ios",
       "phase": 0,
       "milestone": "M0",
@@ -157,7 +157,7 @@
     {
       "id": "ios-apiclient-base",
       "title": "iOS: APIClient base — typed request builder, Authorization header injection, X-Request-Timestamp, error model, 401 surfacing",
-      "status": "todo",
+      "status": "done",
       "owner": "ios",
       "phase": 0,
       "milestone": "M0",
@@ -167,7 +167,7 @@
     {
       "id": "ios-keychain-session",
       "title": "iOS: Keychain session storage — store/read/delete session token securely (kSecAttrAccessibleAfterFirstUnlock)",
-      "status": "todo",
+      "status": "done",
       "owner": "ios",
       "phase": 0,
       "milestone": "M0",

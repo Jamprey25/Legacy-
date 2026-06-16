@@ -54,13 +54,17 @@ public final class LocationEngine: NSObject, LocationEngineProtocol {
     }
 
     public func requestWhenInUseAuthorization() {
+        #if os(iOS)
         manager.requestWhenInUseAuthorization()
+        #endif
     }
 
     public func acquireFix() async throws -> CLLocation {
+        #if os(iOS)
         guard authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways else {
             throw LocationEngineError.unauthorized
         }
+        #endif
 
         return try await withCheckedThrowingContinuation { continuation in
             fixContinuation = continuation

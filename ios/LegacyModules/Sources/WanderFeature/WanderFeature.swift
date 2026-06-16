@@ -36,7 +36,7 @@ public struct WanderFeatureRootView: View {
 
     public var body: some View {
         ZStack {
-            LegacyColors.background
+            LegacyColor.background
                 .ignoresSafeArea()
 
             ContentUnavailableView(
