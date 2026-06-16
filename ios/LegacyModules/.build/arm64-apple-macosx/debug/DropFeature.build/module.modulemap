@@ -1,0 +1,4 @@
+module DropFeature {
+    header "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DropFeature.build/DropFeature-Swift.h"
+    requires objc
+}

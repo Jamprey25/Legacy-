@@ -1,0 +1,14 @@
+{
+  "id": "session-1781544579423",
+  "startedAt": "2026-06-15T17:29:39.423Z",
+  "cwd": "/Users/josephamprey/Desktop/coding projects/Legacy",
+  "context": {},
+  "metrics": {
+    "edits": 9,
+    "commands": 0,
+    "tasks": 0,
+    "errors": 0
+  },
+  "endedAt": "2026-06-16T15:19:08.276Z",
+  "duration": 78568861
+}

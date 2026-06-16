@@ -1,0 +1,4 @@
+module MemoryLaneFeature {
+    header "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/MemoryLaneFeature.build/MemoryLaneFeature-Swift.h"
+    requires objc
+}

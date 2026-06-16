@@ -1,0 +1,4 @@
+module WanderFeature {
+    header "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/WanderFeature.build/WanderFeature-Swift.h"
+    requires objc
+}

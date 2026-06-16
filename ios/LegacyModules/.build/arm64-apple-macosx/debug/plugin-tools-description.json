@@ -1,0 +1,1771 @@
+{
+  "builtTestProducts" : [
+    {
+      "binaryPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LegacyModulesPackageTests.xctest/Contents/MacOS/LegacyModulesPackageTests",
+      "packagePath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules",
+      "productName" : "LegacyModulesPackageTests"
+    }
+  ],
+  "copyCommands" : {
+
+  },
+  "explicitTargetDependencyImportCheckingMode" : {
+    "none" : {
+
+    }
+  },
+  "generatedSourceTargetSet" : [
+
+  ],
+  "pluginDescriptions" : [
+
+  ],
+  "swiftCommands" : {
+    "C.APIClient-arm64-apple-macosx15.0-debug.module" : {
+      "executable" : "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "fileList" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/APIClient.build/sources",
+      "importPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/APIClient/APIClient.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/APIClient/KeychainSessionStore.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/APIClient.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "APIClient",
+      "moduleOutputPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/APIClient.swiftmodule",
+      "objects" : [
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/APIClient.build/APIClient.swift.o",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/APIClient.build/KeychainSessionStore.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-enable-batch-mode",
+        "-index-store-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-module-cache-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/APIClient.build/APIClient-Swift.h",
+        "-swift-version",
+        "5",
+        "-F",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-sdk",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "legacymodules"
+      ],
+      "outputFileMapPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/APIClient.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/APIClient.build/APIClient.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/APIClient.build/KeychainSessionStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/APIClient.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/APIClient/APIClient.swift",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/APIClient/KeychainSessionStore.swift"
+      ],
+      "tempsPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/APIClient.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.APIClientTests-arm64-apple-macosx15.0-debug.module" : {
+      "executable" : "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "fileList" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/APIClientTests.build/sources",
+      "importPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Tests/APIClientTests/APIClientTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/APIClient.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/APIClientTests.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "APIClientTests",
+      "moduleOutputPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/APIClientTests.swiftmodule",
+      "objects" : [
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/APIClientTests.build/APIClientTests.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-enable-batch-mode",
+        "-index-store-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-Xfrontend",
+        "-enable-cross-import-overlays",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-module-cache-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-swift-version",
+        "5",
+        "-F",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-sdk",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "legacymodules"
+      ],
+      "outputFileMapPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/APIClientTests.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/APIClientTests.build/APIClientTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/APIClientTests.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Tests/APIClientTests/APIClientTests.swift"
+      ],
+      "tempsPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/APIClientTests.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.DesignSystem-arm64-apple-macosx15.0-debug.module" : {
+      "executable" : "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "fileList" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystem.build/sources",
+      "importPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/DesignSystem/DesignSystem.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystem.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "DesignSystem",
+      "moduleOutputPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/DesignSystem.swiftmodule",
+      "objects" : [
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystem.build/DesignSystem.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-enable-batch-mode",
+        "-index-store-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-module-cache-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystem.build/DesignSystem-Swift.h",
+        "-swift-version",
+        "5",
+        "-F",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-sdk",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "legacymodules"
+      ],
+      "outputFileMapPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystem.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystem.build/DesignSystem.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/DesignSystem.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/DesignSystem/DesignSystem.swift"
+      ],
+      "tempsPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystem.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.DesignSystemTests-arm64-apple-macosx15.0-debug.module" : {
+      "executable" : "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "fileList" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystemTests.build/sources",
+      "importPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Tests/DesignSystemTests/DesignSystemTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/DesignSystem.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystemTests.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "DesignSystemTests",
+      "moduleOutputPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/DesignSystemTests.swiftmodule",
+      "objects" : [
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystemTests.build/DesignSystemTests.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-enable-batch-mode",
+        "-index-store-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-Xfrontend",
+        "-enable-cross-import-overlays",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-module-cache-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-swift-version",
+        "5",
+        "-F",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-sdk",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "legacymodules"
+      ],
+      "outputFileMapPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystemTests.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystemTests.build/DesignSystemTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/DesignSystemTests.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Tests/DesignSystemTests/DesignSystemTests.swift"
+      ],
+      "tempsPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystemTests.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.DropFeature-arm64-apple-macosx15.0-debug.module" : {
+      "executable" : "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "fileList" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DropFeature.build/sources",
+      "importPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/DropFeature/DropFeature.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/DesignSystem.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/APIClient.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/LocationEngine.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DropFeature.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "DropFeature",
+      "moduleOutputPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/DropFeature.swiftmodule",
+      "objects" : [
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DropFeature.build/DropFeature.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-enable-batch-mode",
+        "-index-store-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-module-cache-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DropFeature.build/DropFeature-Swift.h",
+        "-swift-version",
+        "5",
+        "-F",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-sdk",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "legacymodules"
+      ],
+      "outputFileMapPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DropFeature.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DropFeature.build/DropFeature.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/DropFeature.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/DropFeature/DropFeature.swift"
+      ],
+      "tempsPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DropFeature.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.ImportFeature-arm64-apple-macosx15.0-debug.module" : {
+      "executable" : "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "fileList" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ImportFeature.build/sources",
+      "importPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/ImportFeature/ImportFeature.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/DesignSystem.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/APIClient.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/LocationEngine.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ImportFeature.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "ImportFeature",
+      "moduleOutputPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/ImportFeature.swiftmodule",
+      "objects" : [
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ImportFeature.build/ImportFeature.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-enable-batch-mode",
+        "-index-store-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-module-cache-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ImportFeature.build/ImportFeature-Swift.h",
+        "-swift-version",
+        "5",
+        "-F",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-sdk",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "legacymodules"
+      ],
+      "outputFileMapPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ImportFeature.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ImportFeature.build/ImportFeature.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/ImportFeature.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/ImportFeature/ImportFeature.swift"
+      ],
+      "tempsPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ImportFeature.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.LegacyModulesPackageTests-arm64-apple-macosx15.0-debug.module" : {
+      "executable" : "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "fileList" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LegacyModulesPackageTests.build/sources",
+      "importPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LegacyModulesPackageTests.derived/runner.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/LocationEngineTests.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/DesignSystemTests.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/APIClientTests.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LegacyModulesPackageTests.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "LegacyModulesPackageTests",
+      "moduleOutputPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/LegacyModulesPackageTests.swiftmodule",
+      "objects" : [
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LegacyModulesPackageTests.build/runner.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-enable-batch-mode",
+        "-index-store-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-Xfrontend",
+        "-enable-cross-import-overlays",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-module-cache-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LegacyModulesPackageTests.build/LegacyModulesPackageTests-Swift.h",
+        "-F",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-sdk",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "legacymodules"
+      ],
+      "outputFileMapPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LegacyModulesPackageTests.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LegacyModulesPackageTests.build/runner.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/LegacyModulesPackageTests.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LegacyModulesPackageTests.derived/runner.swift"
+      ],
+      "tempsPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LegacyModulesPackageTests.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.LocationEngine-arm64-apple-macosx15.0-debug.module" : {
+      "executable" : "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "fileList" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngine.build/sources",
+      "importPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/LocationEngine/LocationEngine.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngine.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "LocationEngine",
+      "moduleOutputPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/LocationEngine.swiftmodule",
+      "objects" : [
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngine.build/LocationEngine.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-enable-batch-mode",
+        "-index-store-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-module-cache-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngine.build/LocationEngine-Swift.h",
+        "-swift-version",
+        "5",
+        "-F",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-sdk",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "legacymodules"
+      ],
+      "outputFileMapPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngine.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngine.build/LocationEngine.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/LocationEngine.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/LocationEngine/LocationEngine.swift"
+      ],
+      "tempsPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngine.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.LocationEngineTests-arm64-apple-macosx15.0-debug.module" : {
+      "executable" : "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "fileList" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngineTests.build/sources",
+      "importPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Tests/LocationEngineTests/LocationEngineTests.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/LocationEngine.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngineTests.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "LocationEngineTests",
+      "moduleOutputPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/LocationEngineTests.swiftmodule",
+      "objects" : [
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngineTests.build/LocationEngineTests.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-enable-batch-mode",
+        "-index-store-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-Xfrontend",
+        "-enable-cross-import-overlays",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-module-cache-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-swift-version",
+        "5",
+        "-F",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-sdk",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "legacymodules"
+      ],
+      "outputFileMapPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngineTests.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngineTests.build/LocationEngineTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/LocationEngineTests.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Tests/LocationEngineTests/LocationEngineTests.swift"
+      ],
+      "tempsPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngineTests.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.MemoryLaneFeature-arm64-apple-macosx15.0-debug.module" : {
+      "executable" : "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "fileList" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/MemoryLaneFeature.build/sources",
+      "importPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/MemoryLaneFeature/MemoryLaneFeature.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/DesignSystem.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/APIClient.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/MemoryLaneFeature.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "MemoryLaneFeature",
+      "moduleOutputPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/MemoryLaneFeature.swiftmodule",
+      "objects" : [
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/MemoryLaneFeature.build/MemoryLaneFeature.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-enable-batch-mode",
+        "-index-store-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-module-cache-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/MemoryLaneFeature.build/MemoryLaneFeature-Swift.h",
+        "-swift-version",
+        "5",
+        "-F",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-sdk",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "legacymodules"
+      ],
+      "outputFileMapPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/MemoryLaneFeature.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/MemoryLaneFeature.build/MemoryLaneFeature.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/MemoryLaneFeature.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/MemoryLaneFeature/MemoryLaneFeature.swift"
+      ],
+      "tempsPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/MemoryLaneFeature.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.WanderFeature-arm64-apple-macosx15.0-debug.module" : {
+      "executable" : "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "fileList" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/WanderFeature.build/sources",
+      "importPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/WanderFeature/WanderFeature.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/DesignSystem.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/APIClient.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/LocationEngine.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/WanderFeature.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "WanderFeature",
+      "moduleOutputPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/WanderFeature.swiftmodule",
+      "objects" : [
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/WanderFeature.build/WanderFeature.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-enable-batch-mode",
+        "-index-store-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-module-cache-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/WanderFeature.build/WanderFeature-Swift.h",
+        "-swift-version",
+        "5",
+        "-F",
+        "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+        "-sdk",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "legacymodules"
+      ],
+      "outputFileMapPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/WanderFeature.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/WanderFeature.build/WanderFeature.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules/WanderFeature.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/WanderFeature/WanderFeature.swift"
+      ],
+      "tempsPath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/WanderFeature.build",
+      "wholeModuleOptimization" : false
+    }
+  },
+  "swiftFrontendCommands" : {
+
+  },
+  "swiftTargetScanArgs" : {
+    "APIClient" : [
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "-module-name",
+      "APIClient",
+      "-package-name",
+      "legacymodules",
+      "-incremental",
+      "-c",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/APIClient/APIClient.swift",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/APIClient/KeychainSessionStore.swift",
+      "-I",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-enable-batch-mode",
+      "-index-store-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-module-cache-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/APIClient.build/APIClient-Swift.h",
+      "-swift-version",
+      "5",
+      "-F",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-sdk",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "legacymodules",
+      "-driver-use-frontend-path",
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+    ],
+    "APIClientTests" : [
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "-module-name",
+      "APIClientTests",
+      "-package-name",
+      "legacymodules",
+      "-incremental",
+      "-c",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Tests/APIClientTests/APIClientTests.swift",
+      "-I",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-enable-batch-mode",
+      "-index-store-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-Xfrontend",
+      "-enable-cross-import-overlays",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-module-cache-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-swift-version",
+      "5",
+      "-F",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-sdk",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "legacymodules",
+      "-driver-use-frontend-path",
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+    ],
+    "DesignSystem" : [
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "-module-name",
+      "DesignSystem",
+      "-package-name",
+      "legacymodules",
+      "-incremental",
+      "-c",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/DesignSystem/DesignSystem.swift",
+      "-I",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-enable-batch-mode",
+      "-index-store-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-module-cache-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystem.build/DesignSystem-Swift.h",
+      "-swift-version",
+      "5",
+      "-F",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-sdk",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "legacymodules",
+      "-driver-use-frontend-path",
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+    ],
+    "DesignSystemTests" : [
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "-module-name",
+      "DesignSystemTests",
+      "-package-name",
+      "legacymodules",
+      "-incremental",
+      "-c",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Tests/DesignSystemTests/DesignSystemTests.swift",
+      "-I",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-enable-batch-mode",
+      "-index-store-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-Xfrontend",
+      "-enable-cross-import-overlays",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-module-cache-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-swift-version",
+      "5",
+      "-F",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-sdk",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "legacymodules",
+      "-driver-use-frontend-path",
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+    ],
+    "DropFeature" : [
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "-module-name",
+      "DropFeature",
+      "-package-name",
+      "legacymodules",
+      "-incremental",
+      "-c",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/DropFeature/DropFeature.swift",
+      "-I",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-enable-batch-mode",
+      "-index-store-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-module-cache-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DropFeature.build/DropFeature-Swift.h",
+      "-swift-version",
+      "5",
+      "-F",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-sdk",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "legacymodules",
+      "-driver-use-frontend-path",
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+    ],
+    "ImportFeature" : [
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "-module-name",
+      "ImportFeature",
+      "-package-name",
+      "legacymodules",
+      "-incremental",
+      "-c",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/ImportFeature/ImportFeature.swift",
+      "-I",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-enable-batch-mode",
+      "-index-store-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-module-cache-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ImportFeature.build/ImportFeature-Swift.h",
+      "-swift-version",
+      "5",
+      "-F",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-sdk",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "legacymodules",
+      "-driver-use-frontend-path",
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+    ],
+    "LegacyModulesPackageTests" : [
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "-module-name",
+      "LegacyModulesPackageTests",
+      "-package-name",
+      "legacymodules",
+      "-incremental",
+      "-c",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LegacyModulesPackageTests.derived/runner.swift",
+      "-I",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-enable-batch-mode",
+      "-index-store-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-Xfrontend",
+      "-enable-cross-import-overlays",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-module-cache-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LegacyModulesPackageTests.build/LegacyModulesPackageTests-Swift.h",
+      "-F",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-sdk",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "legacymodules",
+      "-driver-use-frontend-path",
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+    ],
+    "LocationEngine" : [
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "-module-name",
+      "LocationEngine",
+      "-package-name",
+      "legacymodules",
+      "-incremental",
+      "-c",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/LocationEngine/LocationEngine.swift",
+      "-I",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-enable-batch-mode",
+      "-index-store-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-module-cache-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngine.build/LocationEngine-Swift.h",
+      "-swift-version",
+      "5",
+      "-F",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-sdk",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "legacymodules",
+      "-driver-use-frontend-path",
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+    ],
+    "LocationEngineTests" : [
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "-module-name",
+      "LocationEngineTests",
+      "-package-name",
+      "legacymodules",
+      "-incremental",
+      "-c",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Tests/LocationEngineTests/LocationEngineTests.swift",
+      "-I",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-enable-batch-mode",
+      "-index-store-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-Xfrontend",
+      "-enable-cross-import-overlays",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-module-cache-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-swift-version",
+      "5",
+      "-F",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-sdk",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "legacymodules",
+      "-driver-use-frontend-path",
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+    ],
+    "MemoryLaneFeature" : [
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "-module-name",
+      "MemoryLaneFeature",
+      "-package-name",
+      "legacymodules",
+      "-incremental",
+      "-c",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/MemoryLaneFeature/MemoryLaneFeature.swift",
+      "-I",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-enable-batch-mode",
+      "-index-store-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-module-cache-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/MemoryLaneFeature.build/MemoryLaneFeature-Swift.h",
+      "-swift-version",
+      "5",
+      "-F",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-sdk",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "legacymodules",
+      "-driver-use-frontend-path",
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+    ],
+    "WanderFeature" : [
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc",
+      "-module-name",
+      "WanderFeature",
+      "-package-name",
+      "legacymodules",
+      "-incremental",
+      "-c",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/WanderFeature/WanderFeature.swift",
+      "-I",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-enable-batch-mode",
+      "-index-store-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-module-cache-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/WanderFeature.build/WanderFeature-Swift.h",
+      "-swift-version",
+      "5",
+      "-F",
+      "/Library/Developer/CommandLineTools/Library/Developer/Frameworks",
+      "-sdk",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "legacymodules",
+      "-driver-use-frontend-path",
+      "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+    ]
+  },
+  "targetDependencyMap" : {
+    "APIClient" : [
+
+    ],
+    "APIClientTests" : [
+      "APIClient"
+    ],
+    "DesignSystem" : [
+
+    ],
+    "DesignSystemTests" : [
+      "DesignSystem"
+    ],
+    "DropFeature" : [
+      "LocationEngine",
+      "APIClient",
+      "DesignSystem"
+    ],
+    "ImportFeature" : [
+      "LocationEngine",
+      "APIClient",
+      "DesignSystem"
+    ],
+    "LegacyModulesPackageTests" : [
+      "APIClientTests",
+      "APIClient",
+      "DesignSystemTests",
+      "DesignSystem",
+      "LocationEngineTests",
+      "LocationEngine"
+    ],
+    "LocationEngine" : [
+
+    ],
+    "LocationEngineTests" : [
+      "LocationEngine"
+    ],
+    "MemoryLaneFeature" : [
+      "APIClient",
+      "DesignSystem"
+    ],
+    "WanderFeature" : [
+      "LocationEngine",
+      "APIClient",
+      "DesignSystem"
+    ]
+  },
+  "testDiscoveryCommands" : {
+
+  },
+  "testEntryPointCommands" : {
+    "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LegacyModulesPackageTests.derived/runner.swift" : {
+      "inputs" : [
+
+      ],
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LegacyModulesPackageTests.derived/runner.swift"
+        }
+      ]
+    }
+  },
+  "traitConfiguration" : {
+    "enableAllTraits" : false
+  },
+  "writeCommands" : {
+    "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/APIClient.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/APIClient/APIClient.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/APIClient/KeychainSessionStore.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/APIClient.build/sources"
+    },
+    "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/APIClientTests.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Tests/APIClientTests/APIClientTests.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/APIClientTests.build/sources"
+    },
+    "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystem.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/DesignSystem/DesignSystem.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystem.build/sources"
+    },
+    "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystemTests.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Tests/DesignSystemTests/DesignSystemTests.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystemTests.build/sources"
+    },
+    "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DropFeature.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/DropFeature/DropFeature.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DropFeature.build/sources"
+    },
+    "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ImportFeature.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/ImportFeature/ImportFeature.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/ImportFeature.build/sources"
+    },
+    "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LegacyModulesPackageTests.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LegacyModulesPackageTests.derived/runner.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LegacyModulesPackageTests.build/sources"
+    },
+    "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LegacyModulesPackageTests.product/Objects.LinkFileList" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<link-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/APIClient.build/APIClient.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/APIClient.build/KeychainSessionStore.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/APIClientTests.build/APIClientTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystem.build/DesignSystem.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystemTests.build/DesignSystemTests.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LegacyModulesPackageTests.build/runner.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngine.build/LocationEngine.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngineTests.build/LocationEngineTests.swift.o"
+        }
+      ],
+      "outputFilePath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LegacyModulesPackageTests.product/Objects.LinkFileList"
+    },
+    "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngine.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/LocationEngine/LocationEngine.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngine.build/sources"
+    },
+    "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngineTests.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Tests/LocationEngineTests/LocationEngineTests.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngineTests.build/sources"
+    },
+    "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/MemoryLaneFeature.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/MemoryLaneFeature/MemoryLaneFeature.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/MemoryLaneFeature.build/sources"
+    },
+    "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/WanderFeature.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/WanderFeature/WanderFeature.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/WanderFeature.build/sources"
+    },
+    "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt" : {
+      "alwaysOutOfDate" : true,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<swift-get-version>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Library/Developer/CommandLineTools/usr/bin/swiftc"
+        }
+      ],
+      "outputFilePath" : "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+    }
+  }
+}

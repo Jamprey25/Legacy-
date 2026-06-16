@@ -1,0 +1,11 @@
+{
+  "": {
+    "swift-dependencies": "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystem.build/master.swiftdeps"
+  },
+  "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Sources/DesignSystem/DesignSystem.swift": {
+    "dependencies": "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystem.build/DesignSystem.d",
+    "object": "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystem.build/DesignSystem.swift.o",
+    "swiftmodule": "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystem.build/DesignSystem~partial.swiftmodule",
+    "swift-dependencies": "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystem.build/DesignSystem.swiftdeps"
+  }
+}

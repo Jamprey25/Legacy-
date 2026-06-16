@@ -1,0 +1,11 @@
+{
+  "": {
+    "swift-dependencies": "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngineTests.build/master.swiftdeps"
+  },
+  "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/Tests/LocationEngineTests/LocationEngineTests.swift": {
+    "dependencies": "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngineTests.build/LocationEngineTests.d",
+    "object": "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngineTests.build/LocationEngineTests.swift.o",
+    "swiftmodule": "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngineTests.build/LocationEngineTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngineTests.build/LocationEngineTests.swiftdeps"
+  }
+}

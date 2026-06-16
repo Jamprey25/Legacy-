@@ -1,0 +1,4 @@
+module LocationEngine {
+    header "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LocationEngine.build/LocationEngine-Swift.h"
+    requires objc
+}

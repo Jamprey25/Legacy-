@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-16"
+    "lastUpdated": "2026-06-16T20:55:00Z"
   },
   "tasks": [
     {
@@ -17,7 +17,7 @@
     {
       "id": "api-contract-doc",
       "title": "Write API contract doc — all endpoints, exact request/response shapes, error codes, headers",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 0,
       "milestone": "M0",
@@ -37,7 +37,7 @@
     {
       "id": "schema-users-sessions",
       "title": "DB schema: users + sessions tables — id, dob, created_at, device_id, session_token, expires_at",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 0,
       "milestone": "M0",
@@ -47,7 +47,7 @@
     {
       "id": "schema-memories",
       "title": "DB schema: memories table — id, owner_id, lat, lng, geohash, source, scan_status, discoverable_after, privacy_tier, media_type, created_at",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 0,
       "milestone": "M0",
@@ -57,7 +57,7 @@
     {
       "id": "schema-seals-conditions",
       "title": "DB schema: seals + conditions tables with DB constraint: condition_time_fallback NOT NULL when condition_type set",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 0,
       "milestone": "M0",
@@ -67,7 +67,7 @@
     {
       "id": "schema-finds-pings",
       "title": "DB schema: finds table (memory_id, user_id, found_at) + presence_pings UNLOGGED table (memory_id, user_id, last_seen_at)",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 0,
       "milestone": "M0",
@@ -77,7 +77,7 @@
     {
       "id": "schema-audit-log",
       "title": "DB schema: audit_log table — event, actor_id, request_id, metadata (jsonb), created_at. No lat/lng ever.",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 0,
       "milestone": "M0",
@@ -137,11 +137,11 @@
     {
       "id": "spm-scaffold",
       "title": "iOS: SPM module scaffold — LocationEngine, APIClient, DropFeature, WanderFeature, MemoryLaneFeature, ImportFeature, DesignSystem as local packages",
-      "status": "todo",
+      "status": "done",
       "owner": "ios",
       "phase": 0,
       "milestone": "M0",
-      "blockedBy": ["api-contract-doc"],
+      "blockedBy": [],
       "notes": "Empty shells with correct public interfaces. No TCA. @Observable MVVM throughout. Min iOS 17."
     },
     {
