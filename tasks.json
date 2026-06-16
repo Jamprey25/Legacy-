@@ -1,0 +1,328 @@
+{
+  "meta": {
+    "project": "Legacy",
+    "lastUpdated": "2026-06-16"
+  },
+  "tasks": [
+    {
+      "id": "csam-vendor-apply",
+      "title": "Apply to CSAM scanning vendor (PhotoDNA/Thorn/Hive)",
+      "status": "done",
+      "owner": "either",
+      "phase": 0,
+      "milestone": "M0",
+      "blockedBy": [],
+      "notes": "PhotoDNA application submitted 2026-06-16"
+    },
+    {
+      "id": "api-contract-doc",
+      "title": "Write API contract doc (endpoints, request/response shapes, error codes)",
+      "status": "todo",
+      "owner": "backend",
+      "phase": 0,
+      "milestone": "M0",
+      "blockedBy": [],
+      "notes": ""
+    },
+    {
+      "id": "collab-log",
+      "title": "Create collab-log.md for cross-AI communication",
+      "status": "done",
+      "owner": "backend",
+      "phase": 0,
+      "milestone": "M0",
+      "blockedBy": [],
+      "notes": ""
+    },
+    {
+      "id": "task-dashboard",
+      "title": "Build and deploy task dashboard to Vercel",
+      "status": "in-progress",
+      "owner": "backend",
+      "phase": 0,
+      "milestone": "M0",
+      "blockedBy": [],
+      "notes": ""
+    },
+    {
+      "id": "postgres-schema",
+      "title": "PostgreSQL schema + migrations (users, memories, presence_pings, seals)",
+      "status": "todo",
+      "owner": "backend",
+      "phase": 0,
+      "milestone": "M0",
+      "blockedBy": ["api-contract-doc"],
+      "notes": "CI gate: no migration may add coordinates to event logs"
+    },
+    {
+      "id": "auth-endpoint",
+      "title": "Auth endpoint — Apple/Google OAuth + email OTP + age gate",
+      "status": "todo",
+      "owner": "backend",
+      "phase": 0,
+      "milestone": "M0",
+      "blockedBy": ["postgres-schema"],
+      "notes": "Under-13 rejected at token exchange. DOB stored at signup."
+    },
+    {
+      "id": "spm-scaffold",
+      "title": "SPM module scaffold (LocationEngine, APIClient, DropFeature, WanderFeature, MemoryLaneFeature, ImportFeature, DesignSystem)",
+      "status": "todo",
+      "owner": "ios",
+      "phase": 0,
+      "milestone": "M0",
+      "blockedBy": ["api-contract-doc"],
+      "notes": "Empty shells with correct module boundaries. No TCA."
+    },
+    {
+      "id": "ios-auth-flow",
+      "title": "iOS auth flow — Apple/Google sign-in + email OTP UI + DOB gate screen",
+      "status": "todo",
+      "owner": "ios",
+      "phase": 0,
+      "milestone": "M0",
+      "blockedBy": ["auth-endpoint", "spm-scaffold"],
+      "notes": ""
+    },
+    {
+      "id": "memories-endpoint",
+      "title": "POST /memories — create memory record + return signed PUT URL",
+      "status": "todo",
+      "owner": "backend",
+      "phase": 1,
+      "milestone": "M1",
+      "blockedBy": ["postgres-schema"],
+      "notes": "Returns memory_id + signed_put_url. scan_status: pending on creation."
+    },
+    {
+      "id": "csam-pipeline-stub",
+      "title": "CSAM pipeline stub — storage webhook that flips scan_status to clear",
+      "status": "todo",
+      "owner": "backend",
+      "phase": 1,
+      "milestone": "M1",
+      "blockedBy": ["memories-endpoint"],
+      "notes": "Stub returns clear immediately in dev. Swap for real vendor on approval."
+    },
+    {
+      "id": "v1-pin-drop-ios",
+      "title": "V1 Pin drop (iOS) — camera/gallery → strip EXIF → POST /memories → background upload",
+      "status": "todo",
+      "owner": "ios",
+      "phase": 1,
+      "milestone": "M1",
+      "blockedBy": ["memories-endpoint", "spm-scaffold"],
+      "notes": "Validates full write path. Simplest drop method."
+    },
+    {
+      "id": "scan-endpoint",
+      "title": "POST /discovery/scan — geohash query, asymmetric bubble math, return teasers",
+      "status": "todo",
+      "owner": "backend",
+      "phase": 1,
+      "milestone": "M2",
+      "blockedBy": ["memories-endpoint"],
+      "notes": "No coordinates in response. 204 when nothing nearby. Location discarded immediately."
+    },
+    {
+      "id": "unlock-endpoint",
+      "title": "POST /memories/{id}/unlock — two-check dwell, proximity re-validate, return signed GET URLs",
+      "status": "todo",
+      "owner": "backend",
+      "phase": 1,
+      "milestone": "M2",
+      "blockedBy": ["scan-endpoint"],
+      "notes": "Requires two passing proximity checks ≥20s apart. Silent rejection if accuracy > 50m."
+    },
+    {
+      "id": "wander-mode-ios",
+      "title": "Wander mode (iOS) — foreground scan calls, warmth cue gradient, pin surface on unlock",
+      "status": "todo",
+      "owner": "ios",
+      "phase": 1,
+      "milestone": "M2",
+      "blockedBy": ["scan-endpoint", "unlock-endpoint"],
+      "notes": "Warmth cue is non-directional. No arrow, no compass. Screen-edge ambient gradient only."
+    },
+    {
+      "id": "memory-lane-ios",
+      "title": "Memory Lane (iOS) — grid of own memories, no proximity check, re-lock option",
+      "status": "todo",
+      "owner": "ios",
+      "phase": 1,
+      "milestone": "M2",
+      "blockedBy": ["spm-scaffold"],
+      "notes": "No per-memory deletion. Memories persist for life of account."
+    },
+    {
+      "id": "v2-treasure-chest-ios",
+      "title": "V2 Treasure Chest (iOS) — compose flow, seals + conditions UI, recipient list",
+      "status": "todo",
+      "owner": "ios",
+      "phase": 1,
+      "milestone": "M2",
+      "blockedBy": ["v1-pin-drop-ios"],
+      "notes": "Full seal suite. Private/recipients/friends privacy picker."
+    },
+    {
+      "id": "seals-conditions-backend",
+      "title": "Seals + conditions evaluation (backend) — fixed_date, duration, age_based, recurring + all conditions",
+      "status": "todo",
+      "owner": "backend",
+      "phase": 1,
+      "milestone": "M2",
+      "blockedBy": ["unlock-endpoint"],
+      "notes": "Evaluated server-side at unlock time only. DB constraint: condition_time_fallback NOT NULL when condition set."
+    },
+    {
+      "id": "v3-import-ios",
+      "title": "V3 Import (iOS) — PHAsset clustering, EXIF strip on-device, batch POST /memories/import",
+      "status": "todo",
+      "owner": "ios",
+      "phase": 1,
+      "milestone": "M3",
+      "blockedBy": ["memories-endpoint"],
+      "notes": "Raw GPS never leaves device. ~50 clusters presented. Private-only, elevation forbidden."
+    },
+    {
+      "id": "import-endpoint",
+      "title": "POST /memories/import — batch memory creation from cluster list",
+      "status": "todo",
+      "owner": "backend",
+      "phase": 1,
+      "milestone": "M3",
+      "blockedBy": ["memories-endpoint"],
+      "notes": "Idempotency key: geohash + capture-date bucket. source: imported, private-only enforced."
+    },
+    {
+      "id": "v4-note-bottle-ios",
+      "title": "V4 Note in a Bottle (iOS) — text-only drop, time-only seals",
+      "status": "todo",
+      "owner": "ios",
+      "phase": 1,
+      "milestone": "M3",
+      "blockedBy": ["v1-pin-drop-ios"],
+      "notes": ""
+    },
+    {
+      "id": "background-proximity",
+      "title": "Background proximity (iOS) — significant-change, CLMonitor region rotation, CLVisit, APNs push",
+      "status": "todo",
+      "owner": "ios",
+      "phase": 1,
+      "milestone": "M4",
+      "blockedBy": ["wander-mode-ios"],
+      "notes": "~14 own pins + ~5 coarse geohash zones. Zero location hardware at steady state."
+    },
+    {
+      "id": "app-attest",
+      "title": "App Attest + simulated-location rejection + accuracy sanity checks",
+      "status": "todo",
+      "owner": "either",
+      "phase": 1,
+      "milestone": "M5",
+      "blockedBy": ["unlock-endpoint"],
+      "notes": "Feature-flagged gate (app_attest_required). Bypass is audit-logged. iOS checks isSimulatedBySoftware."
+    },
+    {
+      "id": "rate-limits-audit-log",
+      "title": "Rate limits, audit log, account export + cascade delete",
+      "status": "todo",
+      "owner": "backend",
+      "phase": 1,
+      "milestone": "M5",
+      "blockedBy": ["auth-endpoint"],
+      "notes": "GET /user/export returns signed archive. No coordinates in event log ever."
+    },
+    {
+      "id": "csam-vendor-live",
+      "title": "CSAM vendor live — swap stub for real hash-match webhook",
+      "status": "todo",
+      "owner": "backend",
+      "phase": 1,
+      "milestone": "M5",
+      "blockedBy": ["csam-pipeline-stub"],
+      "notes": "Blocked on vendor approval. Mandatory reporting per 18 U.S.C. §2258A on match."
+    },
+    {
+      "id": "testflight-beta",
+      "title": "TestFlight beta — App Store labels, reviewer rationale for background location",
+      "status": "todo",
+      "owner": "either",
+      "phase": 1,
+      "milestone": "M5",
+      "blockedBy": ["csam-vendor-live", "app-attest", "rate-limits-audit-log"],
+      "notes": "Write App Store reviewer rationale for background-location permission early."
+    },
+    {
+      "id": "phone-verification",
+      "title": "Phone verification + recipient ACL + summons flow (SMS deep link)",
+      "status": "todo",
+      "owner": "either",
+      "phase": 2,
+      "milestone": "M6",
+      "blockedBy": ["testflight-beta"],
+      "notes": "Twilio SMS for summons. E.164 phone numbers. Deep link → sign-in → memory surfaced."
+    },
+    {
+      "id": "friends-graph",
+      "title": "Friends graph + friends-tier discovery",
+      "status": "todo",
+      "owner": "either",
+      "phase": 2,
+      "milestone": "M7",
+      "blockedBy": ["phone-verification"],
+      "notes": "Mutual connections. Accept = friend-tier memories discoverable in proximity."
+    },
+    {
+      "id": "replies",
+      "title": "Replies — place-locked Memory record attached to original pin",
+      "status": "todo",
+      "owner": "either",
+      "phase": 2,
+      "milestone": "M7",
+      "blockedBy": ["friends-graph"],
+      "notes": "Discoverer submits reply at same location. Owner discovers on next return."
+    },
+    {
+      "id": "vault",
+      "title": "Vault — shared family memory map, $99/yr tier, milestone seals",
+      "status": "todo",
+      "owner": "either",
+      "phase": 2,
+      "milestone": "M8",
+      "blockedBy": ["friends-graph"],
+      "notes": "Child access at 13. StoreKit 2 subscription."
+    },
+    {
+      "id": "public-memories",
+      "title": "Public memories (16+) — content screening pipeline, moderation queue",
+      "status": "todo",
+      "owner": "either",
+      "phase": 3,
+      "milestone": "M9",
+      "blockedBy": ["testflight-beta"],
+      "notes": "Must revisit velocity/teleport detection before Phase 3 (DEC-23)."
+    },
+    {
+      "id": "institutional-layer",
+      "title": "Institutional layer — university/festival/tourism board curated license",
+      "status": "todo",
+      "owner": "either",
+      "phase": 3,
+      "milestone": "M10",
+      "blockedBy": ["public-memories"],
+      "notes": "Annual per-geography license. No ads inside experience ever."
+    },
+    {
+      "id": "android",
+      "title": "Android",
+      "status": "todo",
+      "owner": "either",
+      "phase": 3,
+      "milestone": "M11",
+      "blockedBy": ["public-memories"],
+      "notes": ""
+    }
+  ]
+}

@@ -43,7 +43,7 @@ Each serves a distinct use case and has different composition/privacy rules.
 
 ### Memory Lane
 - Grid of own memories, sorted by recency of drop (oldest first)
-- Read-only; no deletion (memories are permanent)
+- Read-only; no per-memory deletion (memories persist for the life of the account; account deletion cascades)
 - Shows teaser: photo, drop date, "time since dropped" delta
 - Tap to unlock and see full memory (no proximity check for own memories)
 - Option to "re-earn" by returning to the location and re-locking

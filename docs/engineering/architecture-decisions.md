@@ -72,7 +72,7 @@ Screen-edge ambient gradient + haptic on coarse-zone entry. No arrow, compass, o
 
 Why: simple; prefixes are in spec; generated on-device for background detection. Revisit if: H3 or adaptive precision becomes necessary (unlikely pre-Phase 3).
 
-**DEC-17 — `presence_pings` as UNLOGGED table with TTL** · *Decided (DEC-19 revision)*
+**DEC-17 — `presence_pings` as UNLOGGED table with TTL** · *Decided (revised)*
 
 Upsert (`memory_id`, `user_id`, `last_seen_at`) with ~3min TTL. No coordinates stored; only the boolean outcome of a proximity check. Scheduled purge job keeps the table empty at steady state. Why: avoids tuple churn and WAL pressure on a regular table without WebSocket complexity (Supabase Realtime Presence upgrade path). Revisit to Realtime Presence if: live "N of M here" UX is pulled out of tabled features.
 
@@ -146,15 +146,17 @@ Items this plan adds that the product spec should absorb:
 
 ---
 
+**DEC-29 — Offline-but-near UX: show warmth cue, surface "need a signal" message, withhold pin** · *Decided*
+
+When device is inside a coarse zone (data pre-fetched) but lacks connectivity to call `/unlock`, the warmth cue persists and the app surfaces: "There's something here. You'll need a signal to open it." The exact pin location is not revealed. Why: coarse zones are pre-fetched on every successful scan, so offline-in-zone state requires no new infrastructure. Withholding the pin preserves the proximity invariant without requiring a server round-trip. Revisit if: user testing shows this message is confusing or users interpret it as a bug.
+
+---
+
 ## Decisions pending
 
 **Open — CSAM scanning vendor selection** · *Not blocking design*
 
 Candidates: Microsoft PhotoDNA Cloud, Thorn Safer, Hive. Pipeline is vendor-agnostic (webhook flips `scan_status`). Action item: apply in M0.
-
-**Open — Offline-but-near UX path** · *Decided (DEC-29)*
-
-When device is in a coarse zone (data on-device) but lacks connectivity to call `/unlock`, the warmth cue persists and app surfaces: "There's something here. You'll need a signal to open it." Pin exact location not revealed in this state. Implementation: trivial (coarse zones pre-fetched on every successful scan). Revisit: only if real-world testing shows this path is confusing.
 
 **Tabled — Rich "N of M here" co-presence UX** · *Phase 2+ decision*
 

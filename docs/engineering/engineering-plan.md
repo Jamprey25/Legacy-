@@ -74,7 +74,7 @@ The product's core constraint (proximity-gated release) is a validation problem,
 | Endpoint | Method | Input | Output | Side effect |
 |---|---|---|---|---|
 | `/auth/social` | POST | provider token + device info | session token | age gate enforced; user created |
-| `/memories` | POST | lat, lng, accuracy_m, photo_key | memory_id | memory created; cooldown window set |
+| `/memories` | POST | lat, lng, accuracy_m, media_type | memory_id, signed_put_url | memory created; cooldown window set; client uploads to signed URL |
 | `/memories/import` | POST | cluster list (centroid, capture_date) | import_id, [memory_ids] | private memories created in batch |
 | `/discovery/scan` | POST | lat, lng, accuracy_m | teaser[] (no coords, no media) | location submitted → validated → discarded |
 | `/memories/{id}/unlock` | POST | lat, lng, accuracy_m | signed media URLs | proximity re-validated; Find recorded |
@@ -109,6 +109,7 @@ All requests carry `Authorization: Bearer <session_token>` and timestamp within 
 | `weather` | `{ condition: "rainy\|sunny\|snow" }` (cached 15 min) | condition_time_fallback |
 | `co_presence` | `{ required_users: int, window_minutes: int }` | condition_time_fallback |
 | `long_absence` | `{ days_since_last_find }` | condition_time_fallback |
+| `nth_return` | `{ n: int }` | condition_time_fallback |
 
 **Enforced structurally:** DB constraint refuses `condition_type NOT NULL AND condition_time_fallback IS NULL`. No user can be stranded.
 
@@ -219,7 +220,7 @@ Replies are place-locked by design: you cannot reply to a memory from your couch
 ## 12. Anti-spoofing & integrity
 
 - **App Attest + DeviceCheck:** validated at auth, drop, and unlock. Feature-flagged gate (allow bypass during Apple downtime; audit-logged).
-- **Simulated-location rejection:** iOS 15+ `sourceInformation.isSimulatedBySoftware` flag checked; drop rejected if true.
+- **Simulated-location rejection:** `sourceInformation.isSimulatedBySoftware` flag checked (available on iOS 17+ minimum); drop rejected if true.
 - **Accuracy sanity checks:** reported accuracy must be >0, <1000m; timestamps within clock skew.
 - **Server-side dwell for non-owned unlocks:** requires two passing proximity checks ≥20s apart (the scan counts as first). Compensates for no velocity/teleport detection (which would require a movement trail, violating SEC-LOC-1).
 - **Deliberately rejected:** velocity/teleport detection. Requires retaining a position trail → violates privacy invariant. Accepted residual risk for Phase 1 (private-only); **must revisit before Phase 3** (public content).
@@ -253,14 +254,14 @@ States per (memory, gathering-window): `idle → gathering → satisfied → unl
 3. Optional UX (Phase 2+ decision): "2 of 3 here" progress shown to participants only — delight, slight presence leak.
 4. Pings auto-purge after TTL; table empty at steady state.
 
-`presence_pings` as UNLOGGED table (DEC-19): avoids tuple churn/vacuum pressure without WebSocket complexity.
+`presence_pings` as UNLOGGED table (DEC-17): avoids tuple churn/vacuum pressure without WebSocket complexity.
 
 ---
 
 ## 15. Build roadmap (Phase 1 → Phase 3)
 
 **Phase 1 — Single-user complete**
-- M0: Repo + SPM modules; Supabase auth + DOB gate; CI. *Demo: sign in, empty Wander map.*
+- M0: Repo + SPM modules; Auth endpoint + DOB gate; CI. *Demo: sign in, empty Wander map.*
 - M1: Quick drop + composed drop; upload + CSAM plumbing (vendor stubbed if approval pending). *Demo: drop a memory.*
 - M2: `scan`/`unlock` with asymmetric bubbles, dwell, cooldown. *Demo: the core loop — drop, return, unlock.*
 - M3: On-device import clustering + batch import. *Demo: fresh install → map dense in <2 min.*
