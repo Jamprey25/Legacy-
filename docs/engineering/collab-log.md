@@ -56,6 +56,9 @@ Do not use interactive choice prompts or "which do you prefer?" in chat without 
 | 2026-06-16 | **Backend runtime LOCKED: TypeScript/Node (Hono or Fastify) + `pg` on Vercel Functions.** Decided by Joseph. Unblocks the auth chain. iOS unaffected (codes to the contract). | joseph |
 | 2026-06-16 | iOS adds a `LegacyAPIStubs` library (StubHTTPTransport + contract-shaped fixtures) — debug/test/preview only, not linked by the app. | ios |
 | 2026-06-16 | **`AuthFeature` SPM module** for M0 auth UI. Apple native; Google button UI-only until OAuth client ID + backend ready; email OTP wired. | ios |
+| 2026-06-16 | **Xcode-less iOS workflow:** `swift build` in `ios/LegacyModules` host-compiles all library targets on macOS (Command Line Tools). `swift test` / XCTest / SwiftUI previews / device run require full Xcode — tests are written but not runnable until disk space allows install. | ios |
+| 2026-06-16 | **`EXIFStripper`** (DropFeature): ImageIO rewrite strips GPS/EXIF/TIFF before upload; `hasMetadata(in:)` for unit tests. **`URLSessionMediaUploader`** scaffold for signed PUT (background URLSession still TODO). | ios |
+| 2026-06-16 | **`WanderCoordinator`**: movement-gated `/discovery/scan`, teaser list UI, max-warmth → `WarmthCueOverlay`, unlock with `423` dwell/not-in-range messaging. `WanderScanPolicy` pure helper for tests. | ios |
 
 ---
 
@@ -97,6 +100,8 @@ Legacy app            → AuthFeature, WanderFeature, LegacyAPIStubs (DEBUG)
 ```
 
 - **M0 auth UI shipped (`ios-auth-ui` done):** `AuthFeature` module. Sign in → Keychain → empty Wander map. Email OTP + DOB + age gate wired to contract. Google deferred (see brainstorm). DEBUG builds use stubbed API client for offline demo.
+
+- **M1/M2 logic (host-verified, no Xcode):** `EXIFStripper` + `URLSessionMediaUploader` in DropFeature; `WanderCoordinator` scan/unlock loop + teaser list + warmth overlay in WanderFeature. Unit tests added (`DropFeatureTests`, `WanderFeatureTests`) — run with `swift test` once Xcode is installed. MapKit map UI, PHPicker/camera, and haptics still blocked on Xcode.
 
 - **Open in Xcode:** `ios/Legacy.xcodeproj` (local package ref to `ios/LegacyModules`). Set development team before running on device.
 - **Ruflo task tracking (2026-06-16):** Cursor syncs iOS work to ruflo via CLI (`npx @claude-flow/cli@latest task create/list`) + AgentDB memory (`namespace: legacy`). `tasks.json` remains dashboard source of truth. Ruflo session: `legacy-ios-cursor`. Active ruflo tasks: `task-1781641270028-pdoaek` (ios-design-system), `task-1781641273869-92k6cd` (ios-keychain-session), `task-1781641280362-ppoul1` (ios-apiclient-base, blocked).
@@ -151,3 +156,27 @@ Building `ios-auth-ui` now against `LegacyAPIClient.stubbed()` while backend aut
 
 No Joseph action needed unless he wants Google live in M0 (would need OAuth client ID in docs + Xcode).
 
+
+---
+
+## 📅 End-of-day handoff — 2026-06-16
+
+**Where we are:** M0 is nearly complete. Backend auth chain + DB schema are built, tested, and pushed. iOS has its scaffold, design system, API client, keychain, and auth UI in flight.
+
+**Backend (Claude) — done today, all on `main`:**
+- Full SQL schema (7 migrations) with privacy invariants enforced structurally
+- API contract v1 (`docs/engineering/api-contract.md`)
+- Auth chain: Apple/Google verify, email OTP, age gate, sessions, middleware — typecheck + 8 tests green
+- Dashboard "Needs a decision" panel
+
+**Not yet done / picks up next session:**
+1. **Backend can't run live until Joseph adds Neon creds.** Create `backend/.env.local` from `.env.example` with `DATABASE_URL` (Neon pooled) + `SESSION_JWT_SECRET`. Then: `cd backend && npm run migrate` to apply schema, `npm run dev` to smoke-test. ← first thing tomorrow
+2. `github-ci-setup` (todo) — CI pipeline + privacy-gate grep. Unblocked, no deps.
+3. M1 backend: `endpoint-memories-post` + `s3-signed-put-url` — needs an S3-compatible bucket decision (Vercel Blob vs R2 vs S3). Flag for Joseph.
+
+**Open for Joseph:**
+- Drop Neon `DATABASE_URL` into `backend/.env.local` so backend goes live.
+- Decide media storage (Vercel Blob / R2 / S3) before M1 upload work.
+- Optional: Google OAuth client ID if we want Google live in M0 (else it ships in M1).
+
+**Note:** iOS working-tree changes (DropFeature, WanderFeature, dashboard components) are Cursor's in-flight work — Cursor to commit on its side.
