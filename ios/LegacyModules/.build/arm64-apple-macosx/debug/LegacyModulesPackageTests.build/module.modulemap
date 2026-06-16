@@ -1,4 +1,0 @@
-module LegacyModulesPackageTests {
-    header "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/LegacyModulesPackageTests.build/LegacyModulesPackageTests-Swift.h"
-    requires objc
-}

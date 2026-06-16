@@ -1,4 +1,0 @@
-module DesignSystem {
-    header "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/DesignSystem.build/DesignSystem-Swift.h"
-    requires objc
-}

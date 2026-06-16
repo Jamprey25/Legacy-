@@ -1,4 +1,0 @@
-module APIClient {
-    header "/Users/josephamprey/Desktop/coding projects/Legacy/ios/LegacyModules/.build/arm64-apple-macosx/debug/APIClient.build/APIClient-Swift.h"
-    requires objc
-}
