@@ -383,6 +383,11 @@ extension LegacyAPIClient {
         try await send(LegacyRequest(method: .get, path: "/v1/memories/\(id)"), as: MemoryDetail.self)
     }
 
+    /// Batch-create private memories from on-device clusters (contract §5).
+    public func importMemories(_ body: ImportMemoriesRequest) async throws -> ImportMemoriesResponse {
+        try await send(request(.post, "/v1/memories/import", body), as: ImportMemoriesResponse.self)
+    }
+
     /// Returns `nil` when the server responds `204` (nothing eligible nearby).
     public func scan(_ body: LocationRequest) async throws -> ScanResponse? {
         try await sendOptional(request(.post, "/v1/discovery/scan", body), as: ScanResponse.self)
@@ -395,6 +400,24 @@ extension LegacyAPIClient {
     public func logout() async throws {
         try await sendNoContent(LegacyRequest(method: .post, path: "/v1/auth/logout", body: Data("{}".utf8)))
     }
+
+    /// Notify the backend that an upload completed so it can run the CSAM pipeline stub.
+    /// Only called in DEBUG builds — in production the storage provider fires this webhook
+    /// server-to-server and the app is never involved.
+    /// Requires WEBHOOK_SECRET=dev-webhook-secret in the backend .env.local.
+    #if DEBUG
+    public func notifyUploadComplete(memoryID: String, mediaKey: String) async throws {
+        struct Body: Encodable { let memory_id: String; let media_key: String }
+        let bodyData = try Self.jsonEncoder.encode(Body(memory_id: memoryID, media_key: mediaKey))
+        let url = configuration.baseURL.appendingPathComponent("v1/internal/webhook/storage")
+        var urlReq = URLRequest(url: url)
+        urlReq.httpMethod = "POST"
+        urlReq.httpBody = bodyData
+        urlReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlReq.setValue("dev-webhook-secret", forHTTPHeaderField: "X-Webhook-Secret")
+        _ = try? await URLSession.shared.data(for: urlReq)
+    }
+    #endif
 
     // MARK: Request building helper
 

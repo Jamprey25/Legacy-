@@ -370,8 +370,8 @@
     },
     {
       "id": "ios-v1-pin-drop-flow",
-      "title": "iOS: V1 Pin drop end-to-end — 1-tap: capture → strip EXIF → POST /memories → background upload → confirmation",
-      "status": "in-progress",
+      "title": "iOS: V1 Pin drop end-to-end \u2014 1-tap: capture \u2192 strip EXIF \u2192 POST /memories \u2192 background upload \u2192 confirmation",
+      "status": "done",
       "owner": "ios",
       "phase": 1,
       "milestone": "M1",
@@ -552,7 +552,7 @@
       "blockedBy": [
         "endpoint-memories-list"
       ],
-      "notes": "Grid + pagination + detail (MapKit drop map for owner) + unlock-at-location for media. List `thumbnail_key` only until CSAM pipeline generates thumbs — placeholder icons for now."
+      "notes": "Grid + pagination + detail (MapKit drop map for owner) + unlock-at-location for media. List `thumbnail_key` only until CSAM pipeline generates thumbs \u2014 placeholder icons for now."
     },
     {
       "id": "ios-offline-near-ux",

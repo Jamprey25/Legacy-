@@ -112,6 +112,17 @@ public final class DropCoordinator {
             state = .uploading
             try await uploader.upload(data: stripped, to: url, contentType: contentType)
 
+            // In DEBUG, notify the backend so the CSAM stub flips scan_status → clear.
+            // In production, the storage provider fires this webhook server-to-server.
+            // mediaKey mirrors the backend convention: memories/<id>/original.<ext>
+            #if DEBUG
+            let ext = contentType.contains("mp4") ? "mp4" : "jpg"
+            try? await apiClient.notifyUploadComplete(
+                memoryID: response.memoryID,
+                mediaKey: "memories/\(response.memoryID)/original.\(ext)"
+            )
+            #endif
+
             state = .succeeded(memoryID: response.memoryID)
         } catch DropError.missingUpload {
             state = .failed("Server did not return an upload URL.")
