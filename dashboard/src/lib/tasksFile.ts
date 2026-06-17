@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
-import type { Decision, TasksFile } from "../app/types";
+import type { Decision, TasksFile, ThreadResponse } from "../app/types";
 
 const GITHUB_REPO = process.env.GITHUB_REPO ?? "Jamprey25/Legacy-";
 const GITHUB_BRANCH = process.env.GITHUB_BRANCH ?? "main";
@@ -65,6 +65,41 @@ export async function writeTasksFile(data: TasksFile, message: string): Promise<
   } else {
     await writeToDisk(data);
   }
+}
+
+export function addResponse(
+  data: TasksFile,
+  itemId: string,
+  response: ThreadResponse
+): { data: TasksFile; decision: Decision } {
+  const decisions = data.decisions ?? [];
+  const index = decisions.findIndex((d) => d.id === itemId);
+  if (index === -1) throw new Error(`Item not found: ${itemId}`);
+
+  const current = decisions[index];
+  const updated: Decision = {
+    ...current,
+    responses: [...(current.responses ?? []), response],
+  };
+
+  const next = { ...data, decisions: [...decisions] };
+  next.decisions![index] = updated;
+  return { data: next, decision: updated };
+}
+
+export function resolveDiscussion(
+  data: TasksFile,
+  itemId: string
+): { data: TasksFile; decision: Decision } {
+  const decisions = data.decisions ?? [];
+  const index = decisions.findIndex((d) => d.id === itemId);
+  if (index === -1) throw new Error(`Item not found: ${itemId}`);
+
+  const current = decisions[index];
+  const updated: Decision = { ...current, status: "resolved" };
+  const next = { ...data, decisions: [...decisions] };
+  next.decisions![index] = updated;
+  return { data: next, decision: updated };
 }
 
 export function resolveDecision(

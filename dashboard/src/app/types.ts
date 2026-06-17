@@ -12,8 +12,8 @@ export interface Task {
   notes: string;
 }
 
-export type DecisionStatus = "open" | "decided";
-export type DecisionKind = "decision" | "blocker";
+export type DecisionStatus = "open" | "decided" | "resolved";
+export type DecisionKind = "decision" | "blocker" | "question" | "concern" | "idea";
 
 /** One choosable path for an open decision — Joseph picks one in the dashboard. */
 export interface DecisionOption {
@@ -23,21 +23,30 @@ export interface DecisionOption {
   recommended?: boolean;
 }
 
+/** A single reply in a question/concern/idea thread. */
+export interface ThreadResponse {
+  author: Owner | "joseph";
+  text: string;
+  date: string; // ISO date
+}
+
 export interface Decision {
   id: string;
-  kind: DecisionKind;          // "decision" needs a call; "blocker" is something stuck
+  kind: DecisionKind;
   title: string;
   status: DecisionStatus;
-  raisedBy: Owner;             // who flagged it
+  raisedBy: Owner | "joseph";
   needs: Owner | "joseph";     // who needs to act
   detail: string;
-  /** Required when status is "open" — Joseph chooses one option in the dashboard. */
+  /** Required when kind is "decision" — Joseph chooses one option in the dashboard. */
   options?: DecisionOption[];
-  recommendation?: string;     // prose fallback / extra context
-  blocks: string[];            // task ids this is holding up
-  chosenOptionId?: string;     // set when decided via dashboard
-  decidedAt?: string;          // ISO date when closed
-  resolution?: string;         // filled in when decided
+  recommendation?: string;
+  blocks: string[];
+  chosenOptionId?: string;
+  decidedAt?: string;
+  resolution?: string;
+  /** Thread of responses for question/concern/idea kinds. */
+  responses?: ThreadResponse[];
 }
 
 export interface TasksFile {

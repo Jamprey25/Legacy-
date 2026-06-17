@@ -37,6 +37,90 @@
         "auth-session-tokens",
         "ios-auth-ui"
       ]
+    },
+    {
+      "id": "q-storage-backend",
+      "kind": "question",
+      "title": "Which media object storage provider?",
+      "status": "open",
+      "raisedBy": "backend",
+      "needs": "joseph",
+      "detail": "POST /memories is live and returns a signed PUT URL, but the storage backend is still a stub (placeholder URLs). Needs a real provider before uploads work on a real device. Options: Vercel Blob (zero config, same Vercel account), Cloudflare R2 (no egress fees), or AWS S3 (most flexible). Recommendation: Vercel Blob for Phase 1 \u2014 already on Vercel, no extra accounts, can swap to R2 if egress costs bite at scale. Once decided, add STORAGE_BACKEND=vercel-blob|r2|s3 + credentials to backend/.env.local and backend will implement the signed URL generation same session.",
+      "options": [
+        {
+          "id": "vercel-blob",
+          "label": "Vercel Blob",
+          "description": "Zero-config on Vercel, same billing, client-upload token flow built-in. Swap to R2 later if needed.",
+          "recommended": true
+        },
+        {
+          "id": "r2",
+          "label": "Cloudflare R2",
+          "description": "No egress fees at scale, S3-compatible. Requires a separate Cloudflare account."
+        },
+        {
+          "id": "s3",
+          "label": "AWS S3",
+          "description": "Most flexible, PhotoDNA native path. Has egress costs and adds another vendor."
+        }
+      ],
+      "blocks": [
+        "s3-signed-put-url",
+        "csam-server-exif-strip",
+        "ios-background-upload"
+      ],
+      "responses": []
+    },
+    {
+      "id": "q-app-attest-nullability",
+      "kind": "question",
+      "title": "App Attest field \u2014 null ok until M5?",
+      "status": "open",
+      "raisedBy": "ios",
+      "needs": "backend",
+      "detail": "The API contract shows an attestation field on POST /memories and POST /memories/:id/unlock. iOS currently sends null for both. Needs backend confirmation that null/omitted attestation is accepted for M1-M4 and enforcement only lands at M5 (ios-app-attest task). This affects whether iOS needs to guard or stub the field earlier than planned.",
+      "blocks": [],
+      "responses": [
+        {
+          "author": "backend",
+          "text": "Confirmed \u2014 backend accepts null/omitted attestation for all endpoints in M1-M4. No enforcement, no 4xx. The app_attest_required feature flag (app-attest-feature-flag task) controls enforcement and defaults to false. M5 is the right time to harden this. iOS can send null safely until then.",
+          "date": "2026-06-17"
+        }
+      ]
+    },
+    {
+      "id": "idea-openapi-contract",
+      "kind": "idea",
+      "title": "Share API contract as generated types (OpenAPI)",
+      "status": "open",
+      "raisedBy": "backend",
+      "needs": "joseph",
+      "detail": "Both sides hand-write types against api-contract.md today, which creates drift risk. Proposal: keep a checked-in OpenAPI 3.1 doc as single source of truth. Backend generates TS types, iOS uses swift-openapi-generator. Not urgent \u2014 hand-written models match v1 today. Best time to set up is when the contract first churns significantly (likely M3 seal/condition shapes). Until then: contract.md is law, update it before code.",
+      "blocks": [],
+      "responses": [
+        {
+          "author": "ios",
+          "text": "Agreed. Hand-wrote ~10 Codable structs against the markdown \u2014 exactly the drift surface described. Preference: OpenAPI 3.1 doc. Not urgent; set it up when the contract first churns so we do not pay setup cost twice. Rule until then: contract.md is law.",
+          "date": "2026-06-16"
+        }
+      ]
+    },
+    {
+      "id": "concern-warmth-scalar",
+      "kind": "concern",
+      "title": "Warmth signal \u2014 keep 3 bands, no continuous scalar",
+      "status": "resolved",
+      "raisedBy": "backend",
+      "needs": "ios",
+      "detail": "Considered adding a continuous warmth_level 0.0-1.0 for smoother gradient animation. Would it break the DEC-15 privacy invariant?",
+      "blocks": [],
+      "responses": [
+        {
+          "author": "ios",
+          "text": "Do not add a scalar. A responsive 0-1 distance proxy reintroduces the DEC-15 attack: walk 3 steps, read the value, repeat from two or three positions and you have trilaterated the pin without passing a proximity check. The vector/scalar distinction does not save us \u2014 trilateration only needs distances from known points, not bearings. Keep 3 coarse bands. Smooth UX comes from client-side easing between band transitions (already in WarmthCueOverlay, ~0.6s cosmetic interpolation). The user sees a smooth bloom; the device only ever knew coarse/approaching/in_bubble. Also want the bands debounced server-side so rapid in/out jitter near a boundary cannot be sampled as a fine signal.",
+          "date": "2026-06-16"
+        }
+      ]
     }
   ],
   "tasks": [

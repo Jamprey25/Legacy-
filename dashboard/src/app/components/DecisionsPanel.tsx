@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import type { Task, Decision, DecisionOption } from "../types";
+import type { Task, Decision, DecisionOption, ThreadResponse } from "../types";
 
 const SECRET_KEY = "legacy-dashboard-secret";
 
@@ -337,6 +337,144 @@ function OpenDecisionCard({
   );
 }
 
+const KIND_META: Record<string, { emoji: string; color: string; label: string }> = {
+  question: { emoji: "❓", color: "#0ea5e9", label: "Question" },
+  concern:  { emoji: "⚠️", color: "#f59e0b", label: "Concern"  },
+  idea:     { emoji: "💡", color: "#8b5cf6", label: "Idea"     },
+};
+
+const AUTHOR_COLOR: Record<string, string> = {
+  backend: "#6366f1",
+  ios:     "#0ea5e9",
+  joseph:  "#16a34a",
+  either:  "#8b5cf6",
+};
+
+function ThreadCard({
+  d,
+  onResponded,
+}: {
+  d: Decision;
+  onResponded: () => void;
+}) {
+  const meta = KIND_META[d.kind] ?? KIND_META.question;
+  const isResolved = d.status === "resolved";
+  const [replyText, setReplyText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState(!isResolved);
+
+  const submit = useCallback(async () => {
+    if (!replyText.trim()) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/discussions/respond", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: d.id, author: "joseph", text: replyText.trim() }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(json.error ?? `Request failed (${res.status})`);
+      setReplyText("");
+      onResponded();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save reply");
+    } finally {
+      setSubmitting(false);
+    }
+  }, [d.id, replyText, onResponded]);
+
+  return (
+    <div style={{
+      background: isResolved ? "#0f1210" : "#12111a",
+      border: `1px solid ${meta.color}33`,
+      borderLeft: `3px solid ${isResolved ? "#16a34a" : meta.color}`,
+      borderRadius: 8,
+      overflow: "hidden",
+      opacity: isResolved ? 0.8 : 1,
+    }}>
+      {/* Header */}
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: "100%", textAlign: "left", background: "none", border: "none",
+          padding: "12px 14px", cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 8,
+        }}
+      >
+        <span style={{ fontSize: 14 }}>{isResolved ? "✓" : meta.emoji}</span>
+        <span style={{ fontWeight: 600, color: "#e8e8e8", fontSize: 13, flex: 1 }}>{d.title}</span>
+        <span style={{
+          fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4,
+          background: meta.color + "22", color: meta.color, border: `1px solid ${meta.color}44`,
+        }}>{meta.label}</span>
+        <span style={{ fontSize: 10, color: "#555" }}>
+          {d.raisedBy} · {(d.responses ?? []).length} repl{(d.responses ?? []).length === 1 ? "y" : "ies"}
+        </span>
+        <span style={{ fontSize: 10, color: "#444" }}>{open ? "▲" : "▼"}</span>
+      </button>
+
+      {open && (
+        <div style={{ padding: "0 14px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+          {/* Original post */}
+          <p style={{ color: "#aaa", fontSize: 13, lineHeight: 1.6, margin: 0 }}>{d.detail}</p>
+
+          {/* Thread */}
+          {(d.responses ?? []).length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, borderLeft: "2px solid #222", paddingLeft: 12 }}>
+              {(d.responses ?? []).map((r: ThreadResponse, i: number) => (
+                <div key={i} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700,
+                      color: AUTHOR_COLOR[r.author] ?? "#888",
+                    }}>{r.author}</span>
+                    <span style={{ fontSize: 10, color: "#444" }}>{r.date}</span>
+                  </div>
+                  <p style={{ color: "#ccc", fontSize: 12, lineHeight: 1.6, margin: 0 }}>{r.text}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Joseph reply box */}
+          {!isResolved && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <textarea
+                value={replyText}
+                onChange={e => setReplyText(e.target.value)}
+                placeholder="Reply as Joseph…"
+                rows={2}
+                style={{
+                  padding: "8px 10px", borderRadius: 6, border: "1px solid #2a2a2a",
+                  background: "#0e0e0e", color: "#e8e8e8", fontSize: 12,
+                  resize: "vertical", fontFamily: "inherit",
+                }}
+              />
+              {error && <p style={{ color: "#ff6b6b", fontSize: 11, margin: 0 }}>{error}</p>}
+              <button
+                type="button"
+                disabled={!replyText.trim() || submitting}
+                onClick={() => void submit()}
+                style={{
+                  alignSelf: "flex-start", padding: "6px 14px", borderRadius: 6,
+                  border: "none", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                  background: replyText.trim() && !submitting ? meta.color : "#333",
+                  color: replyText.trim() && !submitting ? "#fff" : "#666",
+                }}
+              >
+                {submitting ? "Saving…" : "Reply"}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DecisionsPanel({
   decisions,
   tasks,
@@ -348,9 +486,15 @@ export default function DecisionsPanel({
   onResolved: () => void;
   prominent?: boolean;
 }) {
-  const open = decisions.filter((d) => d.status === "open");
+  const THREAD_KINDS = new Set(["question", "concern", "idea"]);
+  const DECISION_KINDS = new Set(["decision", "blocker"]);
+
+  const open = decisions.filter((d) => d.status === "open" && DECISION_KINDS.has(d.kind));
   const decided = decisions.filter((d) => d.status === "decided");
-  if (open.length === 0 && decided.length === 0) return null;
+  const threads = decisions.filter((d) => THREAD_KINDS.has(d.kind));
+  const openThreads = threads.filter((d) => d.status !== "resolved");
+
+  if (open.length === 0 && decided.length === 0 && threads.length === 0) return null;
 
   return (
     <div
@@ -425,6 +569,28 @@ export default function DecisionsPanel({
             ))}
           </div>
         </>
+      )}
+
+      {threads.length > 0 && (
+        <div style={{ marginTop: (open.length > 0 || decided.length > 0) ? 32 : 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 700, color: "#e8e8e8" }}>
+              Questions, Concerns & Ideas
+            </h2>
+            {openThreads.length > 0 && (
+              <span style={{
+                background: "#0ea5e922", color: "#0ea5e9",
+                border: "1px solid #0ea5e944",
+                borderRadius: 4, padding: "1px 8px", fontSize: 11, fontWeight: 600,
+              }}>{openThreads.length} open</span>
+            )}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {threads.map((d) => (
+              <ThreadCard key={d.id} d={d} onResponded={onResolved} />
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );
