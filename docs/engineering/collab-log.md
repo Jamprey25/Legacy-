@@ -84,7 +84,8 @@ Contract shows `"attestation"` on create/unlock. iOS sends `null` today. Confirm
 | 2026-06-16 | **Backend runtime LOCKED: TypeScript/Node (Hono or Fastify) + `pg` on Vercel Functions.** Decided by Joseph. Unblocks the auth chain. iOS unaffected (codes to the contract). | joseph |
 | 2026-06-16 | iOS adds a `LegacyAPIStubs` library (StubHTTPTransport + contract-shaped fixtures) — debug/test/preview only, not linked by the app. | ios |
 | 2026-06-16 | **`AuthFeature` SPM module** for M0 auth UI. Apple native; Google button UI-only until OAuth client ID + backend ready; email OTP wired. | ios |
-| 2026-06-16 | **Xcode-less iOS workflow:** `swift build` in `ios/LegacyModules` host-compiles all library targets on macOS (Command Line Tools). `swift test` / XCTest / SwiftUI previews / device run require full Xcode — tests are written but not runnable until disk space allows install. | ios |
+| 2026-06-16 | **Xcode-less iOS workflow:** `swift build` in `ios/LegacyModules` host-compiles library targets via Command Line Tools. Used while disk space blocked full Xcode install. | ios |
+| 2026-06-16 | **Xcode installing (Joseph):** Full Xcode + iOS simulator runtime downloading. When complete: `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`, open Xcode once to accept license, then `swift test` in `ios/LegacyModules` and run `ios/Legacy.xcodeproj` on simulator. Unblocks camera picker, MapKit, device haptics, XCTest. | ios |
 | 2026-06-16 | **`EXIFStripper`** (DropFeature): ImageIO rewrite strips GPS/EXIF/TIFF before upload; `hasMetadata(in:)` for unit tests. **`URLSessionMediaUploader`** scaffold for signed PUT (background URLSession still TODO). | ios |
 | 2026-06-16 | **`WanderCoordinator`**: movement-gated `/discovery/scan`, teaser list UI, max-warmth → `WarmthCueOverlay`, unlock with `423` dwell/not-in-range messaging. `WanderScanPolicy` pure helper for tests. | ios |
 | 2026-06-17 | **GitHub Actions CI** (`.github/workflows/ci.yml`): backend typecheck + vitest + privacy gate grep (lat/lng/geohash banned from audit_log migrations). | backend |
@@ -140,7 +141,7 @@ Legacy app            → AuthFeature, WanderFeature, LegacyAPIStubs (DEBUG)
 
 - **Open questions (2026-06-16):** Memory Lane list endpoint missing from contract — see Open questions. Media storage provider blocks M1 backend upload URLs. Attestation nullability until M5 — needs backend confirm.
 
-- **Open in Xcode:** `ios/Legacy.xcodeproj` (local package ref to `ios/LegacyModules`). Set development team before running on device.
+- **Dev environment (2026-06-16):** Joseph installing Xcode + iOS simulator runtime. Until `xcode-select` points at Xcode.app, only `swift build` works (CLT). After install finishes, see Decisions made → Xcode installing checklist.
 - **Ruflo task tracking (2026-06-16):** Cursor syncs iOS work to ruflo via CLI (`npx @claude-flow/cli@latest task create/list`) + AgentDB memory (`namespace: legacy`). `tasks.json` remains dashboard source of truth. Ruflo session: `legacy-ios-cursor`. Active ruflo tasks: `task-1781641270028-pdoaek` (ios-design-system), `task-1781641273869-92k6cd` (ios-keychain-session), `task-1781641280362-ppoul1` (ios-apiclient-base, blocked).
 
 ---
