@@ -1155,7 +1155,7 @@
     {
       "id": "audit-log-instrumentation",
       "title": "Backend: Audit log instrumentation \u2014 structured events on auth, drop, scan, unlock, attest-bypass; never log coordinates",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 1,
       "milestone": "M5",

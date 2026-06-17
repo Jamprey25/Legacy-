@@ -22,6 +22,7 @@ import { issueCode, verifyCode } from "../db/otp.js";
 import { upsertSession, revokeSession, type DeviceInfo } from "../db/sessions.js";
 import { requireAuth, type AuthVars } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
+import { audit } from "../lib/audit.js";
 
 export const authRoutes = new Hono<{ Variables: AuthVars }>();
 
@@ -60,11 +61,15 @@ authRoutes.post("/social", async (c) => {
 
   // First sign-in needs DOB for the age gate. Returning users: look up without DOB.
   const existing = await findExistingByProvider(body.provider, identity.sub);
-  if (existing) return c.json(await sessionResponse(existing, body.device), 201);
+  if (existing) {
+    audit(c, "auth.login", { method: body.provider, is_new: false }, existing.id);
+    return c.json(await sessionResponse(existing, body.device), 201);
+  }
 
   if (!body.dob) throw new ApiError("dob_required", "Date of birth is required to sign up.");
   const ageTier = resolveAgeTier(body.dob); // throws age_restricted for under-13
   const user = await findOrCreateByProvider(body.provider, identity.sub, identity.email, body.dob, ageTier);
+  audit(c, "auth.login", { method: body.provider, is_new: true }, user.id);
   return c.json(await sessionResponse(user, body.device), 201);
 });
 
@@ -85,11 +90,15 @@ authRoutes.post("/email/verify", async (c) => {
   await verifyCode(body.email, body.code); // throws invalid_code
 
   const existing = await findExistingByEmail(body.email);
-  if (existing) return c.json(await sessionResponse(existing, body.device), 201);
+  if (existing) {
+    audit(c, "auth.login", { method: "email", is_new: false }, existing.id);
+    return c.json(await sessionResponse(existing, body.device), 201);
+  }
 
   if (!body.dob) throw new ApiError("dob_required", "Date of birth is required to sign up.");
   const ageTier = resolveAgeTier(body.dob);
   const user = await findOrCreateByEmail(body.email, body.dob, ageTier);
+  audit(c, "auth.login", { method: "email", is_new: true }, user.id);
   return c.json(await sessionResponse(user, body.device), 201);
 });
 

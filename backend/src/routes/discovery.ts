@@ -8,6 +8,7 @@ import { ownMemoryProximity, othersMemoryProximity } from "../lib/proximity.js";
 import { generateSignedGetUrl } from "../lib/storage.js";
 import { findNearbyMemories } from "../db/memories.js";
 import { validateLocationInput } from "../lib/locationInput.js";
+import { audit } from "../lib/audit.js";
 import { upsertPresencePing } from "../db/presencePings.js";
 import { requireAuth, type AuthVars } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
@@ -82,6 +83,9 @@ discoveryRoutes.post("/scan", async (c) => {
   );
 
   const filteredTeasers = teasers.filter(Boolean);
+
+  // Audit: count only — never coordinates (DEC-17 / privacy gate).
+  audit(c, "scan", { teaser_count: filteredTeasers.length });
 
   if (filteredTeasers.length === 0) {
     return new Response(null, { status: 204 });

@@ -19,6 +19,7 @@ import { evaluateCondition } from "../lib/conditionEval.js";
 import { requireAuth, type AuthVars } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { validateLocationInput } from "../lib/locationInput.js";
+import { audit } from "../lib/audit.js";
 
 export const memoriesRoutes = new Hono<{ Variables: AuthVars }>();
 
@@ -280,6 +281,15 @@ memoriesRoutes.post("/", dropLimit, async (c) => {
     expiresAt = storage.expiresAt;
   }
 
+  // Audit: non-locational facts only (no lat/lng/geohash — privacy gate).
+  audit(c, "memory.drop", {
+    memory_id: memory.id,
+    media_type: mediaType,
+    drop_method: dropMethod,
+    sealed: parsedSeal !== null,
+    conditional: parsedCondition !== null,
+  });
+
   // Response shape per api-contract §3.1
   return c.json(
     {
@@ -431,6 +441,9 @@ memoriesRoutes.post("/:id/unlock", unlockLimit, async (c) => {
   // --- Record Find ---
   await createFind(memoryId, userId);
   const returnCount = await getReturnCount(memoryId, userId);
+
+  // Audit: outcome + memory id only (no coordinates — privacy gate).
+  audit(c, "unlock", { memory_id: memory.id, result: "success", is_own: isOwn });
 
   return c.json({
     memory_id: memory.id,
