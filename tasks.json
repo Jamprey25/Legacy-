@@ -1008,7 +1008,7 @@
     {
       "id": "ios-significant-change",
       "title": "iOS: Background \u2014 significant-change location service: wake on ~500m+ movement, fetch nearby own pins, re-arm geofences, terminate",
-      "status": "todo",
+      "status": "done",
       "owner": "ios",
       "phase": 1,
       "milestone": "M4",
@@ -1020,7 +1020,7 @@
     {
       "id": "ios-clmonitor-regions",
       "title": "iOS: Background \u2014 CLMonitor region setup: ~14 nearest own pins + ~5 coarse geohash zones with eligible others' content",
-      "status": "todo",
+      "status": "done",
       "owner": "ios",
       "phase": 1,
       "milestone": "M4",
@@ -1032,7 +1032,7 @@
     {
       "id": "ios-region-rotation",
       "title": "iOS: Background \u2014 region rotation on every significant-change wake: evict stale regions, arm nearest set",
-      "status": "todo",
+      "status": "done",
       "owner": "ios",
       "phase": 1,
       "milestone": "M4",
