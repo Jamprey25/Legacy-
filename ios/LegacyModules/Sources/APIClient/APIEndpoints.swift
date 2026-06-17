@@ -205,7 +205,7 @@ public struct CreateMemoryResponse: Decodable, Sendable, Equatable {
 
 // MARK: - Memory Lane (owner list)
 
-public struct MemoryLaneItem: Decodable, Sendable, Equatable, Identifiable {
+public struct MemoryLaneItem: Decodable, Sendable, Equatable, Identifiable, Hashable {
     public var id: String { memoryID }
     public let memoryID: String
     public let dropDate: String
@@ -235,6 +235,36 @@ public struct ListMemoriesResponse: Decodable, Sendable, Equatable {
     enum CodingKeys: String, CodingKey {
         case memories
         case nextCursor = "next_cursor"
+    }
+}
+
+/// Owner-only full memory row (`GET /v1/memories/{id}`). Includes coordinates — owner only.
+public struct MemoryDetail: Decodable, Sendable, Equatable {
+    public let memoryID: String
+    public let lat: Double
+    public let lng: Double
+    public let geohash: String
+    public let source: String
+    public let dropMethod: String
+    public let privacyTier: String
+    public let scanStatus: String
+    public let mediaType: String
+    public let mediaKey: String?
+    public let thumbnailKey: String?
+    public let discoverableAfter: String
+    public let createdAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case memoryID = "memory_id"
+        case lat, lng, geohash, source
+        case dropMethod = "drop_method"
+        case privacyTier = "privacy_tier"
+        case scanStatus = "scan_status"
+        case mediaType = "media_type"
+        case mediaKey = "media_key"
+        case thumbnailKey = "thumbnail_key"
+        case discoverableAfter = "discoverable_after"
+        case createdAt = "created_at"
     }
 }
 
@@ -346,6 +376,11 @@ extension LegacyAPIClient {
             path += "&cursor=\(encoded)"
         }
         return try await send(LegacyRequest(method: .get, path: path), as: ListMemoriesResponse.self)
+    }
+
+    /// Owner-only detail including drop coordinates.
+    public func getMemory(id: String) async throws -> MemoryDetail {
+        try await send(LegacyRequest(method: .get, path: "/v1/memories/\(id)"), as: MemoryDetail.self)
     }
 
     /// Returns `nil` when the server responds `204` (nothing eligible nearby).

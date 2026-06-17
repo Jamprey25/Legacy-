@@ -7,6 +7,7 @@ import MemoryLaneFeature
 import DesignSystem
 import APIClient
 import LocationEngine
+import SwiftData
 #if DEBUG
 import LegacyAPIStubs
 #endif
@@ -64,6 +65,7 @@ struct LegacyApp: App {
             )
             .onAppear { appModel.refreshSession() }
         }
+        .modelContainer(for: DropDraft.self)
     }
 }
 
@@ -120,12 +122,18 @@ private struct MainTabView: View {
             }
 
             MemoryLaneFeatureRootView(
-                coordinator: MemoryLaneCoordinator(apiClient: apiClient)
+                coordinator: MemoryLaneCoordinator(
+                    apiClient: apiClient,
+                    locationEngine: locationEngine
+                )
             )
             .tabItem {
                 Label("Lane", systemImage: "photo.on.rectangle.angled")
             }
         }
         .tint(LegacyColor.accent)
+        .task {
+            locationEngine.requestWhenInUseAuthorization()
+        }
     }
 }

@@ -41,7 +41,7 @@ let package = Package(
         ),
         .target(
             name: "MemoryLaneFeature",
-            dependencies: ["DesignSystem", "APIClient"]
+            dependencies: ["DesignSystem", "APIClient", "LocationEngine"]
         ),
         .target(
             name: "ImportFeature",

@@ -90,6 +90,24 @@ public enum LegacyFixtures {
     }
     """.utf8)
 
+    public static let memoryDetail = Data("""
+    {
+      "memory_id": "22222222-2222-2222-2222-222222222222",
+      "lat": 37.7749,
+      "lng": -122.4194,
+      "geohash": "9q8yyk8yp",
+      "source": "live",
+      "drop_method": "pin",
+      "privacy_tier": "private",
+      "scan_status": "clear",
+      "media_type": "photo",
+      "media_key": "memories/22222222/full.jpg",
+      "thumbnail_key": null,
+      "discoverable_after": "2026-06-17T20:55:00Z",
+      "created_at": "2024-09-01T18:30:00Z"
+    }
+    """.utf8)
+
     /// 423 Locked — dwell not yet satisfied (contract §4).
     public static let lockedDwell = Data("""
     {
@@ -105,6 +123,7 @@ public enum LegacyFixtures {
         _ = try decoder.decode(ScanResponse.self, from: scanWithTeasers)
         _ = try decoder.decode(UnlockResponse.self, from: unlock)
         _ = try decoder.decode(ListMemoriesResponse.self, from: memoryList)
+        _ = try decoder.decode(MemoryDetail.self, from: memoryDetail)
     }
 }
 
@@ -118,6 +137,7 @@ extension StubHTTPTransport {
         transport.enqueue("/v1/auth/email/verify", .json(201, LegacyFixtures.authSocial))
         transport.enqueue("POST /v1/memories", .json(201, LegacyFixtures.createMemory))
         transport.enqueue("GET /v1/memories", .ok(LegacyFixtures.memoryList))
+        transport.enqueue("GET /memories/22222222-2222-2222-2222-222222222222", .ok(LegacyFixtures.memoryDetail))
         transport.enqueue("/v1/discovery/scan", .ok(LegacyFixtures.scanWithTeasers))
         transport.enqueue("/unlock", .json(423, LegacyFixtures.lockedDwell), .ok(LegacyFixtures.unlock))
         return transport

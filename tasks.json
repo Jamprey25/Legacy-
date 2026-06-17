@@ -9,6 +9,21 @@
       "kind": "decision",
       "title": "Backend language / runtime",
       "status": "decided",
+      "chosenOptionId": "ts-node",
+      "decidedAt": "2026-06-16",
+      "options": [
+        {
+          "id": "ts-node",
+          "label": "TypeScript / Node (Hono or Fastify)",
+          "description": "One language with dashboard + backend, easy contract type-sharing, deploy on Vercel Functions.",
+          "recommended": true
+        },
+        {
+          "id": "go",
+          "label": "Go",
+          "description": "Single fast binary, great for stateless validation hot path; separate deploy story from dashboard."
+        }
+      ],
       "resolution": "TypeScript/Node (Hono or Fastify) + pg on Vercel Functions. Decided by Joseph 2026-06-16; unblocks the auth chain for backend to build. iOS codes to api-contract.md regardless.",
       "raisedBy": "backend",
       "needs": "joseph",
@@ -285,7 +300,7 @@
     {
       "id": "csam-pipeline-stub",
       "title": "Backend: CSAM pipeline stub \u2014 storage webhook flips scan_status to 'clear' immediately in dev/staging",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 1,
       "milestone": "M1",
@@ -331,7 +346,7 @@
     {
       "id": "ios-background-upload",
       "title": "iOS: Background URLSession upload \u2014 PUT to signed URL, resumable, progress tracking, retry on failure",
-      "status": "todo",
+      "status": "done",
       "owner": "ios",
       "phase": 1,
       "milestone": "M1",
@@ -344,7 +359,7 @@
     {
       "id": "ios-draft-store",
       "title": "iOS: SwiftData draft store \u2014 persist interrupted drops (camera roll picked, not yet uploaded)",
-      "status": "todo",
+      "status": "done",
       "owner": "ios",
       "phase": 1,
       "milestone": "M1",

@@ -35,6 +35,7 @@ public final class DropCoordinator {
     private let uploader: MediaUploading
 
     public private(set) var selectedPhotoData: Data?
+    public private(set) var pendingRecovery: PendingUploadRecovery?
 
     public private(set) var state: DropState = .idle
     public var isDropping: Bool {
@@ -58,6 +59,10 @@ public final class DropCoordinator {
         selectedPhotoData = nil
     }
 
+    public func clearPendingRecovery() {
+        pendingRecovery = nil
+    }
+
     public func confirmDrop() async {
         guard let data = selectedPhotoData else { return }
         await dropPin(photoData: data)
@@ -71,9 +76,16 @@ public final class DropCoordinator {
         guard !isDropping else { return }
 
         state = .stripping
+        pendingRecovery = nil
+
+        var strippedData: Data?
+        var memoryID: String?
+        var signedPutURL: String?
+        var contentType = "image/jpeg"
 
         do {
             let stripped = try EXIFStripper.stripMetadata(from: photoData)
+            strippedData = stripped
             let fix = try await locationEngine.acquireFix()
 
             state = .creating
@@ -85,6 +97,7 @@ public final class DropCoordinator {
                 dropMethod: "pin"
             )
             let response = try await apiClient.createMemory(body)
+            memoryID = response.memoryID
 
             guard
                 let upload = response.upload,
@@ -93,8 +106,10 @@ public final class DropCoordinator {
                 throw DropError.missingUpload
             }
 
+            signedPutURL = upload.signedPutURL
+            contentType = upload.headers["Content-Type"] ?? "image/jpeg"
+
             state = .uploading
-            let contentType = upload.headers["Content-Type"] ?? "image/jpeg"
             try await uploader.upload(data: stripped, to: url, contentType: contentType)
 
             state = .succeeded(memoryID: response.memoryID)
@@ -104,8 +119,24 @@ public final class DropCoordinator {
             state = .failed("Could not prepare photo for upload.")
         } catch let LegacyAPIError.invalidRequest(code, message) {
             state = .failed(message.isEmpty ? code : message)
+            if let memoryID, let strippedData, let signedPutURL {
+                pendingRecovery = PendingUploadRecovery(
+                    memoryID: memoryID,
+                    photoData: strippedData,
+                    signedPutURL: signedPutURL,
+                    contentType: contentType
+                )
+            }
         } catch {
             state = .failed("Drop failed. Check location permission and connectivity.")
+            if let memoryID, let strippedData, let signedPutURL {
+                pendingRecovery = PendingUploadRecovery(
+                    memoryID: memoryID,
+                    photoData: strippedData,
+                    signedPutURL: signedPutURL,
+                    contentType: contentType
+                )
+            }
         }
     }
 }

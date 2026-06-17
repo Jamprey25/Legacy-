@@ -168,6 +168,24 @@ export interface NearbyMemory extends MemoryRow {
  * Phase 1: private tier only → owner_id = requestingUserId.
  * Eligibility: scan_status = clear, discoverable_after elapsed.
  */
+/**
+ * Set media_key and flip scan_status to 'clear' after a successful upload + pipeline pass.
+ * Returns the updated row, or null if the memory doesn't exist.
+ */
+export async function updateMemoryAfterUpload(
+  memoryId: string,
+  mediaKey: string,
+): Promise<MemoryRow | null> {
+  const rows = await sql`
+    UPDATE memories
+    SET media_key = ${mediaKey},
+        scan_status = 'clear'
+    WHERE id = ${memoryId}
+    RETURNING *
+  `;
+  return rows.length > 0 ? (rows[0] as unknown as MemoryRow) : null;
+}
+
 export async function findNearbyMemories(
   coarseHash: string,
   neighbourHashes: string[],
