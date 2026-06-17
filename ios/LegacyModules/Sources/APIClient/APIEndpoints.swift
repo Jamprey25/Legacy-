@@ -148,11 +148,27 @@ public struct SignedUpload: Decodable, Sendable, Equatable {
         case expiresAt = "expires_at"
         case method, headers
     }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        signedPutURL = try container.decode(String.self, forKey: .signedPutURL)
+        expiresAt = try container.decodeIfPresent(String.self, forKey: .expiresAt) ?? ""
+        method = try container.decodeIfPresent(String.self, forKey: .method) ?? "PUT"
+        headers = try container.decodeIfPresent([String: String].self, forKey: .headers)
+            ?? ["Content-Type": "image/jpeg"]
+    }
+
+    public init(signedPutURL: String, expiresAt: String, method: String, headers: [String: String]) {
+        self.signedPutURL = signedPutURL
+        self.expiresAt = expiresAt
+        self.method = method
+        self.headers = headers
+    }
 }
 
 public struct CreateMemoryResponse: Decodable, Sendable, Equatable {
     public let memoryID: String
-    public let upload: SignedUpload?     // null for text memories
+    public let upload: SignedUpload?
     public let discoverableAfter: String
     public let scanStatus: String
 
@@ -161,6 +177,64 @@ public struct CreateMemoryResponse: Decodable, Sendable, Equatable {
         case upload
         case discoverableAfter = "discoverable_after"
         case scanStatus = "scan_status"
+        case signedPutURLFlat = "signed_put_url"
+        case expiresAtFlat = "expires_at"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        memoryID = try container.decode(String.self, forKey: .memoryID)
+        discoverableAfter = try container.decodeIfPresent(String.self, forKey: .discoverableAfter) ?? ""
+        scanStatus = try container.decodeIfPresent(String.self, forKey: .scanStatus) ?? "pending"
+
+        if let nested = try container.decodeIfPresent(SignedUpload.self, forKey: .upload) {
+            upload = nested
+        } else if let flatURL = try container.decodeIfPresent(String.self, forKey: .signedPutURLFlat) {
+            let expires = try container.decodeIfPresent(String.self, forKey: .expiresAtFlat) ?? ""
+            upload = SignedUpload(
+                signedPutURL: flatURL,
+                expiresAt: expires,
+                method: "PUT",
+                headers: ["Content-Type": "image/jpeg"]
+            )
+        } else {
+            upload = nil
+        }
+    }
+}
+
+// MARK: - Memory Lane (owner list)
+
+public struct MemoryLaneItem: Decodable, Sendable, Equatable, Identifiable {
+    public var id: String { memoryID }
+    public let memoryID: String
+    public let dropDate: String
+    public let createdAt: String
+    public let mediaType: String
+    public let scanStatus: String
+    public let thumbnailKey: String?
+    public let privacyTier: String
+    public let dropMethod: String
+
+    enum CodingKeys: String, CodingKey {
+        case memoryID = "memory_id"
+        case dropDate = "drop_date"
+        case createdAt = "created_at"
+        case mediaType = "media_type"
+        case scanStatus = "scan_status"
+        case thumbnailKey = "thumbnail_key"
+        case privacyTier = "privacy_tier"
+        case dropMethod = "drop_method"
+    }
+}
+
+public struct ListMemoriesResponse: Decodable, Sendable, Equatable {
+    public let memories: [MemoryLaneItem]
+    public let nextCursor: String?
+
+    enum CodingKeys: String, CodingKey {
+        case memories
+        case nextCursor = "next_cursor"
     }
 }
 
@@ -262,6 +336,16 @@ extension LegacyAPIClient {
 
     public func createMemory(_ body: CreateMemoryRequest) async throws -> CreateMemoryResponse {
         try await send(request(.post, "/v1/memories", body), as: CreateMemoryResponse.self)
+    }
+
+    /// Paginated owner list for Memory Lane — oldest first, no coordinates.
+    public func listMemories(cursor: String? = nil, limit: Int = 50) async throws -> ListMemoriesResponse {
+        var path = "/v1/memories?limit=\(limit)"
+        if let cursor, !cursor.isEmpty {
+            let encoded = cursor.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? cursor
+            path += "&cursor=\(encoded)"
+        }
+        return try await send(LegacyRequest(method: .get, path: path), as: ListMemoriesResponse.self)
     }
 
     /// Returns `nil` when the server responds `204` (nothing eligible nearby).

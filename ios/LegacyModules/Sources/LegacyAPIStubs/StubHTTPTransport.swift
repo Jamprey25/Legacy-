@@ -35,6 +35,7 @@ public final class StubHTTPTransport: HTTPTransport, @unchecked Sendable {
     }
 
     /// Queue one or more responses for requests whose path ends with `path`.
+    /// Prefix with `"GET "` or `"POST "` to match HTTP method + path (e.g. `"GET /v1/memories"`).
     public func enqueue(_ path: String, _ responses: StubResponse...) {
         lock.lock(); defer { lock.unlock() }
         routes[path, default: []].append(contentsOf: responses)
@@ -42,10 +43,18 @@ public final class StubHTTPTransport: HTTPTransport, @unchecked Sendable {
 
     public func data(for request: URLRequest) async throws -> (Data, URLResponse) {
         let path = request.url?.path ?? ""
+        let method = request.httpMethod ?? "GET"
 
         let chosen: StubResponse = {
             lock.lock(); defer { lock.unlock() }
-            guard let key = routes.keys.first(where: { path.hasSuffix($0) }) else {
+            guard let key = routes.keys.first(where: { routeKey in
+                if routeKey.contains(" ") {
+                    let parts = routeKey.split(separator: " ", maxSplits: 1)
+                    guard parts.count == 2 else { return false }
+                    return parts[0] == Substring(method) && path.hasSuffix(String(parts[1]))
+                }
+                return path.hasSuffix(routeKey)
+            }) else {
                 return fallback
             }
             var queue = routes[key] ?? []

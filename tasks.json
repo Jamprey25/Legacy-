@@ -309,14 +309,14 @@
     {
       "id": "ios-v1-camera-picker",
       "title": "iOS: V1 Pin — camera capture + photo library picker, single photo selection, preview before drop",
-      "status": "todo",
+      "status": "done",
       "owner": "ios",
       "phase": 1,
       "milestone": "M1",
       "blockedBy": [
         "spm-scaffold"
       ],
-      "notes": "PHPickerViewController for library. AVFoundation for camera. No filters, no editing."
+      "notes": "PhotoLibraryPicker (PHPicker) + CameraPicker (UIImagePickerController) + preview + confirm drop wired in DropFeatureRootView."
     },
     {
       "id": "ios-exif-strip",
@@ -518,7 +518,7 @@
     {
       "id": "ios-wander-unlock-flow",
       "title": "iOS: Wander unlock flow — tap pin → proximity check → if in range POST /unlock → show media; if not show teaser + walk closer",
-      "status": "in-progress",
+      "status": "done",
       "owner": "ios",
       "phase": 1,
       "milestone": "M2",
@@ -526,20 +526,17 @@
         "ios-warmth-cue",
         "endpoint-unlock-signed-get-url"
       ],
-      "notes": "Coordinator + teaser row + UnlockedMemorySheet shipped. Dwell/423 UX wired. Map walk-closer affordances need Xcode."
+      "notes": "Teaser list + unlock + UnlockedMemorySheet + dwell/423 UX. Map walk-closer deferred (list-first v1)."
     },
     {
       "id": "ios-memory-lane",
       "title": "iOS: Memory Lane — grid of own memories, oldest-first, teaser card (photo, drop date, time-since delta), tap to view full",
-      "status": "todo",
+      "status": "in-progress",
       "owner": "ios",
       "phase": 1,
       "milestone": "M2",
-      "blockedBy": [
-        "ios-apiclient-base",
-        "endpoint-memories-list"
-      ],
-      "notes": "No proximity check for own memories. No per-memory deletion. Option to re-lock (return to earn again)."
+      "blockedBy": ["endpoint-memories-list"],
+      "notes": "Grid + pagination + time-since delta shipped. Thumbnail URLs + tap-to-view full memory still TODO."
     },
     {
       "id": "ios-offline-near-ux",

@@ -62,6 +62,34 @@ public enum LegacyFixtures {
     }
     """.utf8)
 
+    public static let memoryList = Data("""
+    {
+      "memories": [
+        {
+          "memory_id": "22222222-2222-2222-2222-222222222222",
+          "drop_date": "2024-09-01",
+          "created_at": "2024-09-01T18:30:00Z",
+          "media_type": "photo",
+          "scan_status": "clear",
+          "thumbnail_key": null,
+          "privacy_tier": "private",
+          "drop_method": "pin"
+        },
+        {
+          "memory_id": "33333333-3333-3333-3333-333333333333",
+          "drop_date": "2023-06-15",
+          "created_at": "2023-06-15T12:00:00Z",
+          "media_type": "photo",
+          "scan_status": "pending",
+          "thumbnail_key": null,
+          "privacy_tier": "private",
+          "drop_method": "pin"
+        }
+      ],
+      "next_cursor": null
+    }
+    """.utf8)
+
     /// 423 Locked — dwell not yet satisfied (contract §4).
     public static let lockedDwell = Data("""
     {
@@ -76,6 +104,7 @@ public enum LegacyFixtures {
         _ = try decoder.decode(CreateMemoryResponse.self, from: createMemory)
         _ = try decoder.decode(ScanResponse.self, from: scanWithTeasers)
         _ = try decoder.decode(UnlockResponse.self, from: unlock)
+        _ = try decoder.decode(ListMemoriesResponse.self, from: memoryList)
     }
 }
 
@@ -87,7 +116,8 @@ extension StubHTTPTransport {
         transport.enqueue("/v1/auth/social", .json(201, LegacyFixtures.authSocial))
         transport.enqueue("/v1/auth/email/start", .noContent)
         transport.enqueue("/v1/auth/email/verify", .json(201, LegacyFixtures.authSocial))
-        transport.enqueue("/v1/memories", .json(201, LegacyFixtures.createMemory))
+        transport.enqueue("POST /v1/memories", .json(201, LegacyFixtures.createMemory))
+        transport.enqueue("GET /v1/memories", .ok(LegacyFixtures.memoryList))
         transport.enqueue("/v1/discovery/scan", .ok(LegacyFixtures.scanWithTeasers))
         transport.enqueue("/unlock", .json(423, LegacyFixtures.lockedDwell), .ok(LegacyFixtures.unlock))
         return transport

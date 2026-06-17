@@ -14,6 +14,8 @@
 		B10000000000000000000005 /* LocationEngine in Frameworks */ = {isa = PBXBuildFile; productRef = P10000000000000000000004 /* LocationEngine */; };
 		B10000000000000000000006 /* AuthFeature in Frameworks */ = {isa = PBXBuildFile; productRef = P10000000000000000000005 /* AuthFeature */; };
 		B10000000000000000000007 /* LegacyAPIStubs in Frameworks */ = {isa = PBXBuildFile; productRef = P10000000000000000000006 /* LegacyAPIStubs */; };
+		B10000000000000000000008 /* DropFeature in Frameworks */ = {isa = PBXBuildFile; productRef = P10000000000000000000007 /* DropFeature */; };
+		B10000000000000000000009 /* MemoryLaneFeature in Frameworks */ = {isa = PBXBuildFile; productRef = P10000000000000000000008 /* MemoryLaneFeature */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -33,6 +35,8 @@
 				B10000000000000000000005 /* LocationEngine in Frameworks */,
 				B10000000000000000000006 /* AuthFeature in Frameworks */,
 				B10000000000000000000007 /* LegacyAPIStubs in Frameworks */,
+				B10000000000000000000008 /* DropFeature in Frameworks */,
+				B10000000000000000000009 /* MemoryLaneFeature in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -87,6 +91,8 @@
 				P10000000000000000000004 /* LocationEngine */,
 				P10000000000000000000005 /* AuthFeature */,
 				P10000000000000000000006 /* LegacyAPIStubs */,
+				P10000000000000000000007 /* DropFeature */,
+				P10000000000000000000008 /* MemoryLaneFeature */,
 			);
 			productName = Legacy;
 			productReference = F10000000000000000000003 /* Legacy.app */;
@@ -299,6 +305,14 @@
 		P10000000000000000000006 /* LegacyAPIStubs */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = LegacyAPIStubs;
+		};
+		P10000000000000000000007 /* DropFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DropFeature;
+		};
+		P10000000000000000000008 /* MemoryLaneFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MemoryLaneFeature;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -15,6 +15,45 @@ public final class MemoryLaneCoordinator {
     }
 
     private let apiClient: LegacyAPIClient
+    private var nextCursor: String?
+
+    public private(set) var items: [MemoryLaneItem] = []
+    public private(set) var isLoading = false
+    public private(set) var isLoadingMore = false
+    public private(set) var errorMessage: String?
+
+    public var canLoadMore: Bool { nextCursor != nil }
+
+    public func loadInitial() async {
+        guard !isLoading else { return }
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            let response = try await apiClient.listMemories()
+            items = response.memories
+            nextCursor = response.nextCursor
+        } catch {
+            errorMessage = "Could not load your memories."
+        }
+    }
+
+    public func loadMoreIfNeeded(current item: MemoryLaneItem) async {
+        guard let cursor = nextCursor, !isLoadingMore else { return }
+        guard item.id == items.last?.id else { return }
+
+        isLoadingMore = true
+        defer { isLoadingMore = false }
+
+        do {
+            let response = try await apiClient.listMemories(cursor: cursor)
+            items.append(contentsOf: response.memories)
+            nextCursor = response.nextCursor
+        } catch {
+            errorMessage = "Could not load more memories."
+        }
+    }
 }
 
 public struct MemoryLaneFeatureRootView: View {
@@ -24,11 +63,88 @@ public struct MemoryLaneFeatureRootView: View {
 
     @Bindable private var coordinator: MemoryLaneCoordinator
 
+    private let columns = [
+        GridItem(.flexible(), spacing: LegacySpacing.md),
+        GridItem(.flexible(), spacing: LegacySpacing.md),
+    ]
+
     public var body: some View {
-        ContentUnavailableView(
-            "Memory Lane",
-            systemImage: "photo.on.rectangle.angled",
-            description: Text("Your memories — M2")
-        )
+        NavigationStack {
+            Group {
+                if coordinator.isLoading && coordinator.items.isEmpty {
+                    ProgressView()
+                        .tint(LegacyColor.accent)
+                } else if coordinator.items.isEmpty {
+                    ContentUnavailableView(
+                        "Memory Lane",
+                        systemImage: "photo.on.rectangle.angled",
+                        description: Text("Memories you drop will appear here, oldest first.")
+                    )
+                } else {
+                    ScrollView {
+                        LazyVGrid(columns: columns, spacing: LegacySpacing.md) {
+                            ForEach(coordinator.items) { item in
+                                MemoryLaneCard(item: item)
+                                    .onAppear {
+                                        Task { await coordinator.loadMoreIfNeeded(current: item) }
+                                    }
+                            }
+                        }
+                        .padding(LegacySpacing.lg)
+
+                        if coordinator.isLoadingMore {
+                            ProgressView()
+                                .tint(LegacyColor.accent)
+                                .padding(.bottom, LegacySpacing.lg)
+                        }
+                    }
+                }
+            }
+            .background(LegacyColor.background)
+            .navigationTitle("Memory Lane")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.large)
+            #endif
+            .task { await coordinator.loadInitial() }
+            .refreshable { await coordinator.loadInitial() }
+
+            if let message = coordinator.errorMessage {
+                Text(message)
+                    .font(LegacyFont.caption)
+                    .foregroundStyle(LegacyColor.danger)
+                    .padding(LegacySpacing.md)
+            }
+        }
+    }
+}
+
+private struct MemoryLaneCard: View {
+    let item: MemoryLaneItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: LegacySpacing.sm) {
+            ZStack {
+                RoundedRectangle(cornerRadius: LegacyRadius.sm)
+                    .fill(LegacyColor.surface)
+                    .aspectRatio(1, contentMode: .fit)
+                Image(systemName: item.mediaType == "text" ? "text.quote" : "photo")
+                    .font(.title2)
+                    .foregroundStyle(LegacyColor.textSecondary)
+            }
+
+            Text(item.dropDate)
+                .font(LegacyFont.caption)
+                .foregroundStyle(LegacyColor.textPrimary)
+
+            Text(MemoryLaneFormatting.timeSinceDrop(createdAtISO: item.createdAt))
+                .font(LegacyFont.metric)
+                .foregroundStyle(LegacyColor.accent)
+
+            if item.scanStatus == "pending" {
+                Text("Uploading…")
+                    .font(LegacyFont.caption)
+                    .foregroundStyle(LegacyColor.textSecondary)
+            }
+        }
     }
 }

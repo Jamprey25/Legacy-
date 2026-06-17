@@ -2,6 +2,9 @@ import SwiftUI
 import UIKit
 import AuthFeature
 import WanderFeature
+import DropFeature
+import MemoryLaneFeature
+import DesignSystem
 import APIClient
 import LocationEngine
 #if DEBUG
@@ -73,11 +76,9 @@ private struct RootView: View {
     var body: some View {
         Group {
             if appModel.isAuthenticated {
-                WanderFeatureRootView(
-                    coordinator: WanderCoordinator(
-                        apiClient: apiClient,
-                        locationEngine: locationEngine
-                    )
+                MainTabView(
+                    apiClient: apiClient,
+                    locationEngine: locationEngine
                 )
             } else {
                 AuthFeatureRootView(
@@ -89,5 +90,42 @@ private struct RootView: View {
                 )
             }
         }
+    }
+}
+
+private struct MainTabView: View {
+    let apiClient: LegacyAPIClient
+    let locationEngine: LocationEngine
+
+    var body: some View {
+        TabView {
+            WanderFeatureRootView(
+                coordinator: WanderCoordinator(
+                    apiClient: apiClient,
+                    locationEngine: locationEngine
+                )
+            )
+            .tabItem {
+                Label("Wander", systemImage: "map")
+            }
+
+            DropFeatureRootView(
+                coordinator: DropCoordinator(
+                    apiClient: apiClient,
+                    locationEngine: locationEngine
+                )
+            )
+            .tabItem {
+                Label("Drop", systemImage: "mappin.and.ellipse")
+            }
+
+            MemoryLaneFeatureRootView(
+                coordinator: MemoryLaneCoordinator(apiClient: apiClient)
+            )
+            .tabItem {
+                Label("Lane", systemImage: "photo.on.rectangle.angled")
+            }
+        }
+        .tint(LegacyColor.accent)
     }
 }

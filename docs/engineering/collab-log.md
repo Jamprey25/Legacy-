@@ -93,6 +93,7 @@ Contract shows `"attestation"` on create/unlock. iOS sends `null` today. Confirm
 | 2026-06-16 | **`DropCoordinator`**: EXIF strip → `POST /v1/memories` → signed PUT upload orchestration (picker/camera wiring still separate). | ios |
 | 2026-06-16 | **`WarmthHaptics`**: band-transition haptics (`UIImpactFeedbackGenerator` on iOS, no-op on macOS host builds). Wired into scan warmth updates. | ios |
 | 2026-06-16 | **`PhotoClusterEngine`**: ~150 m grid clustering + adjacent merge + rank — Import M3 prep, no Photos framework required for algorithm tests. | ios |
+| 2026-06-17 | **Main tab shell + pickers:** Wander/Drop/Lane tabs; PHPicker + camera + preview; Memory Lane grid + `listMemories()`. `CreateMemoryResponse` accepts contract nested `upload` or backend flat `signed_put_url`. Stub routes keyed by HTTP method. | ios |
 
 ---
 
@@ -134,16 +135,14 @@ DropFeature           → DesignSystem, APIClient, LocationEngine
 WanderFeature         → DesignSystem, APIClient, LocationEngine
 MemoryLaneFeature     → DesignSystem, APIClient
 ImportFeature         → DesignSystem, APIClient, LocationEngine
-Legacy app            → AuthFeature, WanderFeature, LegacyAPIStubs (DEBUG)
+Legacy app            → AuthFeature, WanderFeature, DropFeature, MemoryLaneFeature, LegacyAPIStubs (DEBUG)
 ```
 
-- **M0 auth UI shipped (`ios-auth-ui` done):** `AuthFeature` module. Sign in → Keychain → empty Wander map. Email OTP + DOB + age gate wired to contract. Google deferred (see brainstorm). DEBUG builds use stubbed API client for offline demo.
+- **M0 auth UI shipped (`ios-auth-ui` done):** `AuthFeature` module. Sign in → Keychain → tab shell. Email OTP + DOB + age gate wired to contract. Google deferred (see brainstorm). DEBUG builds use stubbed API client for offline demo.
 
-- **M1/M2 logic (host-verified, no Xcode):** `EXIFStripper` + `URLSessionMediaUploader` + **`DropCoordinator`** (strip → POST → PUT) in DropFeature; `WanderCoordinator` scan/unlock + **`UnlockedMemorySheet`** + **`WarmthHaptics`** in WanderFeature; **`PhotoClusterEngine`** in ImportFeature (pure Swift, no Photos framework). Unit tests in `DropFeatureTests`, `WanderFeatureTests`, `ImportFeatureTests`. MapKit, PHPicker/camera, and device haptic verification still need Xcode.
+- **M1/M2 app (2026-06-17):** Tab bar — **Wander** (scan/unlock/warmth), **Drop** (library/camera picker → preview → `DropCoordinator`), **Memory Lane** (paginated grid, time-since delta). All 30 SPM unit tests green with Xcode toolchain.
 
-- **Open questions (2026-06-16):** Memory Lane list endpoint missing from contract — see Open questions. Media storage provider blocks M1 backend upload URLs. Attestation nullability until M5 — needs backend confirm.
-
-- **Dev environment (2026-06-16):** Joseph installing Xcode + iOS simulator runtime. Until `xcode-select` points at Xcode.app, only `swift build` works (CLT). After install finishes, see Decisions made → Xcode installing checklist.
+- **Open questions:** Media storage provider (`STORAGE_BACKEND`) for live signed PUT URLs. Attestation nullability until M5 — needs backend confirm.
 - **Ruflo task tracking (2026-06-16):** Cursor syncs iOS work to ruflo via CLI (`npx @claude-flow/cli@latest task create/list`) + AgentDB memory (`namespace: legacy`). `tasks.json` remains dashboard source of truth. Ruflo session: `legacy-ios-cursor`. Active ruflo tasks: `task-1781641270028-pdoaek` (ios-design-system), `task-1781641273869-92k6cd` (ios-keychain-session), `task-1781641280362-ppoul1` (ios-apiclient-base, blocked).
 
 ---

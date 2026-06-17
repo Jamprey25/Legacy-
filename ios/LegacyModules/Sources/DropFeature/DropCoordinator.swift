@@ -34,6 +34,8 @@ public final class DropCoordinator {
     private let locationEngine: LocationEngine
     private let uploader: MediaUploading
 
+    public private(set) var selectedPhotoData: Data?
+
     public private(set) var state: DropState = .idle
     public var isDropping: Bool {
         switch state {
@@ -44,6 +46,24 @@ public final class DropCoordinator {
 
     public func reset() {
         state = .idle
+        selectedPhotoData = nil
+    }
+
+    public func selectPhoto(_ data: Data) {
+        selectedPhotoData = data
+        state = .idle
+    }
+
+    public func clearSelection() {
+        selectedPhotoData = nil
+    }
+
+    public func confirmDrop() async {
+        guard let data = selectedPhotoData else { return }
+        await dropPin(photoData: data)
+        if case .succeeded = state {
+            selectedPhotoData = nil
+        }
     }
 
     /// Drop a photo at the current location. Caller supplies raw JPEG/HEIC bytes (picker wiring is separate).
