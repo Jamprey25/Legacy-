@@ -2,7 +2,6 @@ import DesignSystem
 import SwiftUI
 
 #if os(iOS)
-import AuthenticationServices
 
 public enum AuthFeature {
     public static let version = "0.1.0"
@@ -61,40 +60,10 @@ private struct AuthWelcomeView: View {
             }
 
             VStack(spacing: LegacySpacing.md) {
-                SignInWithAppleButton(.signIn) { request in
-                    request.requestedScopes = [.email, .fullName]
-                } onCompletion: { result in
-                    switch result {
-                    case let .success(authorization):
-                        guard
-                            let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
-                            let tokenData = credential.identityToken,
-                            let token = String(data: tokenData, encoding: .utf8)
-                        else {
-                            coordinator.reportError("Could not read Apple identity token.")
-                            return
-                        }
-                        coordinator.appleSignInCompleted(identityToken: token)
-                    case let .failure(error):
-                        if (error as NSError).code != ASAuthorizationError.canceled.rawValue {
-                            coordinator.reportError(error.localizedDescription)
-                        }
-                    }
-                }
-                .signInWithAppleButtonStyle(.white)
-                .frame(height: 50)
-                .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.md, style: .continuous))
-
-                Button("Continue with Google") {
-                    coordinator.googleSignInTapped()
-                }
-                .buttonStyle(.legacySecondary)
-                .opacity(0.55)
-
                 Button("Continue with Email") {
                     coordinator.beginEmailSignIn()
                 }
-                .buttonStyle(.legacySecondary)
+                .buttonStyle(.legacyPrimary)
             }
             .padding(.horizontal, LegacySpacing.xl)
 

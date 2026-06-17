@@ -16,7 +16,6 @@ public final class AuthCoordinator {
     }
 
     public enum PendingAuth: Equatable {
-        case apple(identityToken: String)
         case email
     }
 
@@ -42,15 +41,7 @@ public final class AuthCoordinator {
         self.onAuthenticated = onAuthenticated
     }
 
-    // MARK: - Social
-
-    public func appleSignInCompleted(identityToken: String) {
-        route = .dobGate(pending: .apple(identityToken: identityToken))
-    }
-
-    public func googleSignInTapped() {
-        errorMessage = "Google Sign In will be available once backend OAuth and a client ID are configured."
-    }
+    // MARK: - Social (deferred)
 
     public func reportError(_ message: String) {
         errorMessage = message
@@ -69,29 +60,9 @@ public final class AuthCoordinator {
         errorMessage = nil
         defer { isLoading = false }
 
-        let dobString = AuthFormatting.dobString(from: dob)
-
-        do {
-            switch pending {
-            case let .apple(token):
-                let response = try await apiClient.authSocial(
-                    SocialAuthRequest(
-                        provider: "apple",
-                        identityToken: token,
-                        dob: dobString,
-                        device: AuthFormatting.deviceInfo(deviceID: deviceID)
-                    )
-                )
-                try await finishAuth(response)
-            case .email:
-                route = .emailOTP(email: email)
-            }
-        } catch let LegacyAPIError.forbidden(code, message) where code == "age_restricted" {
-            route = .ageRestricted
-        } catch let LegacyAPIError.invalidRequest(code, message) where code == "dob_required" {
-            errorMessage = message
-        } catch {
-            errorMessage = userFacingMessage(for: error)
+        switch pending {
+        case .email:
+            route = .emailOTP(email: email)
         }
     }
 
