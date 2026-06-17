@@ -124,7 +124,7 @@ Contract shows `"attestation"` on create/unlock. iOS sends `null` today. Confirm
 | 2026-06-16 | **`DropCoordinator`**: EXIF strip → `POST /v1/memories` → signed PUT upload orchestration (picker/camera wiring still separate). | ios |
 | 2026-06-16 | **`WarmthHaptics`**: band-transition haptics (`UIImpactFeedbackGenerator` on iOS, no-op on macOS host builds). Wired into scan warmth updates. | ios |
 | 2026-06-16 | **`PhotoClusterEngine`**: ~150 m grid clustering + adjacent merge + rank — Import M3 prep, no Photos framework required for algorithm tests. | ios |
-| 2026-06-17 | **Main tab shell + pickers:** Wander/Drop/Lane tabs; PHPicker + camera + preview; Memory Lane grid + `listMemories()`. `CreateMemoryResponse` accepts contract nested `upload` or backend flat `signed_put_url`. Stub routes keyed by HTTP method. | ios |
+| 2026-06-17 | **Memory Lane detail + Drop drafts:** `getMemory()` + MapKit owner drop map + unlock-at-location; SwiftData `DropDraft` with retry banner; `BackgroundMediaUploader` scaffold; location permission on tab launch. | ios |
 
 ---
 

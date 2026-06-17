@@ -354,7 +354,7 @@
         "ios-exif-strip",
         "s3-signed-put-url"
       ],
-      "notes": "Memory record created first (POST /memories), upload after. `URLSessionMediaUploader` scaffold in DropFeature; Background URLSession + progress UI still TODO."
+      "notes": "`BackgroundMediaUploader` (URLSession background config) + foreground `URLSessionMediaUploader`. App delegate completion handler + progress UI still TODO."
     },
     {
       "id": "ios-draft-store",
@@ -366,20 +366,19 @@
       "blockedBy": [
         "ios-background-upload"
       ],
-      "notes": "Never cache non-owned coordinates. Only store: selected photo, pending memory_id, upload state."
+      "notes": "`DropDraft` SwiftData model + Application Support photo files. Auto-save on upload failure; retry banner in Drop tab. No coordinates stored."
     },
     {
       "id": "ios-v1-pin-drop-flow",
-      "title": "iOS: V1 Pin drop end-to-end \u2014 1-tap: capture \u2192 strip EXIF \u2192 POST /memories \u2192 background upload \u2192 confirmation",
-      "status": "todo",
+      "title": "iOS: V1 Pin drop end-to-end — 1-tap: capture → strip EXIF → POST /memories → background upload → confirmation",
+      "status": "in-progress",
       "owner": "ios",
       "phase": 1,
       "milestone": "M1",
       "blockedBy": [
-        "ios-draft-store",
-        "endpoint-memories-post"
+        "s3-signed-put-url"
       ],
-      "notes": "DropCoordinator orchestration shipped (strip \u2192 POST \u2192 PUT). Blocked on picker + draft store + live backend."
+      "notes": "Picker + preview + DropCoordinator + SwiftData draft retry shipped. DEBUG stubs E2E works; live drops need STORAGE_BACKEND credentials."
     },
     {
       "id": "endpoint-scan-geohash-query",
@@ -553,7 +552,7 @@
       "blockedBy": [
         "endpoint-memories-list"
       ],
-      "notes": "Grid + pagination + time-since delta shipped. Thumbnail URLs + tap-to-view full memory still TODO."
+      "notes": "Grid + pagination + detail (MapKit drop map for owner) + unlock-at-location for media. List `thumbnail_key` only until CSAM pipeline generates thumbs — placeholder icons for now."
     },
     {
       "id": "ios-offline-near-ux",
