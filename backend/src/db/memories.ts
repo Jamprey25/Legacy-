@@ -15,6 +15,9 @@ export interface CreateMemoryInput {
   source: "live" | "imported";
   mediaKey: string | null;
   discoverableAfter: Date;
+  privacyTier?: "private" | "recipients" | "friends" | "public";
+  teaserText?: string | null;
+  caption?: string | null;
 }
 
 export interface MemoryRow {
@@ -42,6 +45,7 @@ export async function createMemory(input: CreateMemoryInput): Promise<MemoryRow>
     INSERT INTO memories (
       owner_id, lat, lng, geohash,
       source, drop_method, media_type, media_key,
+      privacy_tier, teaser_text, caption,
       discoverable_after
     ) VALUES (
       ${input.ownerId},
@@ -52,6 +56,9 @@ export async function createMemory(input: CreateMemoryInput): Promise<MemoryRow>
       ${input.dropMethod},
       ${input.mediaType},
       ${input.mediaKey},
+      ${input.privacyTier ?? "private"},
+      ${input.teaserText ?? null},
+      ${input.caption ?? null},
       ${input.discoverableAfter.toISOString()}
     )
     RETURNING *

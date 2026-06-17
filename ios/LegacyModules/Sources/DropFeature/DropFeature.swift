@@ -8,7 +8,7 @@ import SwiftData
 import UIKit
 #endif
 
-/// V1 Pin and V2 Treasure Chest drop flows.
+/// V1 Pin, V2 Treasure Chest, and V4 Note in a Bottle drop flows.
 public enum DropFeature {
     public static let version = "0.1.0"
 }
@@ -24,36 +24,33 @@ public struct DropFeatureRootView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \DropDraft.createdAt, order: .reverse) private var drafts: [DropDraft]
 
+    @State private var mode: DropTabMode = .pin
+    @State private var compose = DropComposeDraft()
     @State private var showLibrary = false
     @State private var showCamera = false
     #endif
 
     public var body: some View {
-        VStack(spacing: LegacySpacing.lg) {
-            #if os(iOS)
-            if !drafts.isEmpty {
-                draftBanner
-            }
-
-            if let data = coordinator.selectedPhotoData, let image = UIImage(data: data) {
-                photoPreview(image)
-            } else {
-                pickerPrompt
-            }
-            #else
-            ContentUnavailableView("Drop", systemImage: "mappin.and.ellipse")
-            #endif
-
-            statusView
-
-            if case .succeeded = coordinator.state {
-                Button("Drop another") { coordinator.reset() }
-                    .buttonStyle(.legacySecondary)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(LegacyColor.background)
         #if os(iOS)
+        NavigationStack {
+            VStack(spacing: LegacySpacing.md) {
+                Picker("Drop mode", selection: $mode) {
+                    ForEach(DropTabMode.allCases) { entry in
+                        Label(entry.label, systemImage: entry.icon).tag(entry)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, LegacySpacing.lg)
+                .padding(.top, LegacySpacing.sm)
+
+                modeContent
+                statusView
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(LegacyColor.background)
+            .navigationTitle("Drop")
+            .navigationBarTitleDisplayMode(.inline)
+        }
         .onChange(of: coordinator.pendingRecovery) { _, recovery in
             guard let recovery else { return }
             try? DropDraftStore.saveDraft(
@@ -84,10 +81,83 @@ public struct DropFeatureRootView: View {
             )
             .ignoresSafeArea()
         }
+        #else
+        ContentUnavailableView("Drop", systemImage: "mappin.and.ellipse")
         #endif
     }
 
     #if os(iOS)
+    @ViewBuilder
+    private var modeContent: some View {
+        switch mode {
+        case .pin:
+            pinFlow
+        case .treasure:
+            VStack(spacing: 0) {
+                treasurePhotoSection
+                DropComposeViews.TreasureChestForm(
+                    compose: $compose,
+                    hasPhoto: coordinator.selectedPhotoData != nil,
+                    isDropping: coordinator.isDropping,
+                    onDrop: { Task { await coordinator.confirmTreasureDrop(compose: compose) } }
+                )
+            }
+        case .note:
+            DropComposeViews.NoteBottleForm(
+                compose: $compose,
+                isDropping: coordinator.isDropping,
+                onDrop: { Task { await coordinator.dropNoteBottle(compose: compose) } }
+            )
+        }
+    }
+
+    private var treasurePhotoSection: some View {
+        VStack(spacing: LegacySpacing.sm) {
+            if let data = coordinator.selectedPhotoData, let image = UIImage(data: data) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxHeight: 160)
+                    .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.md))
+                    .padding(.horizontal, LegacySpacing.lg)
+            }
+            HStack(spacing: LegacySpacing.md) {
+                Button("Library") { showLibrary = true }
+                if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                    Button("Camera") { showCamera = true }
+                }
+                if coordinator.selectedPhotoData != nil {
+                    Button("Clear") { coordinator.clearSelection() }
+                }
+            }
+            .font(LegacyFont.callout)
+            .foregroundStyle(LegacyColor.accent)
+            .padding(.bottom, LegacySpacing.sm)
+        }
+    }
+
+    private var pinFlow: some View {
+        VStack(spacing: LegacySpacing.lg) {
+            if !drafts.isEmpty {
+                draftBanner
+            }
+
+            if let data = coordinator.selectedPhotoData, let image = UIImage(data: data) {
+                photoPreview(image)
+            } else {
+                pickerPrompt
+            }
+
+            if case .succeeded = coordinator.state {
+                Button("Drop another") {
+                    coordinator.reset()
+                    compose = DropComposeDraft()
+                }
+                .buttonStyle(.legacySecondary)
+            }
+        }
+    }
+
     private var draftBanner: some View {
         VStack(alignment: .leading, spacing: LegacySpacing.sm) {
             Text("Pending uploads")
@@ -120,7 +190,7 @@ public struct DropFeatureRootView: View {
     private var pickerPrompt: some View {
         Group {
             ContentUnavailableView(
-                "Drop",
+                "Quick pin",
                 systemImage: "mappin.and.ellipse",
                 description: Text("Pin a photo at your current location.")
             )
@@ -142,20 +212,26 @@ public struct DropFeatureRootView: View {
             Image(uiImage: image)
                 .resizable()
                 .scaledToFit()
-                .frame(maxHeight: 280)
+                .frame(maxHeight: 240)
                 .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.md))
                 .padding(.horizontal, LegacySpacing.lg)
 
             Button("Drop here") {
-                Task { await coordinator.confirmDrop() }
+                Task { await coordinator.confirmPinDrop() }
             }
             .buttonStyle(.legacyPrimary)
             .padding(.horizontal, LegacySpacing.xl)
             .disabled(coordinator.isDropping)
 
-            Button("Choose a different photo") { coordinator.clearSelection() }
-                .font(LegacyFont.callout)
-                .foregroundStyle(LegacyColor.textSecondary)
+            HStack(spacing: LegacySpacing.md) {
+                Button("Library") { showLibrary = true }
+                if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                    Button("Camera") { showCamera = true }
+                }
+                Button("Clear") { coordinator.clearSelection() }
+            }
+            .font(LegacyFont.callout)
+            .foregroundStyle(LegacyColor.textSecondary)
         }
     }
 
@@ -185,12 +261,14 @@ public struct DropFeatureRootView: View {
             Text("Memory dropped.")
                 .font(LegacyFont.callout)
                 .foregroundStyle(LegacyColor.accent)
+                .padding(.bottom, LegacySpacing.sm)
         case .failed(let message):
             Text(message)
                 .font(LegacyFont.callout)
                 .foregroundStyle(LegacyColor.danger)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, LegacySpacing.lg)
+                .padding(.bottom, LegacySpacing.sm)
         }
     }
 }

@@ -1,4 +1,4 @@
-@testable import WanderFeature
+import LocationEngine
 import XCTest
 
 final class OwnMemoryPinCacheTests: XCTestCase {

@@ -61,3 +61,16 @@ jobs:
             exit 1
           fi
           echo "OK: no stray coordinate columns found."
+
+  ios-modules:
+    name: iOS modules — swift build + test
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: ios/LegacyModules
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SPM unit tests
+        run: swift test

@@ -1,6 +1,6 @@
 import Foundation
 
-/// Cached drop location for the user's own unlocked memories only.
+/// Cached drop location for the user's own memories only.
 /// Non-owned coordinates must never persist on device (M2 privacy invariant).
 public struct CachedOwnPin: Codable, Sendable, Equatable, Identifiable {
     public let memoryID: String
@@ -11,6 +11,22 @@ public struct CachedOwnPin: Codable, Sendable, Equatable, Identifiable {
     public let cachedAt: Date
 
     public var id: String { memoryID }
+
+    public init(
+        memoryID: String,
+        lat: Double,
+        lng: Double,
+        dropDate: String,
+        thumbnailURL: String?,
+        cachedAt: Date
+    ) {
+        self.memoryID = memoryID
+        self.lat = lat
+        self.lng = lng
+        self.dropDate = dropDate
+        self.thumbnailURL = thumbnailURL
+        self.cachedAt = cachedAt
+    }
 }
 
 public enum OwnMemoryPinCache {

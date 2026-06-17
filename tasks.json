@@ -134,6 +134,124 @@
       ]
     }
   ],
+  "manualTests": [
+    {
+      "id": "qa-auth-cold-launch",
+      "title": "Cold launch shows sign-in when logged out",
+      "status": "pending",
+      "addedBy": "ios",
+      "platform": "xcode",
+      "milestone": "M0",
+      "relatedTasks": ["ios-auth-ui"],
+      "steps": [
+        "Delete the app from the simulator (or reset Keychain for Legacy)",
+        "Run Legacy from Xcode (⌘R)",
+        "Confirm the welcome / sign-in screen appears — not the Wander map"
+      ]
+    },
+    {
+      "id": "qa-auth-email-otp-debug",
+      "title": "Email OTP sign-in works in DEBUG (stubbed API)",
+      "status": "pending",
+      "addedBy": "ios",
+      "platform": "simulator",
+      "milestone": "M0",
+      "relatedTasks": ["ios-auth-ui"],
+      "steps": [
+        "Run a DEBUG build (LegacyAPIClient.stubbed())",
+        "Choose email sign-in, enter any email, request OTP",
+        "Enter the OTP from fixture / stub response",
+        "Complete DOB picker if shown",
+        "Confirm you land on the empty Wander map"
+      ]
+    },
+    {
+      "id": "qa-auth-dob-under13",
+      "title": "Under-13 DOB shows age-restricted screen",
+      "status": "pending",
+      "addedBy": "ios",
+      "platform": "simulator",
+      "milestone": "M0",
+      "relatedTasks": ["ios-auth-ui"],
+      "steps": [
+        "Sign out or fresh install",
+        "Start sign-in and pick a DOB that makes the user under 13",
+        "Confirm age-restricted / rejection UI — must not reach Wander"
+      ]
+    },
+    {
+      "id": "qa-session-persists",
+      "title": "Session persists across relaunch (Keychain)",
+      "status": "pending",
+      "addedBy": "ios",
+      "platform": "simulator",
+      "milestone": "M0",
+      "relatedTasks": ["ios-keychain-session", "ios-auth-ui"],
+      "steps": [
+        "Sign in successfully",
+        "Stop the app (not delete) and relaunch from Xcode",
+        "Confirm you skip sign-in and go straight to Wander — token read from Keychain"
+      ]
+    },
+    {
+      "id": "qa-wander-empty-map",
+      "title": "Post-auth Wander shows empty map shell",
+      "status": "pending",
+      "addedBy": "ios",
+      "platform": "simulator",
+      "milestone": "M0",
+      "relatedTasks": ["ios-auth-ui"],
+      "steps": [
+        "Sign in (DEBUG stub or live backend)",
+        "Confirm Wander tab is default / reachable",
+        "Map loads with no foreign-memory pins (M0 demo: empty or own pins only)"
+      ]
+    },
+    {
+      "id": "qa-memory-lane-grid",
+      "title": "Memory Lane grid loads own memories",
+      "status": "pending",
+      "addedBy": "ios",
+      "platform": "simulator",
+      "milestone": "M2",
+      "relatedTasks": ["ios-memory-lane"],
+      "steps": [
+        "Sign in with an account that has memories (or stub fixtures with list data)",
+        "Open Memory Lane tab",
+        "Confirm teaser cards appear oldest-first; tap one opens detail",
+        "Pull to refresh or scroll — pagination / error banner behaves correctly"
+      ]
+    },
+    {
+      "id": "qa-tab-shell",
+      "title": "Tab bar navigation between Wander and Memory Lane",
+      "status": "pending",
+      "addedBy": "ios",
+      "platform": "simulator",
+      "milestone": "M0",
+      "relatedTasks": ["ios-auth-ui"],
+      "steps": [
+        "After sign-in, switch between main tabs (Wander, Memory Lane, etc.)",
+        "Confirm no crash, state preserved when switching back",
+        "Sign-out (if exposed in UI) returns to auth flow"
+      ]
+    },
+    {
+      "id": "qa-location-permission",
+      "title": "Location permission prompt on first Wander use",
+      "status": "pending",
+      "addedBy": "ios",
+      "platform": "simulator",
+      "milestone": "M2",
+      "relatedTasks": ["ios-location-engine", "ios-wander-foreground-scan"],
+      "steps": [
+        "Fresh install or reset location privacy for Legacy",
+        "Open Wander and trigger a scan (move or wait for movement gate)",
+        "Confirm iOS location permission alert appears",
+        "Allow — confirm scan loop continues without crash"
+      ]
+    }
+  ],
   "tasks": [
     {
       "id": "csam-vendor-apply",
@@ -725,7 +843,7 @@
     {
       "id": "ios-v2-compose-ui",
       "title": "iOS: V2 Treasure Chest — compose flow: photo picker, teaser text, seal picker, recipient list, privacy picker (private/recipients/friends)",
-      "status": "todo",
+      "status": "done",
       "owner": "ios",
       "phase": 1,
       "milestone": "M3",
@@ -737,7 +855,7 @@
     {
       "id": "ios-v4-note-bottle",
       "title": "iOS: V4 Note in a Bottle — text composer, GPS auto-set from current location, time-only seal picker",
-      "status": "todo",
+      "status": "done",
       "owner": "ios",
       "phase": 1,
       "milestone": "M3",

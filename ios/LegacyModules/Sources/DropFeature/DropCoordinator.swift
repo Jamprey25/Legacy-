@@ -5,6 +5,7 @@ import LocationEngine
 public enum DropError: Error, Sendable, Equatable {
     case missingUpload
     case stripFailed
+    case emptyNote
 }
 
 public enum DropState: Sendable, Equatable {
@@ -16,7 +17,7 @@ public enum DropState: Sendable, Equatable {
     case failed(String)
 }
 
-/// Orchestrates V1 pin drop: strip EXIF → POST /memories → PUT to signed URL.
+/// Orchestrates pin, treasure chest, and note-in-a-bottle drops.
 @MainActor
 @Observable
 public final class DropCoordinator {
@@ -63,16 +64,27 @@ public final class DropCoordinator {
         pendingRecovery = nil
     }
 
-    public func confirmDrop() async {
+    public func confirmPinDrop() async {
         guard let data = selectedPhotoData else { return }
-        await dropPin(photoData: data)
+        await dropPhoto(photoData: data, dropMethod: "pin", compose: .pinDefault)
         if case .succeeded = state {
             selectedPhotoData = nil
         }
     }
 
-    /// Drop a photo at the current location. Caller supplies raw JPEG/HEIC bytes (picker wiring is separate).
-    public func dropPin(photoData: Data) async {
+    public func confirmTreasureDrop(compose: DropComposeDraft) async {
+        guard let data = selectedPhotoData else { return }
+        await dropPhoto(photoData: data, dropMethod: "treasure_chest", compose: compose)
+        if case .succeeded = state {
+            selectedPhotoData = nil
+        }
+    }
+
+    public func dropNoteBottle(compose: DropComposeDraft) async {
+        await dropTextNote(compose: compose)
+    }
+
+    private func dropPhoto(photoData: Data, dropMethod: String, compose: DropComposeDraft) async {
         guard !isDropping else { return }
 
         state = .stripping
@@ -82,19 +94,22 @@ public final class DropCoordinator {
         var memoryID: String?
         var signedPutURL: String?
         var contentType = "image/jpeg"
+        var fixLat = 0.0
+        var fixLng = 0.0
 
         do {
             let stripped = try EXIFStripper.stripMetadata(from: photoData)
             strippedData = stripped
             let fix = try await locationEngine.acquireFix()
+            fixLat = fix.lat
+            fixLng = fix.lng
 
             state = .creating
-            let body = CreateMemoryRequest(
-                lat: fix.lat,
-                lng: fix.lng,
-                accuracyM: fix.accuracyM,
+            let body = makeCreateRequest(
+                fix: fix,
                 mediaType: "photo",
-                dropMethod: "pin"
+                dropMethod: dropMethod,
+                compose: compose
             )
             let response = try await apiClient.createMemory(body)
             memoryID = response.memoryID
@@ -112,9 +127,6 @@ public final class DropCoordinator {
             state = .uploading
             try await uploader.upload(data: stripped, to: url, contentType: contentType)
 
-            // In DEBUG, notify the backend so the CSAM stub flips scan_status → clear.
-            // In production, the storage provider fires this webhook server-to-server.
-            // mediaKey mirrors the backend convention: memories/<id>/original.<ext>
             #if DEBUG
             let ext = contentType.contains("mp4") ? "mp4" : "jpg"
             try? await apiClient.notifyUploadComplete(
@@ -123,6 +135,7 @@ public final class DropCoordinator {
             )
             #endif
 
+            cacheOwnDrop(memoryID: response.memoryID, lat: fixLat, lng: fixLng)
             state = .succeeded(memoryID: response.memoryID)
         } catch DropError.missingUpload {
             state = .failed("Server did not return an upload URL.")
@@ -130,24 +143,92 @@ public final class DropCoordinator {
             state = .failed("Could not prepare photo for upload.")
         } catch let LegacyAPIError.invalidRequest(code, message) {
             state = .failed(message.isEmpty ? code : message)
-            if let memoryID, let strippedData, let signedPutURL {
-                pendingRecovery = PendingUploadRecovery(
-                    memoryID: memoryID,
-                    photoData: strippedData,
-                    signedPutURL: signedPutURL,
-                    contentType: contentType
-                )
-            }
+            stageRecovery(memoryID: memoryID, photoData: strippedData, signedPutURL: signedPutURL, contentType: contentType)
         } catch {
             state = .failed("Drop failed. Check location permission and connectivity.")
-            if let memoryID, let strippedData, let signedPutURL {
-                pendingRecovery = PendingUploadRecovery(
-                    memoryID: memoryID,
-                    photoData: strippedData,
-                    signedPutURL: signedPutURL,
-                    contentType: contentType
-                )
-            }
+            stageRecovery(memoryID: memoryID, photoData: strippedData, signedPutURL: signedPutURL, contentType: contentType)
         }
+    }
+
+    private func dropTextNote(compose: DropComposeDraft) async {
+        guard !isDropping else { return }
+        let trimmed = compose.noteText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            state = .failed("Write something for your note.")
+            return
+        }
+
+        state = .creating
+        pendingRecovery = nil
+
+        do {
+            let fix = try await locationEngine.acquireFix()
+            let body = makeCreateRequest(
+                fix: fix,
+                mediaType: "text",
+                dropMethod: "note_bottle",
+                compose: compose,
+                caption: trimmed
+            )
+            let response = try await apiClient.createMemory(body)
+            cacheOwnDrop(memoryID: response.memoryID, lat: fix.lat, lng: fix.lng)
+            state = .succeeded(memoryID: response.memoryID)
+        } catch let LegacyAPIError.invalidRequest(code, message) {
+            state = .failed(message.isEmpty ? code : message)
+        } catch {
+            state = .failed("Could not drop your note. Check location and connectivity.")
+        }
+    }
+
+    private func makeCreateRequest(
+        fix: LocationFix,
+        mediaType: String,
+        dropMethod: String,
+        compose: DropComposeDraft,
+        caption: String? = nil
+    ) -> CreateMemoryRequest {
+        let teaser = compose.teaserText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return CreateMemoryRequest(
+            lat: fix.lat,
+            lng: fix.lng,
+            accuracyM: fix.accuracyM,
+            mediaType: mediaType,
+            dropMethod: dropMethod,
+            privacyTier: compose.privacyTier.isAvailableInPhase1 ? compose.privacyTier.rawValue : "private",
+            teaserText: teaser.isEmpty ? nil : teaser,
+            caption: caption,
+            seal: DropComposeMapping.sealPayload(from: compose.seal),
+            condition: compose.condition.map(DropComposeMapping.conditionPayload(from:))
+        )
+    }
+
+    private func stageRecovery(
+        memoryID: String?,
+        photoData: Data?,
+        signedPutURL: String?,
+        contentType: String
+    ) {
+        guard let memoryID, let photoData, let signedPutURL else { return }
+        pendingRecovery = PendingUploadRecovery(
+            memoryID: memoryID,
+            photoData: photoData,
+            signedPutURL: signedPutURL,
+            contentType: contentType
+        )
+    }
+
+    private func cacheOwnDrop(memoryID: String, lat: Double, lng: Double) {
+        let day = ISO8601DateFormatter()
+        day.formatOptions = [.withFullDate]
+        OwnMemoryPinCache.save(
+            CachedOwnPin(
+                memoryID: memoryID,
+                lat: lat,
+                lng: lng,
+                dropDate: day.string(from: Date()),
+                thumbnailURL: nil,
+                cachedAt: Date()
+            )
+        )
     }
 }

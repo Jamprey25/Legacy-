@@ -9,6 +9,8 @@ import { ApiError } from "../lib/errors.js";
 import { encode as geohashEncode } from "../lib/geohash.js";
 import { generateSignedPutUrl, generateSignedGetUrl } from "../lib/storage.js";
 import { createMemory, getMemoryByOwner, getMemoryWithContext, listMemoriesByOwner } from "../db/memories.js";
+import { createSeal, type SealType } from "../db/seals.js";
+import { createCondition, type ConditionType } from "../db/conditions.js";
 import { upsertPresencePing, getPresencePing } from "../db/presencePings.js";
 import { createFind, getReturnCount, getLastFoundAt } from "../db/finds.js";
 import { ownMemoryProximity, othersMemoryProximity } from "../lib/proximity.js";
@@ -58,13 +60,118 @@ interface PostMemoriesBody {
   lng: unknown;
   accuracy_m: unknown;
   media_type: unknown;
+  drop_method?: unknown;
+  privacy_tier?: unknown;
+  teaser_text?: unknown;
+  caption?: unknown;
+  cooldown_hours?: unknown;
+  seal?: unknown;
+  condition?: unknown;
 }
 
 const VALID_MEDIA_TYPES = ["photo", "video", "text"] as const;
 type MediaType = (typeof VALID_MEDIA_TYPES)[number];
 
-/** Cooldown window after a live drop (seconds). Tunable in DB config table later. */
-const COOLDOWN_SECONDS = 24 * 60 * 60; // 24 hours default
+const VALID_DROP_METHODS = ["pin", "treasure_chest", "note_bottle"] as const;
+type DropMethod = (typeof VALID_DROP_METHODS)[number];
+
+const PHASE1_PRIVACY = new Set(["private"]);
+
+function parseSeal(raw: unknown): { sealType: SealType; config: Record<string, unknown> } | null {
+  if (raw == null) return null;
+  if (typeof raw !== "object" || raw === null || !("type" in raw)) {
+    throw new ApiError("invalid_request", "seal must be an object with a type field.");
+  }
+  const body = raw as Record<string, unknown>;
+  const type = body.type;
+  if (typeof type !== "string") {
+    throw new ApiError("invalid_request", "seal.type must be a string.");
+  }
+
+  switch (type) {
+    case "fixed_date":
+      if (typeof body.open_at !== "string") {
+        throw new ApiError("seal_config_invalid", "fixed_date seal requires open_at.");
+      }
+      return { sealType: "fixed_date", config: { open_at: body.open_at } };
+    case "duration":
+      if (typeof body.locked_hours !== "number") {
+        throw new ApiError("seal_config_invalid", "duration seal requires locked_hours.");
+      }
+      return { sealType: "duration", config: { locked_hours: body.locked_hours } };
+    case "age_based":
+      if (typeof body.recipient_dob !== "string" || typeof body.open_at_age !== "number") {
+        throw new ApiError("seal_config_invalid", "age_based seal requires recipient_dob and open_at_age.");
+      }
+      return {
+        sealType: "age_based",
+        config: { recipient_dob: body.recipient_dob, open_at_age: body.open_at_age },
+      };
+    case "recurring":
+      if (typeof body.window_start !== "string" || typeof body.window_duration_hours !== "number") {
+        throw new ApiError("seal_config_invalid", "recurring seal requires window_start and window_duration_hours.");
+      }
+      return {
+        sealType: "recurring",
+        config: {
+          window_start: body.window_start,
+          window_duration_hours: body.window_duration_hours,
+        },
+      };
+    default:
+      throw new ApiError("seal_config_invalid", `Unknown seal type: ${type}`);
+  }
+}
+
+function parseCondition(raw: unknown): {
+  conditionType: ConditionType;
+  config: Record<string, unknown>;
+  timeFallback: string;
+} | null {
+  if (raw == null) return null;
+  if (typeof raw !== "object" || raw === null || !("type" in raw)) {
+    throw new ApiError("invalid_request", "condition must be an object with a type field.");
+  }
+  const body = raw as Record<string, unknown>;
+  const type = body.type;
+  const fallback = body.time_fallback;
+  if (typeof type !== "string") {
+    throw new ApiError("invalid_request", "condition.type must be a string.");
+  }
+  if (typeof fallback !== "string") {
+    throw new ApiError("seal_config_invalid", "condition requires time_fallback.");
+  }
+
+  switch (type) {
+    case "time_of_day":
+      return {
+        conditionType: "time_of_day",
+        config: { after_hour: body.after_hour, before_hour: body.before_hour },
+        timeFallback: fallback,
+      };
+    case "season":
+      return {
+        conditionType: "season",
+        config: { month_start: body.month_start, month_end: body.month_end },
+        timeFallback: fallback,
+      };
+    case "long_absence":
+      return {
+        conditionType: "long_absence",
+        config: { days_since_last_find: body.days_since_last_find },
+        timeFallback: fallback,
+      };
+    case "nth_return":
+      return {
+        conditionType: "nth_return",
+        config: { n: body.n },
+        timeFallback: fallback,
+      };
+    default:
+      throw new ApiError("seal_config_invalid", `Unknown condition type: ${type}`);
+  }
+}
+
 
 memoriesRoutes.post("/", async (c) => {
   const body = (await c.req.json().catch(() => null)) as PostMemoriesBody | null;
@@ -72,7 +179,40 @@ memoriesRoutes.post("/", async (c) => {
 
   const { lat, lng, accuracy_m, media_type } = body;
 
-  // --- input validation ---
+  const dropMethodRaw = body.drop_method ?? "pin";
+  if (typeof dropMethodRaw !== "string" || !VALID_DROP_METHODS.includes(dropMethodRaw as DropMethod)) {
+    throw new ApiError(
+      "invalid_request",
+      `drop_method must be one of: ${VALID_DROP_METHODS.join(", ")}.`,
+    );
+  }
+  const dropMethod = dropMethodRaw as DropMethod;
+
+  const privacyRaw = body.privacy_tier ?? "private";
+  if (typeof privacyRaw !== "string") {
+    throw new ApiError("invalid_request", "privacy_tier must be a string.");
+  }
+  if (!PHASE1_PRIVACY.has(privacyRaw)) {
+    throw new ApiError("invalid_request", "Phase 1 only supports privacy_tier: private.");
+  }
+
+  const teaserText =
+    typeof body.teaser_text === "string" && body.teaser_text.trim().length > 0
+      ? body.teaser_text.trim()
+      : null;
+  const caption =
+    typeof body.caption === "string" && body.caption.trim().length > 0
+      ? body.caption.trim()
+      : null;
+
+  const cooldownHours =
+    typeof body.cooldown_hours === "number" && body.cooldown_hours > 0
+      ? body.cooldown_hours
+      : 24;
+  const cooldownSeconds = cooldownHours * 60 * 60;
+
+  const parsedSeal = parseSeal(body.seal);
+  const parsedCondition = parseCondition(body.condition);
   if (typeof lat !== "number" || typeof lng !== "number") {
     throw new ApiError("invalid_coordinates", "lat and lng must be numbers.");
   }
@@ -91,7 +231,7 @@ memoriesRoutes.post("/", async (c) => {
 
   // --- geohash + discoverable window ---
   const geohash = geohashEncode(lat, lng, 9);
-  const discoverableAfter = new Date(Date.now() + COOLDOWN_SECONDS * 1000);
+  const discoverableAfter = new Date(Date.now() + cooldownSeconds * 1000);
 
   // --- create the memory record (scan_status: pending by default) ---
   // For text memories, no media key is needed — skip signed URL generation.
@@ -104,11 +244,31 @@ memoriesRoutes.post("/", async (c) => {
     lng,
     geohash,
     mediaType,
-    dropMethod: "pin",
+    dropMethod,
     source: "live",
-    mediaKey: null, // updated by storage webhook once upload completes
+    mediaKey: null,
     discoverableAfter,
+    privacyTier: "private",
+    teaserText,
+    caption,
   });
+
+  if (parsedSeal) {
+    await createSeal({
+      memoryId: memory.id,
+      sealType: parsedSeal.sealType,
+      config: parsedSeal.config,
+    });
+  }
+
+  if (parsedCondition) {
+    await createCondition({
+      memoryId: memory.id,
+      conditionType: parsedCondition.conditionType,
+      config: parsedCondition.config,
+      timeFallback: parsedCondition.timeFallback,
+    });
+  }
 
   // --- signed PUT URL (skipped for text-only memories) ---
   let signedPutUrl: string | undefined;

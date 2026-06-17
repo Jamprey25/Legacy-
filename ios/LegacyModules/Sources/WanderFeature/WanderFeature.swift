@@ -28,6 +28,10 @@ public final class WanderCoordinator {
         self.networkMonitor = networkMonitor
         self.haptics = haptics ?? WarmthHaptics.platformDefault
         self.cachedOwnPins = OwnMemoryPinCache.load()
+        self.teasers = WanderScanCache.load()
+        if !teasers.isEmpty {
+            applyWarmth(from: teasers)
+        }
     }
 
     private let apiClient: LegacyAPIClient
@@ -95,8 +99,10 @@ public final class WanderCoordinator {
 
             if let response = try await apiClient.scan(body) {
                 teasers = response.teasers
+                WanderScanCache.save(teasers: response.teasers)
             } else {
                 teasers = []
+                WanderScanCache.clear()
             }
 
             applyWarmth(from: teasers)
@@ -111,6 +117,9 @@ public final class WanderCoordinator {
         } catch let error as LocationEngineError {
             statusMessage = "Location error: \(error)."
         } catch let error as LegacyAPIError where error.isConnectivityFailure {
+            if teasers.isEmpty {
+                teasers = WanderScanCache.load()
+            }
             applyWarmth(from: teasers)
             statusMessage = showsOfflineNearUX
                 ? "You need a signal to open this."

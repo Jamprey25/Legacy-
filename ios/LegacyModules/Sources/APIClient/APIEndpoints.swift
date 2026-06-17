@@ -101,6 +101,9 @@ public struct CreateMemoryRequest: Encodable, Sendable {
     public let privacyTier: String       // Phase 1: "private"
     public let teaserText: String?
     public let cooldownHours: Int?
+    public let caption: String?
+    public let seal: MemorySealPayload?
+    public let condition: MemoryConditionPayload?
     public let attestation: String?
 
     public init(
@@ -112,6 +115,9 @@ public struct CreateMemoryRequest: Encodable, Sendable {
         privacyTier: String = "private",
         teaserText: String? = nil,
         cooldownHours: Int? = 24,
+        caption: String? = nil,
+        seal: MemorySealPayload? = nil,
+        condition: MemoryConditionPayload? = nil,
         attestation: String? = nil
     ) {
         self.lat = lat
@@ -122,6 +128,9 @@ public struct CreateMemoryRequest: Encodable, Sendable {
         self.privacyTier = privacyTier
         self.teaserText = teaserText
         self.cooldownHours = cooldownHours
+        self.caption = caption
+        self.seal = seal
+        self.condition = condition
         self.attestation = attestation
     }
 
@@ -133,6 +142,9 @@ public struct CreateMemoryRequest: Encodable, Sendable {
         case privacyTier = "privacy_tier"
         case teaserText = "teaser_text"
         case cooldownHours = "cooldown_hours"
+        case caption
+        case seal
+        case condition
         case attestation
     }
 }
@@ -310,6 +322,26 @@ public struct Teaser: Decodable, Sendable, Equatable {
         case inRange = "in_range"
         case warmth
         case scanStatus = "scan_status"
+    }
+
+    public init(
+        memoryID: String,
+        thumbnailURL: String?,
+        dropDate: String,
+        ownerDisplay: String,
+        isOwn: Bool,
+        inRange: Bool,
+        warmth: String,
+        scanStatus: String
+    ) {
+        self.memoryID = memoryID
+        self.thumbnailURL = thumbnailURL
+        self.dropDate = dropDate
+        self.ownerDisplay = ownerDisplay
+        self.isOwn = isOwn
+        self.inRange = inRange
+        self.warmth = warmth
+        self.scanStatus = scanStatus
     }
 }
 

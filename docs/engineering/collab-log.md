@@ -48,12 +48,36 @@ Do not use interactive choice prompts or "which do you prefer?" in chat without 
 
 When Joseph clicks an option, the dashboard sets `status: "decided"`, `chosenOptionId`, `decidedAt`, and `resolution`, then commits to `tasks.json`.
 
+**`manualTests[]` shape (Joseph checks off in Xcode QA panel):**
+
+```json
+{
+  "id": "qa-unique-slug",
+  "title": "What Joseph should verify",
+  "status": "pending",
+  "addedBy": "ios",
+  "platform": "xcode",
+  "milestone": "M0",
+  "relatedTasks": ["ios-auth-ui"],
+  "steps": [
+    "Step 1 — concrete action in Xcode/simulator",
+    "Step 2 — expected result"
+  ],
+  "notes": "Optional extra context"
+}
+```
+
+- `status`: `pending` | `passed` | `failed` — Joseph toggles in the dashboard; `verifiedAt` is set automatically on pass/fail.
+- `addedBy`: `ios` (Cursor), `backend` (Claude), or `joseph`.
+- `platform`: `xcode` | `simulator` | `device`.
+- Add new items when a feature is ready for Joseph to smoke-test — do not ask in chat without logging here first.
+
 | Needs Joseph | Where to record it |
 |---|---|
 | Architectural fork (runtime, auth SDK, module layout) | `tasks.json` `decisions[]` with **`options[]`** + brainstorm reply — Joseph picks in the dashboard |
 | API shape ambiguity | Open questions → Backend → iOS, then `api-contract.md` if decided |
 | Product / UX call with privacy impact | Brainstorm + `architecture-decisions.md` if it graduates |
-| Routine implementation choice | Decide locally; log in **Decisions made** only if it affects the other side |
+| Manual Xcode / device smoke test | `tasks.json` `manualTests[]` — Joseph checks off in dashboard QA panel |
 
 ---
 
@@ -268,5 +292,22 @@ No Joseph action needed unless he wants Google live in M0 (would need OAuth clie
 - Memory Lane list/detail thumbnails remain `thumbnail_key` until CSAM pipeline generates signed URLs.
 
 **iOS follow-ups (not blocking M3 demo on stubs):**
-- Persist last-scan teasers across app restart for offline warmth (currently in-session only).
+- ~~Persist last-scan teasers across app restart for offline warmth (currently in-session only).~~ Done 2026-06-17 — `WanderScanCache` (24h TTL).
 - Owner signed GET on `GET /memories/:id` for Lane detail media without re-unlock.
+
+---
+
+## [ios → all] 2026-06-17 — V2/V4 compose + backend seal persistence
+
+**Shipped:**
+- **Drop tab modes:** Quick pin | Treasure chest | Note in a bottle (segmented picker).
+- **Treasure chest:** teaser text, full seal picker, optional conditions with fallback date UX, privacy picker (Phase 1 forces private), recipient placeholder.
+- **Note in a bottle:** text-only drop (`media_type: text`), time-only seal picker, GPS from current fix.
+- **API client:** `MemorySealPayload`, `MemoryConditionPayload`, extended `CreateMemoryRequest` (seal, condition, caption).
+- **Backend `POST /v1/memories`:** accepts `drop_method`, `teaser_text`, `caption`, `seal`, `condition`; persists seal/condition rows; Phase 1 privacy guard.
+- **WanderScanCache:** last-scan teasers persist 24h for offline warmth across app restarts.
+- **OwnMemoryPinCache** moved to `LocationEngine` — drops cache own pin on success too.
+- **CI:** `ios-modules` job runs `swift test` on macOS.
+- **Tests:** 38/38 SPM green.
+
+**Tasks marked done:** `ios-v2-compose-ui`, `ios-v4-note-bottle`.
