@@ -18,6 +18,7 @@ import { evaluateSeal } from "../lib/sealEval.js";
 import { evaluateCondition } from "../lib/conditionEval.js";
 import { requireAuth, type AuthVars } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
+import { validateLocationInput } from "../lib/locationInput.js";
 
 export const memoriesRoutes = new Hono<{ Variables: AuthVars }>();
 
@@ -184,7 +185,8 @@ memoriesRoutes.post("/", dropLimit, async (c) => {
   const body = (await c.req.json().catch(() => null)) as PostMemoriesBody | null;
   if (!body) throw new ApiError("invalid_request", "Request body must be JSON.");
 
-  const { lat, lng, accuracy_m, media_type } = body;
+  const { media_type } = body;
+  const { lat, lng, accuracyM: accuracy_m } = validateLocationInput(body.lat, body.lng, body.accuracy_m);
 
   const dropMethodRaw = body.drop_method ?? "pin";
   if (typeof dropMethodRaw !== "string" || !VALID_DROP_METHODS.includes(dropMethodRaw as DropMethod)) {
@@ -220,15 +222,6 @@ memoriesRoutes.post("/", dropLimit, async (c) => {
 
   const parsedSeal = parseSeal(body.seal);
   const parsedCondition = parseCondition(body.condition);
-  if (typeof lat !== "number" || typeof lng !== "number") {
-    throw new ApiError("invalid_coordinates", "lat and lng must be numbers.");
-  }
-  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-    throw new ApiError("invalid_coordinates", "Coordinates out of range.");
-  }
-  if (typeof accuracy_m !== "number" || accuracy_m <= 0 || accuracy_m > 1000) {
-    throw new ApiError("invalid_request", "accuracy_m must be a number between 0 and 1000.");
-  }
   if (!VALID_MEDIA_TYPES.includes(media_type as MediaType)) {
     throw new ApiError("invalid_request", `media_type must be one of: ${VALID_MEDIA_TYPES.join(", ")}.`);
   }
@@ -344,17 +337,7 @@ memoriesRoutes.post("/:id/unlock", unlockLimit, async (c) => {
   } | null;
   if (!body) throw new ApiError("invalid_request", "Request body must be JSON.");
 
-  const { lat, lng, accuracy_m } = body;
-
-  if (typeof lat !== "number" || typeof lng !== "number") {
-    throw new ApiError("invalid_coordinates", "lat and lng must be numbers.");
-  }
-  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-    throw new ApiError("invalid_coordinates", "Coordinates out of range.");
-  }
-  if (typeof accuracy_m !== "number" || accuracy_m <= 0 || accuracy_m >= 1000) {
-    throw new ApiError("invalid_coordinates", "accuracy_m must be > 0 and < 1000.");
-  }
+  const { lat, lng, accuracyM: accuracy_m } = validateLocationInput(body.lat, body.lng, body.accuracy_m);
 
   const memory = await getMemoryWithContext(memoryId);
   if (!memory) throw new ApiError("not_found", "Memory not found.");

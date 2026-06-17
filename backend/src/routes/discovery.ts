@@ -7,6 +7,7 @@ import { encode as geohashEncode, neighbours } from "../lib/geohash.js";
 import { ownMemoryProximity, othersMemoryProximity } from "../lib/proximity.js";
 import { generateSignedGetUrl } from "../lib/storage.js";
 import { findNearbyMemories } from "../db/memories.js";
+import { validateLocationInput } from "../lib/locationInput.js";
 import { upsertPresencePing } from "../db/presencePings.js";
 import { requireAuth, type AuthVars } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
@@ -30,17 +31,7 @@ discoveryRoutes.post("/scan", async (c) => {
   } | null;
   if (!body) throw new ApiError("invalid_request", "Request body must be JSON.");
 
-  const { lat, lng, accuracy_m } = body;
-
-  if (typeof lat !== "number" || typeof lng !== "number") {
-    throw new ApiError("invalid_coordinates", "lat and lng must be numbers.");
-  }
-  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-    throw new ApiError("invalid_coordinates", "Coordinates out of range.");
-  }
-  if (typeof accuracy_m !== "number" || accuracy_m <= 0 || accuracy_m >= 1000) {
-    throw new ApiError("invalid_coordinates", "accuracy_m must be > 0 and < 1000.");
-  }
+  const { lat, lng, accuracyM: accuracy_m } = validateLocationInput(body.lat, body.lng, body.accuracy_m);
 
   const userId: string = c.get("userId");
 

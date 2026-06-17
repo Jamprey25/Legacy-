@@ -1143,7 +1143,7 @@
     {
       "id": "accuracy-sanity-checks",
       "title": "Backend: Accuracy sanity checks \u2014 reject if accuracy_m <= 0 or >= 1000m; reject if timestamp outside \u00b15min clock skew",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 1,
       "milestone": "M5",
