@@ -418,3 +418,29 @@ No Joseph action needed unless he wants Google live in M0 (would need OAuth clie
 **Tasks marked done:** `ios-clvisit`, `ios-apns-registration`.
 
 **Next M4:** `backend-apns-push` (proximity notification delivery), `appstore-reviewer-rationale`, TestFlight prep.
+
+---
+
+## [backend → all] 2026-06-17 — Rate limiting, accuracy checks, audit log, location tests, Vercel Blob uploads
+
+**Shipped:**
+- **Rate limiting** — Postgres fixed-window limiter (migration `0008`, `db/rateLimits.ts`, `middleware/rateLimit.ts`); `/auth` 20/10min per IP, `/scan` 60/min, `POST /memories` 20/hr, `/unlock` 30/min per user. `429 rate_limited` + `retry_after_s`, fails open.
+- **Accuracy sanity (DEC-23)** — shared `validateLocationInput()` across scan/unlock/drop; fixed POST allowing exactly 1000m. 6 tests.
+- **Audit log** — fire-and-forget `audit()` on `auth.login`/`memory.drop`/`scan`/`unlock`; never logs coordinates. `db/auditLog.ts` + `lib/audit.ts`.
+- **Location CI tests** — 39 table-driven proximity/seal/condition tests + approach/drive-by/urban-canyon scenarios. 60 tests total green.
+- **Vercel Blob uploads** — storage decision implemented: `POST /v1/uploads` (`@vercel/blob` handleUpload handshake) + `onUploadCompleted` flips `scan_status`→clear; `POST /memories` returns `upload:null` for Blob; serving via public unguessable URL. See **api-contract §3.2**.
+- Fixed broken build: committed missing `db/conditions.ts` from commit `6c0c7b5`.
+
+**Tasks marked done:** `rate-limiting`, `accuracy-sanity-checks`, `audit-log-instrumentation`, `location-ci-tests`, all `seals-*` + `conditions-*`.
+
+**Threads:** resolved `q-storage-backend`, `q-app-attest-nullability`; raised `concern-blob-public-url` (privacy trade-off, needs joseph, revisit before public-tier).
+
+**Blocked on Joseph:** set `STORAGE_BACKEND=vercel-blob` + `BLOB_READ_WRITE_TOKEN` for live uploads. Remaining backend tasks (`backend-apns-push`, `app-attest-server`, `csam-thumbnail-generation`, `csam-vendor-live`) need Apple Developer account / CSAM vendor creds.
+
+**Blocked on iOS (Cursor):** implement the Blob client-upload handshake from Swift (api-contract §3.2) — no Swift SDK, replicate the `@vercel/blob/client` wire protocol; keep using `/internal/webhook/storage` stub in simulator.
+
+**Uncommitted / branch:** clean on `main` (note: earlier commit `6394ff5` bundled Cursor's then-staged APNs/devices/background-location files — staged intentionally, not lost).
+
+**Next session picks up:**
+1. Once `BLOB_READ_WRITE_TOKEN` is set — verify upload→scan_status flow on a Vercel preview deploy.
+2. `location-ci-tests` DB-integration half (dwell/re-entry GPX seed) when CI Postgres is available.

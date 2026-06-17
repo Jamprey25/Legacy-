@@ -137,6 +137,17 @@
           "date": "2026-06-16"
         }
       ]
+    },
+    {
+      "id": "concern-blob-public-url",
+      "kind": "concern",
+      "title": "Vercel Blob media served as public unguessable URL (not short-TTL)",
+      "status": "open",
+      "raisedBy": "backend",
+      "needs": "joseph",
+      "detail": "Vercel Blob has no S3-style presigned/expiring GET. Phase-1 implementation uploads media access:public with addRandomSuffix, so the blob URL is an unguessable bearer capability stored as media_key and returned on unlock. Trade-off vs the contract intent of a short-TTL signed GET: a leaked URL stays valid indefinitely; there is no server-enforced view window. Acceptable for Phase-1 private-tier memories (URL is unguessable, memories are owner/recipient-scoped), but it weakens the privacy posture for public-tier. MUST revisit before public memories / Phase 3 \u2014 options then: migrate to S3 presigned GET, or proxy private blobs through the function with a short-lived token. Documented in api-contract \u00a73.2 and DEC-23 revisit trigger.",
+      "blocks": [],
+      "responses": []
     }
   ],
   "manualTests": [
