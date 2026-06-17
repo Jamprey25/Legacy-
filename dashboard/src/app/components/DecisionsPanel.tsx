@@ -537,7 +537,7 @@ export default function DecisionsPanel({
         </>
       )}
 
-      {open.length === 0 && decided.length > 0 && (
+      {open.length === 0 && decided.length > 0 && openThreads.length === 0 && (
         <div
           style={{
             display: "flex",
@@ -553,6 +553,25 @@ export default function DecisionsPanel({
           <span style={{ fontSize: 16 }}>✓</span>
           <span style={{ fontSize: 14, fontWeight: 600, color: "#16a34a" }}>
             All decisions resolved — nothing blocking you
+          </span>
+        </div>
+      )}
+      {open.length === 0 && openThreads.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 14,
+            padding: "10px 14px",
+            background: "#0e1318",
+            border: "1px solid #0ea5e933",
+            borderRadius: 8,
+          }}
+        >
+          <span style={{ fontSize: 16 }}>💬</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: "#0ea5e9" }}>
+            {openThreads.length} open question{openThreads.length !== 1 ? "s" : ""} or concern{openThreads.length !== 1 ? "s" : ""} — see below
           </span>
         </div>
       )}
