@@ -15,14 +15,18 @@ public enum WanderFeature {
 public final class WanderCoordinator {
     public init(
         apiClient: LegacyAPIClient,
-        locationEngine: LocationEngine
+        locationEngine: LocationEngine,
+        haptics: WarmthHapticFeedback? = nil
     ) {
         self.apiClient = apiClient
         self.locationEngine = locationEngine
+        self.haptics = haptics ?? WarmthHaptics.platformDefault
     }
 
     private let apiClient: LegacyAPIClient
     private let locationEngine: LocationEngine
+    private let haptics: WarmthHapticFeedback
+    private var previousWarmthLevel: WarmthLevel = .none
 
     /// Teasers from the latest scan — no coordinates (contract §4).
     public private(set) var teasers: [Teaser] = []
@@ -30,9 +34,17 @@ public final class WanderCoordinator {
     public private(set) var isUnlocking = false
     public private(set) var statusMessage: String?
     public private(set) var unlockedMediaURL: URL?
+    public private(set) var unlockedCaption: String?
 
     /// Ambient warmth intensity 0…1. No directional component.
     public var warmthIntensity: Double = 0
+
+    public var isShowingUnlockedMedia: Bool { unlockedMediaURL != nil }
+
+    public func dismissUnlockedMedia() {
+        unlockedMediaURL = nil
+        unlockedCaption = nil
+    }
 
     /// Movement-gated foreground scan. Safe to call on appear and after significant movement.
     public func scanIfNeeded(force: Bool = false) async {
@@ -57,7 +69,7 @@ public final class WanderCoordinator {
                 teasers = []
             }
 
-            warmthIntensity = WanderScanPolicy.maxWarmthLevel(from: teasers).intensity
+            applyWarmth(from: teasers)
 
             locationEngine.recordScan(
                 at: CLLocation(latitude: fix.lat, longitude: fix.lng)
@@ -74,6 +86,7 @@ public final class WanderCoordinator {
         isUnlocking = true
         statusMessage = nil
         unlockedMediaURL = nil
+        unlockedCaption = nil
         defer { isUnlocking = false }
 
         do {
@@ -84,6 +97,7 @@ public final class WanderCoordinator {
             if let urlString = response.media.first?.url, let url = URL(string: urlString) {
                 unlockedMediaURL = url
             }
+            unlockedCaption = response.caption
             statusMessage = response.caption
         } catch let LegacyAPIError.locked(code, message, info) {
             switch code {
@@ -103,6 +117,15 @@ public final class WanderCoordinator {
             }
         } catch {
             statusMessage = "Could not unlock. Try again when you have a signal."
+        }
+    }
+
+    private func applyWarmth(from teasers: [Teaser]) {
+        let level = WanderScanPolicy.maxWarmthLevel(from: teasers)
+        warmthIntensity = level.intensity
+        if level != previousWarmthLevel {
+            haptics.playTransition(to: level)
+            previousWarmthLevel = level
         }
     }
 }
@@ -140,7 +163,7 @@ public struct WanderFeatureRootView: View {
                         .tint(LegacyColor.accent)
                 }
 
-                if let message = coordinator.statusMessage {
+                if let message = coordinator.statusMessage, !coordinator.isShowingUnlockedMedia {
                     Text(message)
                         .font(LegacyFont.callout)
                         .foregroundStyle(LegacyColor.textSecondary)
@@ -154,6 +177,14 @@ public struct WanderFeatureRootView: View {
         }
         .task {
             await coordinator.scanIfNeeded(force: true)
+        }
+        .sheet(isPresented: Binding(
+            get: { coordinator.isShowingUnlockedMedia },
+            set: { if !$0 { coordinator.dismissUnlockedMedia() } }
+        )) {
+            if let url = coordinator.unlockedMediaURL {
+                UnlockedMemorySheet(url: url, caption: coordinator.unlockedCaption)
+            }
         }
     }
 }
@@ -183,5 +214,53 @@ private struct TeaserRow: View {
             }
         }
         .listRowBackground(LegacyColor.surface)
+    }
+}
+
+private struct UnlockedMemorySheet: View {
+    let url: URL
+    let caption: String?
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: LegacySpacing.lg) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFit()
+                                .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.md))
+                        case .failure:
+                            ContentUnavailableView("Could not load", systemImage: "photo")
+                        default:
+                            ProgressView()
+                                .tint(LegacyColor.accent)
+                        }
+                    }
+
+                    if let caption, !caption.isEmpty {
+                        Text(caption)
+                            .font(LegacyFont.body)
+                            .foregroundStyle(LegacyColor.textPrimary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .padding(LegacySpacing.lg)
+            }
+            .background(LegacyColor.background)
+            .navigationTitle("Memory")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
     }
 }

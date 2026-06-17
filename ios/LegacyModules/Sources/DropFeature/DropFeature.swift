@@ -8,23 +8,6 @@ public enum DropFeature {
     public static let version = "0.1.0"
 }
 
-@MainActor
-@Observable
-public final class DropCoordinator {
-    public init(
-        apiClient: LegacyAPIClient,
-        locationEngine: LocationEngine
-    ) {
-        self.apiClient = apiClient
-        self.locationEngine = locationEngine
-    }
-
-    private let apiClient: LegacyAPIClient
-    private let locationEngine: LocationEngine
-
-    public var isDropping = false
-}
-
 public struct DropFeatureRootView: View {
     public init(coordinator: DropCoordinator) {
         self.coordinator = coordinator
@@ -33,10 +16,42 @@ public struct DropFeatureRootView: View {
     @Bindable private var coordinator: DropCoordinator
 
     public var body: some View {
-        ContentUnavailableView(
-            "Drop",
-            systemImage: "mappin.and.ellipse",
-            description: Text("Pin drop flow — M1")
-        )
+        VStack(spacing: LegacySpacing.lg) {
+            ContentUnavailableView(
+                "Drop",
+                systemImage: "mappin.and.ellipse",
+                description: Text("Pin a memory at your current location.")
+            )
+
+            statusView
+
+            if case .succeeded = coordinator.state {
+                Button("Drop another") { coordinator.reset() }
+                    .buttonStyle(.legacySecondary)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(LegacyColor.background)
+    }
+
+    @ViewBuilder
+    private var statusView: some View {
+        switch coordinator.state {
+        case .idle:
+            EmptyView()
+        case .stripping, .creating, .uploading:
+            ProgressView("Dropping memory…")
+                .tint(LegacyColor.accent)
+        case .succeeded:
+            Text("Memory dropped.")
+                .font(LegacyFont.callout)
+                .foregroundStyle(LegacyColor.accent)
+        case .failed(let message):
+            Text(message)
+                .font(LegacyFont.callout)
+                .foregroundStyle(LegacyColor.danger)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, LegacySpacing.lg)
+        }
     }
 }

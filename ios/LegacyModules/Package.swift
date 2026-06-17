@@ -75,5 +75,9 @@ let package = Package(
             name: "WanderFeatureTests",
             dependencies: ["WanderFeature", "APIClient", "DesignSystem"]
         ),
+        .testTarget(
+            name: "ImportFeatureTests",
+            dependencies: ["ImportFeature"]
+        ),
     ]
 )

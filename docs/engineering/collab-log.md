@@ -28,7 +28,26 @@ Do not use interactive choice prompts or "which do you prefer?" in chat without 
 
 ## Open questions
 
-*(none open — see Resolved)*
+### [ios → backend] Memory Lane needs a list endpoint
+`ios-memory-lane` is unblocked on the iOS side (`MemoryLaneFeature` shell exists) but **`api-contract.md` v1 has no owner list**. Only `GET /v1/memories/{id}` (single, owner-only, includes coordinates).
+
+**Proposal:** add `GET /v1/memories?cursor=<opaque>&limit=50` returning teaser-shaped rows **without lat/lng** — same fields as scan teasers plus `scan_status`. Sorted oldest-first per task spec. Pagination via cursor.
+
+**Recommendation:** ship this before Memory Lane UI; iOS can stub against fixtures meanwhile.
+
+**Blocks:** `ios-memory-lane` full implementation (grid can be built against fixtures now).
+
+---
+
+### [either → joseph] Media object storage for signed PUT URLs
+M1 backend (`endpoint-memories-post`, `s3-signed-put-url`) and iOS upload path are waiting on a bucket/provider choice: Vercel Blob vs Cloudflare R2 vs AWS S3. iOS `DropCoordinator` orchestration is coded against the contract's `upload.signed_put_url` shape — provider-agnostic.
+
+**Recommendation:** R2 or Vercel Blob for Phase 1 (simple signed PUT, no AWS account friction if avoidable).
+
+---
+
+### [ios → backend] App Attest `attestation` field optional until M5?
+Contract shows `"attestation"` on create/unlock. iOS sends `null` today. Confirm backend accepts omitted/null attestation for M1–M4 and rejects only when M5 enforcement lands.
 
 ---
 
@@ -59,6 +78,9 @@ Do not use interactive choice prompts or "which do you prefer?" in chat without 
 | 2026-06-16 | **Xcode-less iOS workflow:** `swift build` in `ios/LegacyModules` host-compiles all library targets on macOS (Command Line Tools). `swift test` / XCTest / SwiftUI previews / device run require full Xcode — tests are written but not runnable until disk space allows install. | ios |
 | 2026-06-16 | **`EXIFStripper`** (DropFeature): ImageIO rewrite strips GPS/EXIF/TIFF before upload; `hasMetadata(in:)` for unit tests. **`URLSessionMediaUploader`** scaffold for signed PUT (background URLSession still TODO). | ios |
 | 2026-06-16 | **`WanderCoordinator`**: movement-gated `/discovery/scan`, teaser list UI, max-warmth → `WarmthCueOverlay`, unlock with `423` dwell/not-in-range messaging. `WanderScanPolicy` pure helper for tests. | ios |
+| 2026-06-16 | **`DropCoordinator`**: EXIF strip → `POST /v1/memories` → signed PUT upload orchestration (picker/camera wiring still separate). | ios |
+| 2026-06-16 | **`WarmthHaptics`**: band-transition haptics (`UIImpactFeedbackGenerator` on iOS, no-op on macOS host builds). Wired into scan warmth updates. | ios |
+| 2026-06-16 | **`PhotoClusterEngine`**: ~150 m grid clustering + adjacent merge + rank — Import M3 prep, no Photos framework required for algorithm tests. | ios |
 
 ---
 
@@ -101,7 +123,9 @@ Legacy app            → AuthFeature, WanderFeature, LegacyAPIStubs (DEBUG)
 
 - **M0 auth UI shipped (`ios-auth-ui` done):** `AuthFeature` module. Sign in → Keychain → empty Wander map. Email OTP + DOB + age gate wired to contract. Google deferred (see brainstorm). DEBUG builds use stubbed API client for offline demo.
 
-- **M1/M2 logic (host-verified, no Xcode):** `EXIFStripper` + `URLSessionMediaUploader` in DropFeature; `WanderCoordinator` scan/unlock loop + teaser list + warmth overlay in WanderFeature. Unit tests added (`DropFeatureTests`, `WanderFeatureTests`) — run with `swift test` once Xcode is installed. MapKit map UI, PHPicker/camera, and haptics still blocked on Xcode.
+- **M1/M2 logic (host-verified, no Xcode):** `EXIFStripper` + `URLSessionMediaUploader` + **`DropCoordinator`** (strip → POST → PUT) in DropFeature; `WanderCoordinator` scan/unlock + **`UnlockedMemorySheet`** + **`WarmthHaptics`** in WanderFeature; **`PhotoClusterEngine`** in ImportFeature (pure Swift, no Photos framework). Unit tests in `DropFeatureTests`, `WanderFeatureTests`, `ImportFeatureTests`. MapKit, PHPicker/camera, and device haptic verification still need Xcode.
+
+- **Open questions (2026-06-16):** Memory Lane list endpoint missing from contract — see Open questions. Media storage provider blocks M1 backend upload URLs. Attestation nullability until M5 — needs backend confirm.
 
 - **Open in Xcode:** `ios/Legacy.xcodeproj` (local package ref to `ios/LegacyModules`). Set development team before running on device.
 - **Ruflo task tracking (2026-06-16):** Cursor syncs iOS work to ruflo via CLI (`npx @claude-flow/cli@latest task create/list`) + AgentDB memory (`namespace: legacy`). `tasks.json` remains dashboard source of truth. Ruflo session: `legacy-ios-cursor`. Active ruflo tasks: `task-1781641270028-pdoaek` (ios-design-system), `task-1781641273869-92k6cd` (ios-keychain-session), `task-1781641280362-ppoul1` (ios-apiclient-base, blocked).

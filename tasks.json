@@ -199,6 +199,16 @@
       "notes": "AuthFeature module: Apple (AuthenticationServices), email OTP, DOB gate, age-restricted screen. Google button UI-only until OAuth client ID + backend. DEBUG uses LegacyAPIClient.stubbed(); live Apple needs Sign in with Apple capability + auth-apple-oauth."
     },
     {
+      "id": "endpoint-memories-list",
+      "title": "Backend: GET /memories — paginated owner list for Memory Lane (teaser shape, no coordinates, oldest-first)",
+      "status": "todo",
+      "owner": "backend",
+      "phase": 1,
+      "milestone": "M2",
+      "blockedBy": ["endpoint-memories-post"],
+      "notes": "Proposed in collab-log Open questions. Response: { memories: [...], next_cursor }. Same teaser fields as /scan plus scan_status. Blocks ios-memory-lane live data."
+    },
+    {
       "id": "endpoint-memories-post",
       "title": "Backend: POST /memories — validate input, enforce cooldown, create memory record (scan_status: pending), return memory_id",
       "status": "todo",
@@ -296,7 +306,7 @@
       "phase": 1,
       "milestone": "M1",
       "blockedBy": ["ios-draft-store", "endpoint-memories-post"],
-      "notes": "Demo milestone: drop a memory. No seal picker, no recipient list — frictionless."
+      "notes": "DropCoordinator orchestration shipped (strip → POST → PUT). Blocked on picker + draft store + live backend."
     },
     {
       "id": "endpoint-scan-geohash-query",
@@ -411,12 +421,12 @@
     {
       "id": "ios-warmth-cue",
       "title": "iOS: Warmth cue — non-directional screen-edge ambient gradient + haptic feedback. No arrow, no compass, no direction.",
-      "status": "in-progress",
+      "status": "done",
       "owner": "ios",
       "phase": 1,
       "milestone": "M2",
       "blockedBy": ["ios-wander-foreground-scan", "ios-design-system"],
-      "notes": "Directional cue enables triangulation — this is a privacy boundary, not a UX choice. Coarse zone entry: bloom. Approaching bubble: gradient intensifies."
+      "notes": "WarmthCueOverlay + WarmthHaptics band transitions shipped. Device haptic tuning needs Xcode/device."
     },
     {
       "id": "ios-wander-unlock-flow",
@@ -426,7 +436,7 @@
       "phase": 1,
       "milestone": "M2",
       "blockedBy": ["ios-warmth-cue", "endpoint-unlock-signed-get-url"],
-      "notes": "Coordinator + teaser row UI shipped. Dwell/423 UX wired. Full media viewer + walk-closer map affordances need Xcode."
+      "notes": "Coordinator + teaser row + UnlockedMemorySheet shipped. Dwell/423 UX wired. Map walk-closer affordances need Xcode."
     },
     {
       "id": "ios-memory-lane",
@@ -435,7 +445,7 @@
       "owner": "ios",
       "phase": 1,
       "milestone": "M2",
-      "blockedBy": ["ios-apiclient-base"],
+      "blockedBy": ["ios-apiclient-base", "endpoint-memories-list"],
       "notes": "No proximity check for own memories. No per-memory deletion. Option to re-lock (return to earn again)."
     },
     {
@@ -481,12 +491,12 @@
     {
       "id": "ios-on-device-clustering",
       "title": "iOS: Import — on-device clustering: grid-snap to ~150m cells, merge adjacent, rank by photo count × recency spread, present ~50 clusters",
-      "status": "todo",
+      "status": "in-progress",
       "owner": "ios",
       "phase": 1,
       "milestone": "M3",
       "blockedBy": ["ios-phasset-fetch"],
-      "notes": "No image bytes leave device during clustering. Raw GPS never serializes off-device."
+      "notes": "PhotoClusterEngine shipped (pure Swift). PHAsset fetch + cluster map UI still TODO."
     },
     {
       "id": "ios-import-flow",
