@@ -316,23 +316,48 @@ No Joseph action needed unless he wants Google live in M0 (would need OAuth clie
 
 ---
 
-## [joseph → cursor] 2026-06-17 — Use Ruflo + design MCPs (Pika dropped)
+## [joseph → cursor] 2026-06-17 — Design MCP stack (Pika dropped)
 
 **Joseph:** Use **Ruflo for orchestration**. **Do not use Pika** for Legacy design — use **design MCPs** for app layout and pages instead.
 
-**Cursor setup:**
-- **Ruflo swarm:** hierarchical, namespace `legacy` / `legacy-ios` — swarm, memory, `hooks_route`.
-- **Design MCP stack (ranked for Legacy SwiftUI):**
+### Design MCP inventory (workspace)
 
-| MCP | Best for | Legacy use |
+| MCP | Key tools | Output |
 |---|---|---|
-| **Stitch** (`user-stitch`) | Full mobile screens from text, design systems, variants | Wander / Drop / Import / Lane layout mockups; `generate_screen_from_text`, `create_design_system`, export PNG/HTML as SwiftUI reference |
-| **21st Magic** (`user-21st-magic`) | Component patterns, inspiration, logos | Teaser cards, warmth overlay patterns, tab chrome, `21st_magic_component_builder` + `component_inspiration` |
-| **Cursor Canvas** (skill) | Interactive layout review in chat | Compare Stitch output vs current `DesignSystem.swift` before coding |
+| **Stitch** (`user-stitch`) | `create_project`, `create_design_system`, `generate_screen_from_text`, `edit_screens`, `generate_variants`, `apply_design_system`, `download_assets`, `get_screen` | Mobile screenshots, HTML mockups, DTCG design tokens, Figma export |
+| **21st Magic** (`user-21st-magic`) | `21st_magic_component_builder`, `21st_magic_component_inspiration`, `21st_magic_component_refiner`, `logo_search` | React/Tailwind component snippets + previews (layout reference only) |
+| **Cursor GenerateImage** | built-in | App icon, warmth stills, marketing frames |
+| **Cursor Canvas** (skill) | `.canvas.tsx` | Side-by-side layout review vs `DesignSystem.swift` |
 
-**Workflow:** Stitch screen → review in Canvas → map tokens to `LegacyColor` / `LegacyFont` / `LegacySpacing` → implement in SwiftUI. **Never** paste web CSS into iOS; treat MCP output as visual spec only.
+**Not in stack:** Pika (dropped), Vercel plugin MCP (auth/deploy only), shadcn (dashboard web UI only).
 
-**Dropped:** Pika (video/image gen) — not in the Legacy design path.
+### Ranked for Legacy SwiftUI (dark-first, warmth accent)
+
+| Priority | MCP | Tab / screen use |
+|---|---|---|
+| **1 — Stitch** | Full-screen layouts | **Wander:** map + edge warmth + teaser sheet. **Drop:** compose modes + seal picker. **Lane:** time-grid. **Import:** cluster map |
+| **2 — 21st Magic** | Component patterns | Teaser cards, bottom sheets, segmented controls, warmth pill chips — translate to SwiftUI |
+| **3 — GenerateImage** | One-off assets | App icon, TestFlight screenshot templates |
+
+### Stitch project (verified live 2026-06-17)
+
+- **Project:** `Legacy iOS` — id `4577268947470753156`
+- **Design system:** `Luminous Heritage` — dark, amber `#F2B873`, Manrope/Geist (maps to `LegacyColor.accent`)
+- **Wander Tab screen:** `b118d0ba8da946d4a102257d23b39dcb` — screenshot + HTML via `get_screen` / `download_assets`
+- **Queued:** Drop tab, Memory Lane grid, Import cluster map
+
+### Ruflo orchestration
+
+- **Swarm:** hierarchical, namespace `legacy` / `legacy-ios` — swarm, memory, `hooks_route`
+- **AgentDB:** `orchestration-policy` upserted (Stitch + 21st; Pika removed)
+
+### Workflow
+
+1. Read `ios/LegacyModules/Sources/DesignSystem/` tokens
+2. **Stitch:** `generate_screen_from_text` (`deviceType: MOBILE`) — include DEC-15 (no directional warmth)
+3. **Iterate:** `edit_screens` / `generate_variants`; download PNG/HTML as reference
+4. **21st:** `21st_magic_component_inspiration` for card/sheet/chip patterns
+5. **Implement:** SwiftUI manually — MCP output is visual spec only, not shipped code
 
 **Working rule:** Code + tests stay in repo. Ruflo = orchestration memory. Design MCPs = layout reference — `DesignSystem.swift` remains source of truth for shipped UI.
 
