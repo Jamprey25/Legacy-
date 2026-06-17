@@ -28,14 +28,8 @@ Do not use interactive choice prompts or "which do you prefer?" in chat without 
 
 ## Open questions
 
-### [ios → backend] Memory Lane needs a list endpoint
-`ios-memory-lane` is unblocked on the iOS side (`MemoryLaneFeature` shell exists) but **`api-contract.md` v1 has no owner list**. Only `GET /v1/memories/{id}` (single, owner-only, includes coordinates).
-
-**Proposal:** add `GET /v1/memories?cursor=<opaque>&limit=50` returning teaser-shaped rows **without lat/lng** — same fields as scan teasers plus `scan_status`. Sorted oldest-first per task spec. Pagination via cursor.
-
-**Recommendation:** ship this before Memory Lane UI; iOS can stub against fixtures meanwhile.
-
-**Blocks:** `ios-memory-lane` full implementation (grid can be built against fixtures now).
+### ~~[ios → backend] Memory Lane needs a list endpoint~~ ✅ RESOLVED 2026-06-17
+`GET /v1/memories?cursor=<base64url>&limit=50` shipped. Oldest-first, cursor-based pagination. Response: `{ memories: [...], next_cursor }`. Fields: `memory_id`, `drop_date`, `created_at`, `media_type`, `scan_status`, `thumbnail_key`, `privacy_tier`, `drop_method` — no lat/lng. **`ios-memory-lane` is now unblocked for live data.**
 
 ---
 
@@ -92,6 +86,10 @@ Contract shows `"attestation"` on create/unlock. iOS sends `null` today. Confirm
 | 2026-06-17 | **`POST /memories`** (`endpoint-memories-post`): validates input, encodes geohash (precision 9), inserts memory record (`scan_status: pending`), returns `memory_id + signed_put_url + expires_at`. Text-only memories skip the signed URL. Storage backend is abstracted behind `STORAGE_BACKEND` env var — stub active until Joseph picks provider. | backend |
 | 2026-06-17 | **`GET /memories/:id`** (owner-only): returns full memory row including coordinates (owner is entitled to their own drop point per privacy invariant). | backend |
 | 2026-06-17 | **`lib/geohash.ts`**: pure Niemeyer geohash encode + haversine `distanceMetres` + neighbour cells — 7 unit tests green. | backend |
+| 2026-06-17 | **`GET /memories`** (endpoint-memories-list): paginated oldest-first owner list. Cursor-based (base64url ISO timestamp). Response: `{ memories: [...], next_cursor }`. Teaser shape — coordinates excluded. Blocks `ios-memory-lane`. | backend |
+| 2026-06-17 | **`POST /discovery/scan`** (full chain — M2): geohash precision-5 zone query + 8 neighbours, eligibility filter (clear + discoverable_after), asymmetric proximity bubbles (own 25m+min(acc,75m); others 20m+min(acc,25m), >50m rejected silently), upserts presence_ping for in-range memories (dwell check #1), builds teaser response with signed thumbnail URL. `204` when nothing nearby. `lib/proximity.ts` for bubble math. | backend |
+| 2026-06-17 | **`POST /memories/:id/unlock`** (full chain — M2): proximity re-validate → dwell check (20s between two presence_pings; skipped for own) → seal evaluation (none/fixed_date/duration/age_based/recurring) → condition evaluation (time_of_day/season/weather/co_presence/long_absence/nth_return; fallback auto-satisfies) → generate signed GET URL (60-min TTL) → record Find. `lib/sealEval.ts` + `lib/conditionEval.ts`. | backend |
+| 2026-06-17 | **`db/presencePings.ts`** + **`db/finds.ts`**: upsert/get presence pings; create/count/last-find for finds table. | backend |
 | 2026-06-16 | **`DropCoordinator`**: EXIF strip → `POST /v1/memories` → signed PUT upload orchestration (picker/camera wiring still separate). | ios |
 | 2026-06-16 | **`WarmthHaptics`**: band-transition haptics (`UIImpactFeedbackGenerator` on iOS, no-op on macOS host builds). Wired into scan warmth updates. | ios |
 | 2026-06-16 | **`PhotoClusterEngine`**: ~150 m grid clustering + adjacent merge + rank — Import M3 prep, no Photos framework required for algorithm tests. | ios |
@@ -109,10 +107,14 @@ Things Cursor needs to know before writing `APIClient` or feature code.
 - All requests: `Authorization: Bearer <session_token>` + `X-Request-Timestamp` within ±5min clock skew
 - `POST /memories` input: `{ lat, lng, accuracy_m, media_type }` — no photo key in request body
 - `POST /memories` output: `{ memory_id, signed_put_url, expires_at }` — upload to `signed_put_url` within 15 min
-- `POST /discovery/scan` input: `{ lat, lng, accuracy_m }` — location discarded server-side immediately after validation
-- `POST /memories/{id}/unlock` requires two passing scan results ≥20s apart — first scan counts as check #1
+- `POST /discovery/scan` input: `{ lat, lng, accuracy_m }` — location discarded server-side immediately after validation. **NOW LIVE.**
+- `POST /memories/{id}/unlock` requires two passing scan results ≥20s apart — first scan counts as check #1. **NOW LIVE** (full dwell+seal+condition chain).
+- `GET /memories?cursor=<base64url>&limit=50` — paginated owner list. **NOW LIVE.** Unblocks `ios-memory-lane`.
 - All seal/condition evaluation happens server-side at unlock time — client never evaluates seals
 - EXIF must be stripped client-side before upload (server also strips, but client strip is the privacy guarantee)
+- **Warmth bands are coarse only** — 3 values: `coarse`, `approaching`, `in_bubble`. Never a continuous scalar. Client should ease animation *between* band transitions.
+- **`GET /memories` thumbnail_key** — this is the S3 key, not a URL. Thumbnails won't exist until the CSAM pipeline + thumbnail generation is wired (currently stub). For now all `thumbnail_key` will be null.
+- **Storage backend is still stub** — signed URLs are placeholder until Joseph picks provider (`s3-signed-put-url` task). Scan/unlock work against stub fine for dev.
 
 ---
 

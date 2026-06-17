@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-17T10:20:00Z"
+    "lastUpdated": "2026-06-17T11:10:00Z"
   },
   "decisions": [
     {
@@ -14,7 +14,14 @@
       "needs": "joseph",
       "detail": "All auth endpoints and everything downstream need a runtime before they can be built. Now the critical path: blocks all 4 M0 auth tasks and transitively ios-auth-ui (Cursor's next task).",
       "recommendation": "TypeScript/Node (Hono or Fastify) + pg on Vercel Functions — one language across dashboard + backend, easy contract type-sharing, trivial deploy. Alternative: Go for a single fast binary off serverless.",
-      "blocks": ["auth-apple-oauth", "auth-google-oauth", "auth-email-otp", "auth-age-gate", "auth-session-tokens", "ios-auth-ui"]
+      "blocks": [
+        "auth-apple-oauth",
+        "auth-google-oauth",
+        "auth-email-otp",
+        "auth-age-gate",
+        "auth-session-tokens",
+        "ios-auth-ui"
+      ]
     }
   ],
   "tasks": [
@@ -65,7 +72,9 @@
       "owner": "backend",
       "phase": 0,
       "milestone": "M0",
-      "blockedBy": ["schema-users-sessions"],
+      "blockedBy": [
+        "schema-users-sessions"
+      ],
       "notes": "geohash precision 5 (~4.9km cells). Coordinates immutable after insert. scan_status: pending|clear|blocked."
     },
     {
@@ -75,7 +84,9 @@
       "owner": "backend",
       "phase": 0,
       "milestone": "M0",
-      "blockedBy": ["schema-memories"],
+      "blockedBy": [
+        "schema-memories"
+      ],
       "notes": "Seal types: none, fixed_date, duration, age_based, recurring. Condition types: time_of_day, season, weather, co_presence, long_absence, nth_return. DB constraint enforces no user can be stranded."
     },
     {
@@ -85,7 +96,9 @@
       "owner": "backend",
       "phase": 0,
       "milestone": "M0",
-      "blockedBy": ["schema-memories"],
+      "blockedBy": [
+        "schema-memories"
+      ],
       "notes": "finds tracks nth_return counts. presence_pings is UNLOGGED (no WAL) with ~3min TTL — auto-purge job keeps it empty at steady state."
     },
     {
@@ -95,7 +108,9 @@
       "owner": "backend",
       "phase": 0,
       "milestone": "M0",
-      "blockedBy": ["schema-users-sessions"],
+      "blockedBy": [
+        "schema-users-sessions"
+      ],
       "notes": "CI gate enforces coordinates never appear in this table. IP + timestamp + user_id sufficient for rate-limit abuse detection."
     },
     {
@@ -105,7 +120,9 @@
       "owner": "backend",
       "phase": 0,
       "milestone": "M0",
-      "blockedBy": ["schema-users-sessions"],
+      "blockedBy": [
+        "schema-users-sessions"
+      ],
       "notes": "Done: verifyAppleToken (JWKS RS256, iss+aud check) in src/lib/jwt.ts; user find-or-create in src/db/users.ts."
     },
     {
@@ -115,7 +132,9 @@
       "owner": "backend",
       "phase": 0,
       "milestone": "M0",
-      "blockedBy": ["schema-users-sessions"],
+      "blockedBy": [
+        "schema-users-sessions"
+      ],
       "notes": "Done: verifyGoogleToken (JWKS RS256, iss+aud check) in src/lib/jwt.ts."
     },
     {
@@ -125,7 +144,9 @@
       "owner": "backend",
       "phase": 0,
       "milestone": "M0",
-      "blockedBy": ["schema-users-sessions"],
+      "blockedBy": [
+        "schema-users-sessions"
+      ],
       "notes": "Done: src/db/otp.ts (sha-256 hashed, single-use, attempt-capped, 10min TTL) + src/lib/email.ts (Resend or dev console). Migration 0007_email_otp.sql. Send rate-limit still TODO (M5 rate-limiting task)."
     },
     {
@@ -135,7 +156,11 @@
       "owner": "backend",
       "phase": 0,
       "milestone": "M0",
-      "blockedBy": ["auth-apple-oauth", "auth-google-oauth", "auth-email-otp"],
+      "blockedBy": [
+        "auth-apple-oauth",
+        "auth-google-oauth",
+        "auth-email-otp"
+      ],
       "notes": "Done: src/lib/age.ts resolveAgeTier — under-13 throws 403 age_restricted (never created); 13-15 minor; 16+ adult. 8 unit tests in test/age.test.ts. Parental-consent flow for minors deferred to Phase 2."
     },
     {
@@ -145,7 +170,9 @@
       "owner": "backend",
       "phase": 0,
       "milestone": "M0",
-      "blockedBy": ["auth-age-gate"],
+      "blockedBy": [
+        "auth-age-gate"
+      ],
       "notes": "Done: signSession/verifySession (HS256, ~30d) in src/lib/jwt.ts; requireAuth + clockSkew (±5min) middleware in src/middleware/auth.ts. Full auth routes in src/routes/auth.ts. typecheck + tests green."
     },
     {
@@ -165,7 +192,9 @@
       "owner": "ios",
       "phase": 0,
       "milestone": "M0",
-      "blockedBy": ["spm-scaffold"],
+      "blockedBy": [
+        "spm-scaffold"
+      ],
       "notes": "Warmth gradient is screen-edge ambient only — no directional component ever."
     },
     {
@@ -175,7 +204,10 @@
       "owner": "ios",
       "phase": 0,
       "milestone": "M0",
-      "blockedBy": ["spm-scaffold", "api-contract-doc"],
+      "blockedBy": [
+        "spm-scaffold",
+        "api-contract-doc"
+      ],
       "notes": "Session token read from Keychain. Codes to the contract doc — not the real API yet."
     },
     {
@@ -185,7 +217,9 @@
       "owner": "ios",
       "phase": 0,
       "milestone": "M0",
-      "blockedBy": ["spm-scaffold"],
+      "blockedBy": [
+        "spm-scaffold"
+      ],
       "notes": "SEC compliance. Token never stored in UserDefaults or disk."
     },
     {
@@ -201,11 +235,13 @@
     {
       "id": "endpoint-memories-list",
       "title": "Backend: GET /memories — paginated owner list for Memory Lane (teaser shape, no coordinates, oldest-first)",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 1,
       "milestone": "M2",
-      "blockedBy": ["endpoint-memories-post"],
+      "blockedBy": [
+        "endpoint-memories-post"
+      ],
       "notes": "Proposed in collab-log Open questions. Response: { memories: [...], next_cursor }. Same teaser fields as /scan plus scan_status. Blocks ios-memory-lane live data."
     },
     {
@@ -215,7 +251,10 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M1",
-      "blockedBy": ["schema-memories", "auth-session-tokens"],
+      "blockedBy": [
+        "schema-memories",
+        "auth-session-tokens"
+      ],
       "notes": "Done 2026-06-17: src/routes/memories.ts. Validates coords + accuracy_m + media_type, geohash at precision 9, inserts record, returns memory_id + signed_put_url + expires_at. Text memories skip signed URL. Storage backend abstracted (STORAGE_BACKEND env var; stub active)."
     },
     {
@@ -225,7 +264,10 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M1",
-      "blockedBy": ["endpoint-memories-post", "storage-provider-decision"],
+      "blockedBy": [
+        "endpoint-memories-post",
+        "storage-provider-decision"
+      ],
       "notes": "Abstraction in place (src/lib/storage.ts). Stub active. Needs Joseph to pick provider + add credentials. See collab-log.md open questions."
     },
     {
@@ -235,7 +277,9 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M1",
-      "blockedBy": ["s3-signed-put-url"],
+      "blockedBy": [
+        "s3-signed-put-url"
+      ],
       "notes": "Client already strips (privacy guarantee). Server strips again (guarantee of guarantee). SEC-MED-4."
     },
     {
@@ -245,7 +289,9 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M1",
-      "blockedBy": ["csam-server-exif-strip"],
+      "blockedBy": [
+        "csam-server-exif-strip"
+      ],
       "notes": "Real vendor slot is a no-op stub until approval. Pending assets invisible to non-owners. Owner sees own pending media."
     },
     {
@@ -255,7 +301,9 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M1",
-      "blockedBy": ["csam-pipeline-stub"],
+      "blockedBy": [
+        "csam-pipeline-stub"
+      ],
       "notes": "Thumbnails used for teaser cards in scan response. Never generated for pending/blocked assets."
     },
     {
@@ -265,7 +313,9 @@
       "owner": "ios",
       "phase": 1,
       "milestone": "M1",
-      "blockedBy": ["spm-scaffold"],
+      "blockedBy": [
+        "spm-scaffold"
+      ],
       "notes": "PHPickerViewController for library. AVFoundation for camera. No filters, no editing."
     },
     {
@@ -285,7 +335,10 @@
       "owner": "ios",
       "phase": 1,
       "milestone": "M1",
-      "blockedBy": ["ios-exif-strip", "s3-signed-put-url"],
+      "blockedBy": [
+        "ios-exif-strip",
+        "s3-signed-put-url"
+      ],
       "notes": "Memory record created first (POST /memories), upload after. `URLSessionMediaUploader` scaffold in DropFeature; Background URLSession + progress UI still TODO."
     },
     {
@@ -295,7 +348,9 @@
       "owner": "ios",
       "phase": 1,
       "milestone": "M1",
-      "blockedBy": ["ios-background-upload"],
+      "blockedBy": [
+        "ios-background-upload"
+      ],
       "notes": "Never cache non-owned coordinates. Only store: selected photo, pending memory_id, upload state."
     },
     {
@@ -305,97 +360,121 @@
       "owner": "ios",
       "phase": 1,
       "milestone": "M1",
-      "blockedBy": ["ios-draft-store", "endpoint-memories-post"],
+      "blockedBy": [
+        "ios-draft-store",
+        "endpoint-memories-post"
+      ],
       "notes": "DropCoordinator orchestration shipped (strip → POST → PUT). Blocked on picker + draft store + live backend."
     },
     {
       "id": "endpoint-scan-geohash-query",
       "title": "Backend: /scan — geohash prefix query to find nearby memories within coarse bounding box",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 1,
       "milestone": "M2",
-      "blockedBy": ["schema-memories", "auth-session-tokens"],
+      "blockedBy": [
+        "schema-memories",
+        "auth-session-tokens"
+      ],
       "notes": "Query geohash prefix (precision 5) + adjacent cells. O(memories near you), not O(all memories)."
     },
     {
       "id": "endpoint-scan-eligibility",
       "title": "Backend: /scan — eligibility filter: privacy_tier check (owner, recipient, friend, public+age), scan_status=clear, discoverable_after elapsed",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 1,
       "milestone": "M2",
-      "blockedBy": ["endpoint-scan-geohash-query"],
+      "blockedBy": [
+        "endpoint-scan-geohash-query"
+      ],
       "notes": "Phase 1: owner-only (private tier). Recipient/friend tiers in Phase 2."
     },
     {
       "id": "endpoint-scan-bubble-math",
       "title": "Backend: /scan — asymmetric proximity bubble: own memories base 25m + min(accuracy,75m) cushion; others' 20m + min(accuracy,25m), reject if accuracy>50m",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 1,
       "milestone": "M2",
-      "blockedBy": ["endpoint-scan-eligibility"],
+      "blockedBy": [
+        "endpoint-scan-eligibility"
+      ],
       "notes": "Accuracy rejection for others' memories is silent — same response as 'not in range'. Numbers tunable via config table."
     },
     {
       "id": "endpoint-scan-presence-ping",
       "title": "Backend: /scan — upsert presence_ping (memory_id, user_id, last_seen_at) for co-presence evaluation",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 1,
       "milestone": "M2",
-      "blockedBy": ["endpoint-scan-bubble-math", "schema-finds-pings"],
+      "blockedBy": [
+        "endpoint-scan-bubble-math",
+        "schema-finds-pings"
+      ],
       "notes": "Upsert with ~3min TTL. No coordinates stored — only boolean proximity outcome. Table auto-purged."
     },
     {
       "id": "endpoint-scan-teaser-response",
       "title": "Backend: /scan — build teaser response: no coordinates, no media URLs, only memory_id + thumbnail_url + drop_date + owner_display",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 1,
       "milestone": "M2",
-      "blockedBy": ["endpoint-scan-presence-ping"],
+      "blockedBy": [
+        "endpoint-scan-presence-ping"
+      ],
       "notes": "Location submitted → validated → discarded. 204 when nothing nearby. Privacy invariant: no coords ever sent to non-owner."
     },
     {
       "id": "endpoint-unlock-dwell",
       "title": "Backend: /unlock — enforce two-check dwell rule: require two passing proximity checks ≥20s apart (scan counts as check #1)",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 1,
       "milestone": "M2",
-      "blockedBy": ["endpoint-scan-teaser-response"],
+      "blockedBy": [
+        "endpoint-scan-teaser-response"
+      ],
       "notes": "Compensates for no velocity/teleport detection. Own memories skip dwell (false positives harmless). Failure: 423 Locked {reason: dwell_required}."
     },
     {
       "id": "endpoint-unlock-seal-eval",
       "title": "Backend: /unlock — seal evaluation: none, fixed_date, duration, age_based, recurring",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 1,
       "milestone": "M2",
-      "blockedBy": ["endpoint-unlock-dwell", "schema-seals-conditions"],
+      "blockedBy": [
+        "endpoint-unlock-dwell",
+        "schema-seals-conditions"
+      ],
       "notes": "All evaluation server-side at unlock time. age_based: compare owner DOB to open_at_age. recurring: compute next_open window."
     },
     {
       "id": "endpoint-unlock-condition-eval",
       "title": "Backend: /unlock — condition evaluation: time_of_day, season, weather (15min cache), co_presence, long_absence, nth_return",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 1,
       "milestone": "M2",
-      "blockedBy": ["endpoint-unlock-seal-eval"],
+      "blockedBy": [
+        "endpoint-unlock-seal-eval"
+      ],
       "notes": "Weather lazy-evaluated per geohash. Sunset/sunrise via solar formula (no external API). nth_return: count rows in finds table. Fallback to condition_time_fallback when condition not met."
     },
     {
       "id": "endpoint-unlock-signed-get-url",
       "title": "Backend: /unlock — generate signed GET URL for media (short TTL), record Find in finds table",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 1,
       "milestone": "M2",
-      "blockedBy": ["endpoint-unlock-condition-eval"],
+      "blockedBy": [
+        "endpoint-unlock-condition-eval"
+      ],
       "notes": "URL TTL: 60min (long enough to view, short enough to limit sharing). Raw storage keys never leave API. Find record increments nth_return count."
     },
     {
@@ -405,7 +484,9 @@
       "owner": "ios",
       "phase": 1,
       "milestone": "M2",
-      "blockedBy": ["spm-scaffold"],
+      "blockedBy": [
+        "spm-scaffold"
+      ],
       "notes": "Movement gate prevents scan spam. Reports accuracy_m alongside coordinates."
     },
     {
@@ -415,7 +496,10 @@
       "owner": "ios",
       "phase": 1,
       "milestone": "M2",
-      "blockedBy": ["ios-location-engine", "endpoint-scan-teaser-response"],
+      "blockedBy": [
+        "ios-location-engine",
+        "endpoint-scan-teaser-response"
+      ],
       "notes": "Scan on >25m movement OR >30s elapsed. Pins appear without coordinates — teaser only."
     },
     {
@@ -425,7 +509,10 @@
       "owner": "ios",
       "phase": 1,
       "milestone": "M2",
-      "blockedBy": ["ios-wander-foreground-scan", "ios-design-system"],
+      "blockedBy": [
+        "ios-wander-foreground-scan",
+        "ios-design-system"
+      ],
       "notes": "WarmthCueOverlay + WarmthHaptics band transitions shipped. Device haptic tuning needs Xcode/device."
     },
     {
@@ -435,7 +522,10 @@
       "owner": "ios",
       "phase": 1,
       "milestone": "M2",
-      "blockedBy": ["ios-warmth-cue", "endpoint-unlock-signed-get-url"],
+      "blockedBy": [
+        "ios-warmth-cue",
+        "endpoint-unlock-signed-get-url"
+      ],
       "notes": "Coordinator + teaser row + UnlockedMemorySheet shipped. Dwell/423 UX wired. Map walk-closer affordances need Xcode."
     },
     {
@@ -445,7 +535,10 @@
       "owner": "ios",
       "phase": 1,
       "milestone": "M2",
-      "blockedBy": ["ios-apiclient-base", "endpoint-memories-list"],
+      "blockedBy": [
+        "ios-apiclient-base",
+        "endpoint-memories-list"
+      ],
       "notes": "No proximity check for own memories. No per-memory deletion. Option to re-lock (return to earn again)."
     },
     {
@@ -455,7 +548,9 @@
       "owner": "ios",
       "phase": 1,
       "milestone": "M2",
-      "blockedBy": ["ios-wander-unlock-flow"],
+      "blockedBy": [
+        "ios-wander-unlock-flow"
+      ],
       "notes": "Coarse zones pre-fetched on every successful scan. Pin location NOT revealed in offline state. DEC-29."
     },
     {
@@ -465,7 +560,9 @@
       "owner": "ios",
       "phase": 1,
       "milestone": "M2",
-      "blockedBy": ["ios-wander-unlock-flow"],
+      "blockedBy": [
+        "ios-wander-unlock-flow"
+      ],
       "notes": "Only own memories. Non-owned coordinates must never persist on device."
     },
     {
@@ -475,7 +572,9 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M3",
-      "blockedBy": ["s3-signed-put-url"],
+      "blockedBy": [
+        "s3-signed-put-url"
+      ],
       "notes": "Idempotency key: geohash + capture-date bucket (prevents duplicates on retry). source: imported. private-only enforced — elevation to friends/public returns 422 CANNOT_ELEVATE_IMPORT."
     },
     {
@@ -485,7 +584,9 @@
       "owner": "ios",
       "phase": 1,
       "milestone": "M3",
-      "blockedBy": ["spm-scaffold"],
+      "blockedBy": [
+        "spm-scaffold"
+      ],
       "notes": "Photos permission required. Only metadata fetched at this stage — no pixel data."
     },
     {
@@ -495,7 +596,9 @@
       "owner": "ios",
       "phase": 1,
       "milestone": "M3",
-      "blockedBy": ["ios-phasset-fetch"],
+      "blockedBy": [
+        "ios-phasset-fetch"
+      ],
       "notes": "PhotoClusterEngine shipped (pure Swift). PHAsset fetch + cluster map UI still TODO."
     },
     {
@@ -505,7 +608,10 @@
       "owner": "ios",
       "phase": 1,
       "milestone": "M3",
-      "blockedBy": ["ios-on-device-clustering", "endpoint-memories-import"],
+      "blockedBy": [
+        "ios-on-device-clustering",
+        "endpoint-memories-import"
+      ],
       "notes": "Resumable: idempotency key prevents duplicates. Demo milestone: fresh install → dense map in <2min."
     },
     {
@@ -515,7 +621,9 @@
       "owner": "ios",
       "phase": 1,
       "milestone": "M3",
-      "blockedBy": ["ios-v1-pin-drop-flow"],
+      "blockedBy": [
+        "ios-v1-pin-drop-flow"
+      ],
       "notes": "Full seal suite. Conditions are opt-in. Each condition must show what the fallback date will be."
     },
     {
@@ -525,7 +633,9 @@
       "owner": "ios",
       "phase": 1,
       "milestone": "M3",
-      "blockedBy": ["ios-v1-pin-drop-flow"],
+      "blockedBy": [
+        "ios-v1-pin-drop-flow"
+      ],
       "notes": "Text-only — no photo. Location from GPS, not picker."
     },
     {
@@ -535,7 +645,9 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M3",
-      "blockedBy": ["endpoint-unlock-seal-eval"],
+      "blockedBy": [
+        "endpoint-unlock-seal-eval"
+      ],
       "notes": ""
     },
     {
@@ -545,7 +657,9 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M3",
-      "blockedBy": ["endpoint-unlock-seal-eval"],
+      "blockedBy": [
+        "endpoint-unlock-seal-eval"
+      ],
       "notes": ""
     },
     {
@@ -555,7 +669,9 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M3",
-      "blockedBy": ["endpoint-unlock-seal-eval"],
+      "blockedBy": [
+        "endpoint-unlock-seal-eval"
+      ],
       "notes": "Requires owner to specify recipient DOB or recipient must have DOB on file."
     },
     {
@@ -565,7 +681,9 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M3",
-      "blockedBy": ["endpoint-unlock-seal-eval"],
+      "blockedBy": [
+        "endpoint-unlock-seal-eval"
+      ],
       "notes": ""
     },
     {
@@ -575,7 +693,9 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M3",
-      "blockedBy": ["endpoint-unlock-condition-eval"],
+      "blockedBy": [
+        "endpoint-unlock-condition-eval"
+      ],
       "notes": "Use timezone derived from drop-point coordinates — not user's current timezone."
     },
     {
@@ -585,7 +705,9 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M3",
-      "blockedBy": ["endpoint-unlock-condition-eval"],
+      "blockedBy": [
+        "endpoint-unlock-condition-eval"
+      ],
       "notes": ""
     },
     {
@@ -595,7 +717,9 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M3",
-      "blockedBy": ["endpoint-unlock-condition-eval"],
+      "blockedBy": [
+        "endpoint-unlock-condition-eval"
+      ],
       "notes": "Lazy-evaluated: only fetched when someone is at the pin. Sunrise/sunset via solar formula, no external API."
     },
     {
@@ -605,7 +729,10 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M3",
-      "blockedBy": ["endpoint-unlock-condition-eval", "schema-finds-pings"],
+      "blockedBy": [
+        "endpoint-unlock-condition-eval",
+        "schema-finds-pings"
+      ],
       "notes": "Satisfaction opens ~10min unlock window for all participants. States: idle → gathering → satisfied → unlocked → reset."
     },
     {
@@ -615,7 +742,10 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M3",
-      "blockedBy": ["endpoint-unlock-condition-eval", "schema-finds-pings"],
+      "blockedBy": [
+        "endpoint-unlock-condition-eval",
+        "schema-finds-pings"
+      ],
       "notes": "Query finds table for last found_at. Requires finds table to be populated correctly."
     },
     {
@@ -625,7 +755,10 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M3",
-      "blockedBy": ["endpoint-unlock-condition-eval", "schema-finds-pings"],
+      "blockedBy": [
+        "endpoint-unlock-condition-eval",
+        "schema-finds-pings"
+      ],
       "notes": ""
     },
     {
@@ -635,7 +768,9 @@
       "owner": "ios",
       "phase": 1,
       "milestone": "M4",
-      "blockedBy": ["ios-wander-foreground-scan"],
+      "blockedBy": [
+        "ios-wander-foreground-scan"
+      ],
       "notes": "Near-zero battery at steady state. Zero location hardware between wakes."
     },
     {
@@ -645,7 +780,9 @@
       "owner": "ios",
       "phase": 1,
       "milestone": "M4",
-      "blockedBy": ["ios-significant-change"],
+      "blockedBy": [
+        "ios-significant-change"
+      ],
       "notes": "iOS caps ~20 regions per app. Others' coarse zones: device knows 'cell 9q8yy has something' — never a point coordinate."
     },
     {
@@ -655,7 +792,9 @@
       "owner": "ios",
       "phase": 1,
       "milestone": "M4",
-      "blockedBy": ["ios-clmonitor-regions"],
+      "blockedBy": [
+        "ios-clmonitor-regions"
+      ],
       "notes": "1 region slot kept spare. Rotation logic: sort by distance, take top 19."
     },
     {
@@ -665,7 +804,9 @@
       "owner": "ios",
       "phase": 1,
       "milestone": "M4",
-      "blockedBy": ["ios-clmonitor-regions"],
+      "blockedBy": [
+        "ios-clmonitor-regions"
+      ],
       "notes": ""
     },
     {
@@ -675,7 +816,10 @@
       "owner": "ios",
       "phase": 1,
       "milestone": "M4",
-      "blockedBy": ["ios-clvisit", "ios-region-rotation"],
+      "blockedBy": [
+        "ios-clvisit",
+        "ios-region-rotation"
+      ],
       "notes": ""
     },
     {
@@ -685,7 +829,9 @@
       "owner": "ios",
       "phase": 1,
       "milestone": "M4",
-      "blockedBy": ["ios-region-entry-scan"],
+      "blockedBy": [
+        "ios-region-entry-scan"
+      ],
       "notes": "Token-based APNs auth. iOS-only in Phase 1 — no FCM/OneSignal."
     },
     {
@@ -695,7 +841,9 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M4",
-      "blockedBy": ["auth-session-tokens"],
+      "blockedBy": [
+        "auth-session-tokens"
+      ],
       "notes": "Notification content: generic ('Something is waiting for you'). Never includes memory content or coordinates."
     },
     {
@@ -705,7 +853,10 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M5",
-      "blockedBy": ["auth-session-tokens", "endpoint-memories-post"],
+      "blockedBy": [
+        "auth-session-tokens",
+        "endpoint-memories-post"
+      ],
       "notes": ""
     },
     {
@@ -715,7 +866,9 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M5",
-      "blockedBy": ["app-attest-server"],
+      "blockedBy": [
+        "app-attest-server"
+      ],
       "notes": "DEC-22. Bypass is an operational action, not silent. Monitor flag state."
     },
     {
@@ -725,7 +878,9 @@
       "owner": "ios",
       "phase": 1,
       "milestone": "M5",
-      "blockedBy": ["app-attest-server"],
+      "blockedBy": [
+        "app-attest-server"
+      ],
       "notes": "Reject drop if sourceInformation.isSimulatedBySoftware = true. iOS 17+ minimum covers this API."
     },
     {
@@ -735,7 +890,10 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M5",
-      "blockedBy": ["endpoint-scan-teaser-response", "endpoint-unlock-signed-get-url"],
+      "blockedBy": [
+        "endpoint-scan-teaser-response",
+        "endpoint-unlock-signed-get-url"
+      ],
       "notes": "IP + user_id + timestamp sufficient. No coordinates needed for abuse detection."
     },
     {
@@ -745,7 +903,9 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M5",
-      "blockedBy": ["endpoint-scan-teaser-response"],
+      "blockedBy": [
+        "endpoint-scan-teaser-response"
+      ],
       "notes": "DEC-23. Apply to all location-bearing endpoints."
     },
     {
@@ -755,7 +915,10 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M5",
-      "blockedBy": ["schema-audit-log", "rate-limiting"],
+      "blockedBy": [
+        "schema-audit-log",
+        "rate-limiting"
+      ],
       "notes": "CI gate: automated grep confirms no coordinate fields in audit_log migration or insert statements."
     },
     {
@@ -765,7 +928,10 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M5",
-      "blockedBy": ["schema-memories", "s3-signed-put-url"],
+      "blockedBy": [
+        "schema-memories",
+        "s3-signed-put-url"
+      ],
       "notes": "Async job: package, upload to signed S3 path, return URL. Required for App Store privacy compliance."
     },
     {
@@ -775,7 +941,9 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M5",
-      "blockedBy": ["account-export"],
+      "blockedBy": [
+        "account-export"
+      ],
       "notes": ""
     },
     {
@@ -785,7 +953,10 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M5",
-      "blockedBy": ["csam-pipeline-stub", "csam-vendor-apply"],
+      "blockedBy": [
+        "csam-pipeline-stub",
+        "csam-vendor-apply"
+      ],
       "notes": "On match: flip scan_status to blocked, hide memory from all users, file report. Vendor-agnostic interface (webhook)."
     },
     {
@@ -795,7 +966,9 @@
       "owner": "backend",
       "phase": 1,
       "milestone": "M5",
-      "blockedBy": ["endpoint-unlock-condition-eval"],
+      "blockedBy": [
+        "endpoint-unlock-condition-eval"
+      ],
       "notes": "Local Postgres in CI. Seed scripts create dense test geography."
     },
     {
@@ -805,7 +978,9 @@
       "owner": "either",
       "phase": 1,
       "milestone": "M5",
-      "blockedBy": ["ios-region-rotation"],
+      "blockedBy": [
+        "ios-region-rotation"
+      ],
       "notes": "Write early (M3), not at submission. Background location review is a common rejection point."
     },
     {
@@ -815,7 +990,12 @@
       "owner": "either",
       "phase": 1,
       "milestone": "M5",
-      "blockedBy": ["csam-vendor-live", "app-attest-feature-flag", "audit-log-instrumentation", "account-cascade-delete"],
+      "blockedBy": [
+        "csam-vendor-live",
+        "app-attest-feature-flag",
+        "audit-log-instrumentation",
+        "account-cascade-delete"
+      ],
       "notes": ""
     },
     {
@@ -825,7 +1005,9 @@
       "owner": "backend",
       "phase": 2,
       "milestone": "M6",
-      "blockedBy": ["testflight-beta"],
+      "blockedBy": [
+        "testflight-beta"
+      ],
       "notes": ""
     },
     {
@@ -835,7 +1017,9 @@
       "owner": "backend",
       "phase": 2,
       "milestone": "M6",
-      "blockedBy": ["schema-phone-verification"],
+      "blockedBy": [
+        "schema-phone-verification"
+      ],
       "notes": ""
     },
     {
@@ -845,7 +1029,9 @@
       "owner": "backend",
       "phase": 2,
       "milestone": "M6",
-      "blockedBy": ["phone-verification-backend"],
+      "blockedBy": [
+        "phone-verification-backend"
+      ],
       "notes": ""
     },
     {
@@ -855,7 +1041,9 @@
       "owner": "backend",
       "phase": 2,
       "milestone": "M6",
-      "blockedBy": ["recipient-acl-backend"],
+      "blockedBy": [
+        "recipient-acl-backend"
+      ],
       "notes": "Deep link → sign-in → memory surfaced on map. Twilio for SMS delivery."
     },
     {
@@ -865,7 +1053,9 @@
       "owner": "ios",
       "phase": 2,
       "milestone": "M6",
-      "blockedBy": ["summons-flow-backend"],
+      "blockedBy": [
+        "summons-flow-backend"
+      ],
       "notes": ""
     },
     {
@@ -875,7 +1065,9 @@
       "owner": "ios",
       "phase": 2,
       "milestone": "M6",
-      "blockedBy": ["ios-summons-deep-link"],
+      "blockedBy": [
+        "ios-summons-deep-link"
+      ],
       "notes": ""
     },
     {
@@ -885,7 +1077,9 @@
       "owner": "backend",
       "phase": 2,
       "milestone": "M7",
-      "blockedBy": ["schema-phone-verification"],
+      "blockedBy": [
+        "schema-phone-verification"
+      ],
       "notes": "Mutual only: both users must accept. friend-tier memories discoverable in proximity once mutual."
     },
     {
@@ -895,7 +1089,9 @@
       "owner": "backend",
       "phase": 2,
       "milestone": "M7",
-      "blockedBy": ["friends-graph-backend"],
+      "blockedBy": [
+        "friends-graph-backend"
+      ],
       "notes": "Place-locked: proximity required to submit a reply. Cannot reply from couch."
     },
     {
@@ -905,7 +1101,9 @@
       "owner": "ios",
       "phase": 2,
       "milestone": "M7",
-      "blockedBy": ["friends-graph-backend"],
+      "blockedBy": [
+        "friends-graph-backend"
+      ],
       "notes": ""
     },
     {
@@ -915,7 +1113,9 @@
       "owner": "ios",
       "phase": 2,
       "milestone": "M7",
-      "blockedBy": ["replies-backend"],
+      "blockedBy": [
+        "replies-backend"
+      ],
       "notes": ""
     },
     {
@@ -925,7 +1125,9 @@
       "owner": "backend",
       "phase": 2,
       "milestone": "M8",
-      "blockedBy": ["friends-graph-backend"],
+      "blockedBy": [
+        "friends-graph-backend"
+      ],
       "notes": "$99/yr tier. Premium responses: keep (re-earn) or vault (stays unlocked forever once found)."
     },
     {
@@ -935,7 +1137,9 @@
       "owner": "ios",
       "phase": 2,
       "milestone": "M8",
-      "blockedBy": ["vault-backend"],
+      "blockedBy": [
+        "vault-backend"
+      ],
       "notes": ""
     },
     {
@@ -945,7 +1149,9 @@
       "owner": "backend",
       "phase": 3,
       "milestone": "M9",
-      "blockedBy": ["testflight-beta"],
+      "blockedBy": [
+        "testflight-beta"
+      ],
       "notes": "Public drops near sensitive locations (homes, schools) get extra scrutiny. Reportable content auto-hides pending review."
     },
     {
@@ -955,7 +1161,9 @@
       "owner": "backend",
       "phase": 3,
       "milestone": "M9",
-      "blockedBy": ["content-screening-pipeline"],
+      "blockedBy": [
+        "content-screening-pipeline"
+      ],
       "notes": "Deliberately deferred from Phase 1 (private-only). Requires position trail — evaluate privacy cost vs. abuse reduction at Phase 3 kickoff."
     },
     {
@@ -965,7 +1173,9 @@
       "owner": "backend",
       "phase": 3,
       "milestone": "M9",
-      "blockedBy": ["velocity-teleport-detection"],
+      "blockedBy": [
+        "velocity-teleport-detection"
+      ],
       "notes": ""
     },
     {
@@ -975,7 +1185,9 @@
       "owner": "ios",
       "phase": 3,
       "milestone": "M9",
-      "blockedBy": ["public-memories-backend"],
+      "blockedBy": [
+        "public-memories-backend"
+      ],
       "notes": ""
     },
     {
@@ -985,7 +1197,9 @@
       "owner": "backend",
       "phase": 3,
       "milestone": "M10",
-      "blockedBy": ["public-memories-backend"],
+      "blockedBy": [
+        "public-memories-backend"
+      ],
       "notes": "Universities, festivals, tourism boards. No ads inside experience ever."
     },
     {
@@ -995,7 +1209,9 @@
       "owner": "ios",
       "phase": 3,
       "milestone": "M10",
-      "blockedBy": ["institutional-layer-backend"],
+      "blockedBy": [
+        "institutional-layer-backend"
+      ],
       "notes": ""
     },
     {
@@ -1005,7 +1221,9 @@
       "owner": "either",
       "phase": 3,
       "milestone": "M11",
-      "blockedBy": ["ios-public-memories"],
+      "blockedBy": [
+        "ios-public-memories"
+      ],
       "notes": "FCM for push. Re-evaluate MapKit → Maps SDK. Background location model differs significantly."
     }
   ]

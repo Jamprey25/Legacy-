@@ -51,11 +51,25 @@ export class ApiError extends Error {
   readonly status: number;
   readonly extra: Record<string, unknown>;
 
-  constructor(code: ErrorCode, message: string, extra: Record<string, unknown> = {}) {
+  /**
+   * @param statusOverride  Optional HTTP status code override (default: looked up from code).
+   *                        Pass when the caller wants to be explicit (e.g. 423 for proximity errors).
+   */
+  constructor(
+    code: ErrorCode,
+    message: string,
+    statusOrExtra: number | Record<string, unknown> = {},
+    extra: Record<string, unknown> = {},
+  ) {
     super(message);
     this.code = code;
-    this.status = STATUS_BY_CODE[code];
-    this.extra = extra;
+    if (typeof statusOrExtra === "number") {
+      this.status = statusOrExtra;
+      this.extra = extra;
+    } else {
+      this.status = STATUS_BY_CODE[code];
+      this.extra = statusOrExtra;
+    }
   }
 }
 

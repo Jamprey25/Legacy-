@@ -8,7 +8,8 @@
 // Decision pending — leaving stub active until backend is chosen (collab-log.md).
 
 const BACKEND = process.env.STORAGE_BACKEND ?? "stub";
-const TTL_SECONDS = 15 * 60; // 15-min signed URL window (api-contract §3.1)
+const PUT_TTL_SECONDS = 15 * 60; // 15-min upload window (api-contract §3.1)
+const GET_TTL_SECONDS = 60 * 60; // 60-min media view window (api-contract §4 unlock)
 
 export interface SignedPutResult {
   mediaKey: string;
@@ -23,7 +24,7 @@ export async function generateSignedPutUrl(
 ): Promise<SignedPutResult> {
   const ext = mediaType === "video" ? "mp4" : "jpg";
   const mediaKey = `memories/${memoryId}/original.${ext}`;
-  const expiresAt = new Date(Date.now() + TTL_SECONDS * 1000).toISOString();
+  const expiresAt = new Date(Date.now() + PUT_TTL_SECONDS * 1000).toISOString();
 
   if (BACKEND === "stub") {
     return {
@@ -43,6 +44,37 @@ export async function generateSignedPutUrl(
 
   if (BACKEND === "s3") {
     return s3PutUrl(mediaKey, expiresAt);
+  }
+
+  throw new Error(`Unknown STORAGE_BACKEND: ${BACKEND}`);
+}
+
+export interface SignedGetResult {
+  signedGetUrl: string;
+  expiresAt: string; // ISO-8601
+}
+
+/** Generate a signed GET URL for media retrieval (unlock). */
+export async function generateSignedGetUrl(mediaKey: string): Promise<SignedGetResult> {
+  const expiresAt = new Date(Date.now() + GET_TTL_SECONDS * 1000).toISOString();
+
+  if (BACKEND === "stub") {
+    return {
+      signedGetUrl: `https://stub.storage.example/get/${mediaKey}?expires=${expiresAt}`,
+      expiresAt,
+    };
+  }
+
+  if (BACKEND === "vercel-blob") {
+    return vercelBlobGetUrl(mediaKey, expiresAt);
+  }
+
+  if (BACKEND === "r2") {
+    return r2GetUrl(mediaKey, expiresAt);
+  }
+
+  if (BACKEND === "s3") {
+    return s3GetUrl(mediaKey, expiresAt);
   }
 
   throw new Error(`Unknown STORAGE_BACKEND: ${BACKEND}`);
@@ -70,4 +102,16 @@ async function s3PutUrl(mediaKey: string, expiresAt: string): Promise<SignedPutR
   // TODO: use @aws-sdk/client-s3 + @aws-sdk/s3-request-presigner.
   // Env: AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET_NAME
   throw new Error("S3 backend not yet implemented. Add AWS credentials.");
+}
+
+async function vercelBlobGetUrl(_mediaKey: string, _expiresAt: string): Promise<SignedGetResult> {
+  throw new Error("vercel-blob GET backend not yet implemented.");
+}
+
+async function r2GetUrl(_mediaKey: string, _expiresAt: string): Promise<SignedGetResult> {
+  throw new Error("R2 GET backend not yet implemented.");
+}
+
+async function s3GetUrl(_mediaKey: string, _expiresAt: string): Promise<SignedGetResult> {
+  throw new Error("S3 GET backend not yet implemented.");
 }

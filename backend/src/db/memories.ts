@@ -3,7 +3,7 @@
 // The geohash is computed by the caller (lib/geohash.ts) so it can be tested
 // independently without a DB connection.
 
-import { sql } from "./client.js";
+import { sql, type Row } from "./client.js";
 
 export interface CreateMemoryInput {
   ownerId: string;
@@ -30,6 +30,8 @@ export interface MemoryRow {
   media_type: string;
   media_key: string | null;
   thumbnail_key: string | null;
+  caption: string | null;
+  teaser_text: string | null;
   discoverable_after: Date;
   created_at: Date;
 }
@@ -54,7 +56,7 @@ export async function createMemory(input: CreateMemoryInput): Promise<MemoryRow>
     )
     RETURNING *
   `;
-  return rows[0] as MemoryRow;
+  return rows[0] as unknown as MemoryRow;
 }
 
 /** Fetch a single memory by id, owner-only. Returns null if not found or not owner. */
@@ -67,5 +69,124 @@ export async function getMemoryByOwner(
     WHERE id = ${memoryId} AND owner_id = ${ownerId}
     LIMIT 1
   `;
-  return rows.length > 0 ? (rows[0] as MemoryRow) : null;
+  return rows.length > 0 ? (rows[0] as unknown as MemoryRow) : null;
+}
+
+/** Fetch any memory by id. Caller enforces access rules (e.g. unlock route). */
+export async function getMemoryById(memoryId: string): Promise<MemoryRow | null> {
+  const rows = await sql`SELECT * FROM memories WHERE id = ${memoryId} LIMIT 1`;
+  return rows.length > 0 ? (rows[0] as unknown as MemoryRow) : null;
+}
+
+/** Full memory context including seal + condition rows (joined). Used at unlock time. */
+export interface MemoryWithContext extends MemoryRow {
+  seal_type: string | null;
+  seal_config: Row | null;
+  condition_type: string | null;
+  condition_config: Row | null;
+  condition_time_fallback: Date | null;
+}
+
+export async function getMemoryWithContext(memoryId: string): Promise<MemoryWithContext | null> {
+  const rows = await sql`
+    SELECT
+      m.*,
+      s.seal_type,
+      s.config AS seal_config,
+      c.condition_type,
+      c.config AS condition_config,
+      c.condition_time_fallback
+    FROM memories m
+    LEFT JOIN seals s ON s.memory_id = m.id
+    LEFT JOIN conditions c ON c.memory_id = m.id
+    WHERE m.id = ${memoryId}
+    LIMIT 1
+  `;
+  return rows.length > 0 ? (rows[0] as unknown as MemoryWithContext) : null;
+}
+
+export interface ListMemoriesOptions {
+  ownerId: string;
+  limit: number;
+  cursor?: string; // opaque: base64url-encoded ISO timestamp of last seen created_at
+}
+
+export interface ListMemoriesResult {
+  memories: MemoryRow[];
+  nextCursor: string | null;
+}
+
+/**
+ * Paginated oldest-first list of own memories. Cursor is opaque base64url ISO timestamp.
+ */
+export async function listMemoriesByOwner(opts: ListMemoriesOptions): Promise<ListMemoriesResult> {
+  const { ownerId, limit } = opts;
+  let cursorDate: string | null = null;
+  if (opts.cursor) {
+    try {
+      cursorDate = Buffer.from(opts.cursor, "base64url").toString("utf8");
+    } catch {
+      // ignore malformed cursor — start from beginning
+    }
+  }
+
+  const rows = cursorDate
+    ? await sql`
+        SELECT * FROM memories
+        WHERE owner_id = ${ownerId} AND created_at > ${cursorDate}
+        ORDER BY created_at ASC
+        LIMIT ${limit + 1}
+      `
+    : await sql`
+        SELECT * FROM memories
+        WHERE owner_id = ${ownerId}
+        ORDER BY created_at ASC
+        LIMIT ${limit + 1}
+      `;
+
+  const typedRows = rows as unknown as MemoryRow[];
+  const hasMore = typedRows.length > limit;
+  const page = hasMore ? typedRows.slice(0, limit) : typedRows;
+  const lastRow = page[page.length - 1];
+  const nextCursor =
+    hasMore && lastRow
+      ? Buffer.from(new Date(lastRow.created_at).toISOString(), "utf8").toString("base64url")
+      : null;
+
+  return { memories: page, nextCursor };
+}
+
+export interface NearbyMemory extends MemoryRow {
+  seal_type: string | null;
+  condition_type: string | null;
+  condition_time_fallback: Date | null;
+}
+
+/**
+ * Find eligible memories within the coarse geohash zone (precision-5 prefix).
+ * Checks current cell + 8 neighbours via LEFT(geohash,5) = ANY(array).
+ * Phase 1: private tier only → owner_id = requestingUserId.
+ * Eligibility: scan_status = clear, discoverable_after elapsed.
+ */
+export async function findNearbyMemories(
+  coarseHash: string,
+  neighbourHashes: string[],
+  requestingUserId: string,
+): Promise<NearbyMemory[]> {
+  // Truncate memory geohash to precision 5 for zone matching.
+  const zoneHashes = [coarseHash, ...neighbourHashes];
+  const rows = await sql`
+    SELECT m.*,
+           s.seal_type,
+           c.condition_type,
+           c.condition_time_fallback
+    FROM memories m
+    LEFT JOIN seals s ON s.memory_id = m.id
+    LEFT JOIN conditions c ON c.memory_id = m.id
+    WHERE m.owner_id = ${requestingUserId}
+      AND m.scan_status = 'clear'
+      AND m.discoverable_after <= now()
+      AND left(m.geohash, 5) = ANY(${zoneHashes})
+  `;
+  return rows as unknown as NearbyMemory[];
 }
