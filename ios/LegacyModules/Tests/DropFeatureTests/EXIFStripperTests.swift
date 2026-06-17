@@ -8,10 +8,10 @@ final class EXIFStripperTests: XCTestCase {
 
     func testStripRemovesGPSMetadata() throws {
         let original = try makeJPEGWithGPSMetadata()
-        XCTAssertTrue(EXIFStripper.hasMetadata(in: original))
+        XCTAssertTrue(EXIFStripper.hasLocationMetadata(in: original))
 
         let stripped = try EXIFStripper.stripMetadata(from: original)
-        XCTAssertFalse(EXIFStripper.hasMetadata(in: stripped))
+        XCTAssertFalse(EXIFStripper.hasLocationMetadata(in: stripped))
         XCTAssertGreaterThan(stripped.count, 0)
     }
 

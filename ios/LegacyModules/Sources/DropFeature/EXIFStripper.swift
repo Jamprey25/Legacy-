@@ -36,8 +36,31 @@ public enum EXIFStripper {
         return output as Data
     }
 
-    /// True when ImageIO reports any metadata dictionary on the image (used in tests).
+    /// True when GPS or other location-bearing metadata is present (privacy-critical check).
+    public static func hasLocationMetadata(in data: Data) -> Bool {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return false }
+        guard let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] else {
+            return false
+        }
+        if properties[kCGImagePropertyGPSDictionary as String] != nil {
+            return true
+        }
+        if let exif = properties[kCGImagePropertyExifDictionary as String] as? [String: Any] {
+            let locationKeys: Set<String> = [
+                kCGImagePropertyExifUserComment as String,
+                "GPSLatitude",
+                "GPSLongitude",
+            ]
+            if exif.keys.contains(where: { locationKeys.contains($0) }) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// True when ImageIO reports sensitive metadata dictionaries (used in tests).
     public static func hasMetadata(in data: Data) -> Bool {
+        if hasLocationMetadata(in: data) { return true }
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return false }
         guard let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] else {
             return false
