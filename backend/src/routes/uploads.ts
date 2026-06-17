@@ -24,7 +24,8 @@
 import { Hono } from "hono";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { ApiError } from "../lib/errors.js";
-import { getMemoryByOwner, updateMemoryAfterUpload } from "../db/memories.js";
+import { getMemoryByOwner, updateMemoryAfterUpload, setThumbnailKey } from "../db/memories.js";
+import { generateAndStoreThumbnail } from "../lib/thumbnail.js";
 import { requireAuth, type AuthVars } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { audit } from "../lib/audit.js";
@@ -74,6 +75,10 @@ uploadsRoutes.post("/", async (c) => {
       // Store the full public blob URL as media_key and flip scan_status → clear.
       // (CSAM pipeline is a separate gate; in prod this is where the real scan hooks in.)
       await updateMemoryAfterUpload(memoryId, blob.url);
+
+      // Post-clear: generate a teaser thumbnail (images only, best-effort — never blocks).
+      const thumbnailKey = await generateAndStoreThumbnail(blob.url, memoryId, blob.contentType);
+      if (thumbnailKey) await setThumbnailKey(memoryId, thumbnailKey);
     },
   });
 

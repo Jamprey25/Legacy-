@@ -193,6 +193,15 @@ export async function updateMemoryAfterUpload(
   return rows.length > 0 ? (rows[0] as unknown as MemoryRow) : null;
 }
 
+/** Set the thumbnail_key after server-side thumbnail generation (post-clear, best-effort). */
+export async function setThumbnailKey(memoryId: string, thumbnailKey: string): Promise<void> {
+  await sql`
+    UPDATE memories
+    SET thumbnail_key = ${thumbnailKey}
+    WHERE id = ${memoryId}
+  `;
+}
+
 export async function findNearbyMemories(
   coarseHash: string,
   neighbourHashes: string[],

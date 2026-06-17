@@ -559,7 +559,7 @@
     {
       "id": "csam-thumbnail-generation",
       "title": "Backend: Server-side thumbnail generation \u2014 fires post-clear, stores compressed thumbnail key alongside original",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 1,
       "milestone": "M1",
