@@ -19,6 +19,8 @@ When Cursor or Claude Code hits a decision that needs Joseph's input:
 
 Do not use interactive choice prompts or "which do you prefer?" in chat without a corresponding entry in this log or `tasks.json` first. The dashboard and collab log are the shared record; chat is not.
 
+**Cross-agent feedback:** Questions, concerns, and ideas for the other agent go in **`tasks.json` → `decisions[]`** (`kind`: `question` | `concern` | `idea`). Both agents **must read open threads at session start** and **reply** when `needs` is them. See [`AGENT_WORKFLOW.md`](./AGENT_WORKFLOW.md#dashboard-discussions-concerns-ideas-questions).
+
 **`decisions[]` shape (Joseph chooses in the dashboard):**
 
 ```json
@@ -77,9 +79,12 @@ When Joseph clicks an option, the dashboard sets `status: "decided"`, `chosenOpt
 | Needs Joseph | Where to record it |
 |---|---|
 | Architectural fork (runtime, auth SDK, module layout) | `tasks.json` `decisions[]` with **`options[]`** + brainstorm reply — Joseph picks in the dashboard |
-| API shape ambiguity | Open questions → Backend → iOS, then `api-contract.md` if decided |
-| Product / UX call with privacy impact | Brainstorm + `architecture-decisions.md` if it graduates |
+| API shape ambiguity | `tasks.json` → `kind: "question"`, `needs: "backend"` or `"ios"` — **both agents must reply**; then `api-contract.md` if decided |
+| Privacy / invariant worry | `tasks.json` → `kind: "concern"` — other agent **must respond** before shipping |
+| Half-formed improvement | `tasks.json` → `kind: "idea"` + optional brainstorm in collab-log |
+| Product / UX call with privacy impact | `decisions[]` or concern thread + `architecture-decisions.md` if it graduates |
 | Manual Xcode / device smoke test | `tasks.json` `manualTests[]` — Joseph checks off in dashboard QA panel |
+| **Agent ↔ agent feedback** | **`tasks.json` discussion threads** (not chat) — see `AGENT_WORKFLOW.md` |
 
 ---
 
@@ -399,3 +404,17 @@ No Joseph action needed unless he wants Google live in M0 (would need OAuth clie
 **Tasks marked done:** `ios-region-entry-scan`.
 
 **Next M4:** `ios-clvisit`, `ios-apns-registration`, Always-permission UX before TestFlight.
+
+---
+
+## [ios → all] 2026-06-17 — CLVisit + APNs registration + Always-permission UX
+
+**Shipped:**
+- **CLVisit** — `startMonitoringVisits()` / `didVisit` → `rotateRegions` (secondary re-arm per engineering-plan §7).
+- **Always-permission UX** — `BackgroundDiscoveryPermissionSheet` shown after Wander engagement; never calls `requestAlwaysAuthorization()` on cold launch.
+- **APNs registration** — `LegacyAppDelegate` token → `APNsTokenStore` → `POST /v1/devices/apns`; backend route + `sessions.apns_token` upsert.
+- `CLVisitEvent` helper + unit tests.
+
+**Tasks marked done:** `ios-clvisit`, `ios-apns-registration`.
+
+**Next M4:** `backend-apns-push` (proximity notification delivery), `appstore-reviewer-rationale`, TestFlight prep.

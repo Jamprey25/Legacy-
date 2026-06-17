@@ -7,6 +7,7 @@ public enum BackgroundLocationPhase: Sendable, Equatable {
     case monitoring
     case rotating
     case regionEntered(identifier: String)
+    case visitTriggered(arrival: Bool)
     case failed(String)
 }
 
@@ -53,12 +54,16 @@ public final class BackgroundLocationCoordinator: NSObject {
 
         #if !targetEnvironment(simulator)
         manager.startMonitoringSignificantLocationChanges()
+        manager.startMonitoringVisits()
         #endif
         phase = .monitoring
     }
 
     public func stop() {
         manager.stopMonitoringSignificantLocationChanges()
+        #if !targetEnvironment(simulator)
+        manager.stopMonitoringVisits()
+        #endif
         eventTask?.cancel()
         eventTask = nil
         phase = .idle
@@ -92,6 +97,12 @@ public final class BackgroundLocationCoordinator: NSObject {
             return
         }
         manager.requestLocation()
+    }
+
+    /// CLVisit arrive/depart — secondary re-arm per engineering-plan §7.
+    func handleVisit(coordinate: CLLocationCoordinate2D, isArrival: Bool) async {
+        phase = .visitTriggered(arrival: isArrival)
+        await rotateRegions(around: coordinate)
     }
 
     @available(iOS 17.0, *)
@@ -134,6 +145,14 @@ extension BackgroundLocationCoordinator: CLLocationManagerDelegate {
     public nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         Task { @MainActor in
             phase = .failed(error.localizedDescription)
+        }
+    }
+
+    public nonisolated func locationManager(_ manager: CLLocationManager, didVisit visit: CLVisit) {
+        let coordinate = visit.coordinate
+        let isArrival = CLVisitEvent.isArrival(visit)
+        Task { @MainActor in
+            await handleVisit(coordinate: coordinate, isArrival: isArrival)
         }
     }
 }

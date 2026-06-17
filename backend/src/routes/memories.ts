@@ -7,7 +7,7 @@
 import { Hono } from "hono";
 import { ApiError } from "../lib/errors.js";
 import { encode as geohashEncode } from "../lib/geohash.js";
-import { generateSignedPutUrl, generateSignedGetUrl } from "../lib/storage.js";
+import { generateSignedPutUrl, generateSignedGetUrl, usesClientUpload } from "../lib/storage.js";
 import { createMemory, getMemoryByOwner, getMemoryWithContext, listMemoriesByOwner } from "../db/memories.js";
 import { createSeal, type SealType } from "../db/seals.js";
 import { createCondition, type ConditionType } from "../db/conditions.js";
@@ -271,11 +271,13 @@ memoriesRoutes.post("/", dropLimit, async (c) => {
     });
   }
 
-  // --- signed PUT URL (skipped for text-only memories) ---
+  // --- signed PUT URL (skipped for text-only memories AND for client-upload backends) ---
+  // Vercel Blob uses a client-token handshake (POST /v1/uploads), so no presigned PUT
+  // here — upload is null and the client switches to the handshake flow.
   let signedPutUrl: string | undefined;
   let expiresAt: string | undefined;
 
-  if (isMediaMemory) {
+  if (isMediaMemory && !usesClientUpload()) {
     const storage = await generateSignedPutUrl(memory.id, mediaType);
     signedPutUrl = storage.signedPutUrl;
     expiresAt = storage.expiresAt;

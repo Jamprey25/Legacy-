@@ -1,7 +1,7 @@
 # Legacy — Technical Internal
 
 **Audience:** Engineers (and future-you) implementing or reviewing iOS and API behavior.  
-**Last updated:** 2026-06-16  
+**Last updated:** 2026-06-17  
 **Companion docs:** `engineering-plan.md` (product-wide), `api-contract.md` (wire format), `collab-log.md` (decisions)
 
 ---
@@ -155,6 +155,29 @@ Capture photo → strip EXIF (ImageIO, synchronous)
   → Server webhook: EXIF re-strip, CSAM scan, thumbnail
 ```
 
+### 3.5 Background proximity (M4)
+
+Three layered wake sources (engineering-plan §7):
+
+```
+Significant-change wake OR CLVisit arrive/depart
+  → BackgroundLocationCoordinator.rotateRegions(around:)
+      → RegionRotationPolicy (14 own pins + 5 coarse zones, max 19)
+      → CLMonitorRegionService.syncRegions (iOS 17+)
+
+CLMonitor region satisfied
+  → BackgroundRegionScanService.scanOnRegionEntry
+      → LocationEngine.acquireFix() → POST /v1/discovery/scan
+      → WanderCoordinator.ingestBackgroundScan (cache + warmth + UI)
+      → (future) backend-apns-push when in_range
+```
+
+**Always permission:** Never call `requestAlwaysAuthorization()` on launch. `BackgroundDiscoveryPermissionSheet` appears after Wander engagement (teasers or own pins) while still on *When In Use*.
+
+**APNs:** `LegacyAppDelegate` captures device token → `APNsTokenStore` → `POST /v1/devices/apns` on `sessions` row.
+
+Steady-state power: zero continuous GPS; hardware wakes only on significant movement or OS visit events.
+
 ---
 
 ## 4. Dependencies
@@ -277,5 +300,53 @@ cd dashboard && npm run build
 | LegacyAPIStubs harness | Done |
 | `ios-auth-ui` (AuthFeature) | Done — stubs in DEBUG; live Apple needs backend |
 | Drop / Wander / Import flows | M1–M3 |
+| M4 background (CLMonitor, CLVisit, region scan, APNs token reg) | Done — push delivery pending `backend-apns-push` |
 
 See `tasks.json` and the [dashboard](https://dashboard-two-orpin-63.vercel.app) for live status.
+
+---
+
+## 10. Multi-agent coordination
+
+Legacy is built by **two stateless AI agents** (Claude Code → backend, Cursor → iOS) plus Joseph as relay. They do not share chat memory.
+
+### Architecture (coordination layer)
+
+```
+┌─────────────┐     append      ┌──────────────────┐     read      ┌─────────────┐
+│ Claude Code │ ──────────────► │ tasks.json       │ ◄──────────── │   Cursor    │
+│  (backend)  │                 │ collab-log.md    │               │   (iOS)     │
+└─────────────┘                 │ api-contract.md  │               └─────────────┘
+       │                        └────────┬─────────┘                      │
+       │                                 │                               │
+       └──────── edit backend/** ────────┼────── edit ios/** ────────────┘
+                                         │
+                                  ┌──────▼──────┐
+                                  │   Joseph    │
+                                  │  dashboard  │
+                                  │  decisions  │
+                                  └─────────────┘
+```
+
+### State management (agent sessions)
+
+| Phase | Action | Artifact |
+|---|---|---|
+| Session start | Read checklist + **open discussion threads** | `AGENT_WORKFLOW.md` → `tasks.json` (incl. `question`/`concern`/`idea`) → collab-log |
+| During work | Cross-agent feedback | Add/reply in `tasks.json` `decisions[]`; set `needs` to target agent |
+| During work | Document cross-boundary needs | Append collab-log one-liner; thread body stays in dashboard |
+| API change | Same-session contract update | `api-contract.md` + Backend → iOS note |
+| Session end | Publish handoff + **close discussion duty** | Dated handoff block; all threads where `needs` is you have replies |
+
+**Canonical protocol:** [`AGENT_WORKFLOW.md`](./AGENT_WORKFLOW.md)
+
+### Edge cases
+
+- **Concurrent edits:** One side lands first; other reads `git diff` + collab-log before continuing.
+- **Ruflo / AgentDB:** Optional memory only; `tasks.json` is authoritative.
+- **Chat vs docs:** If it is not in collab-log or tasks.json, the other agent will not know.
+- **Agent ↔ agent questions:** Must use dashboard threads (`decisions[]` with `responses[]`), not Joseph relay alone.
+
+### Pedagogical note
+
+This is the **outbox pattern** applied to human–AI collaboration: agents **publish** state to durable storage at session end and **consume** it at session start, instead of assuming shared RAM (the chat thread).

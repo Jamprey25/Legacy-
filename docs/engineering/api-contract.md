@@ -150,10 +150,47 @@ Create a memory record and get a signed upload URL. Drop point is set here and i
 }
 ```
 - For `media_type: "text"` (V4 Note in a Bottle), `upload` is `null`.
-- Client strips EXIF **before** PUTting to `signed_put_url`. Server re-strips on the storage webhook.
+- **Vercel Blob (active backend):** `upload` is `null` for media too — the presigned-PUT model is only for the future S3/R2 backend. With Vercel Blob the client uses the §3.2 client-upload handshake instead.
+- Client strips EXIF **before** uploading. Server re-strips on the storage webhook.
 - `423 not_in_range` is NOT used here — drops are always allowed at the current location.
 - `400 invalid_coordinates` if `accuracy_m <= 0` or `>= 1000`.
 - `422 cannot_elevate_import` is reserved for the import path (§5).
+
+### 3.2 Media upload — Vercel Blob client-upload handshake
+
+Storage decision (Joseph 2026-06-17): **Vercel Blob now, S3 later.** Vercel Blob does
+not issue S3-style presigned PUT URLs, so media uploads use a token handshake against
+`POST /v1/uploads` (requires `Authorization`). The endpoint is the server side of
+`@vercel/blob`'s `handleUpload`.
+
+Flow:
+1. `POST /v1/memories` → `{ memory_id, upload: null, scan_status: "pending" }`.
+2. Handshake — `POST /v1/uploads` with the Blob client-token request body. The
+   `clientPayload` MUST be `JSON.stringify({ memory_id })`. The backend authorizes
+   (memory must belong to the caller), then returns the Blob `clientToken`.
+3. Client PUTs the EXIF-stripped bytes directly to Vercel Blob using the `clientToken`
+   (`access: "public"`, random suffix → unguessable URL). Allowed content types:
+   `image/jpeg`, `image/png`, `image/webp`, `video/mp4`.
+4. Vercel calls our `onUploadCompleted` webhook → backend stores the public blob URL as
+   `media_key` and flips `scan_status → clear`.
+
+**iOS (Cursor) — two options to drive the handshake from Swift:**
+- Easiest: bundle the JS only conceptually — there is no Swift SDK, so replicate the
+  two-step wire protocol of `@vercel/blob/client`'s `upload()`: (a) POST the
+  `blob.generate-client-token` body to `/v1/uploads`, (b) PUT bytes to the returned blob
+  upload URL with the `clientToken` as a bearer token. Capture the exact request shape
+  from the `@vercel/blob` source (`packages/blob/src/client.ts`) — it is not fully
+  specified in the public docs.
+- Dev/simulator: `onUploadCompleted` does NOT fire on localhost. Keep using
+  `POST /v1/internal/webhook/storage` (dev stub) to flip `scan_status` during simulator
+  testing, exactly as today.
+
+**Privacy trade-off (Phase 1):** blobs are `public` with a random suffix → the URL is an
+unguessable bearer capability, NOT a short-TTL signed URL. A leaked URL stays valid.
+Acceptable for Phase-1 private-tier; revisit before public-tier / Phase 3.
+
+**Env:** backend needs `STORAGE_BACKEND=vercel-blob` + `BLOB_READ_WRITE_TOKEN` (auto-set
+when the Blob store is linked to the Vercel project).
 
 ---
 
@@ -286,9 +323,24 @@ Owner-only full memory detail (coordinates included — owner only). `404` if no
 ### `DELETE /v1/user`
 **Response `202`** `{ "status": "deletion_queued" }`. Cascade-deletes memories, media, finds, pings, sessions.
 
+### `POST /v1/devices/apns`
+Register or refresh the APNs device token for the authenticated install.
+
+**Headers:** `Authorization`, `X-Device-Id` (required), `X-Request-Timestamp`, `X-App-Version`.
+
+**Request**
+```json
+{ "apns_token": "<hex-encoded APNs device token>" }
+```
+
+**Response `204`** — token stored on the `sessions` row for `(user_id, device_id)`.
+
+**Errors:** `401 unauthorized`, `400 invalid_request` (missing token or device id).
+
+Push delivery (`backend-apns-push`) is a separate M4 task — this endpoint only stores the token.
+
 ---
 
 ## 8. Open items (tracked in collab-log)
 
-- APNs device-token registration endpoint (`POST /v1/devices/apns`) — finalize shape at M4.
 - Phase 2 endpoints (recipients, friends, replies, summons) — not in this v1 contract; added when M6 starts.

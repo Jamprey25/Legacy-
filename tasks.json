@@ -42,7 +42,7 @@
       "id": "q-storage-backend",
       "kind": "question",
       "title": "Which media object storage provider?",
-      "status": "open",
+      "status": "resolved",
       "raisedBy": "backend",
       "needs": "joseph",
       "detail": "POST /memories is live and returns a signed PUT URL, but the storage backend is still a stub (placeholder URLs). Needs a real provider before uploads work on a real device. Options: Vercel Blob (zero config, same Vercel account), Cloudflare R2 (no egress fees), or AWS S3 (most flexible). Recommendation: Vercel Blob for Phase 1 \u2014 already on Vercel, no extra accounts, can swap to R2 if egress costs bite at scale. Once decided, add STORAGE_BACKEND=vercel-blob|r2|s3 + credentials to backend/.env.local and backend will implement the signed URL generation same session.",
@@ -74,6 +74,11 @@
           "author": "joseph",
           "text": "vercel blob is fine but we prolly want to use aws s3 for later iterations",
           "date": "2026-06-17"
+        },
+        {
+          "author": "backend",
+          "text": "Implemented Vercel Blob client-upload handshake: POST /v1/uploads (handleUpload) + onUploadCompleted flips scan_status. POST /memories returns upload:null for Blob; client uses the handshake. Media served as public unguessable URL (Phase-1 trade-off, revisit before public-tier). S3 presigned path kept for later. iOS handshake + env (BLOB_READ_WRITE_TOKEN) documented in api-contract \u00a73.2.",
+          "date": "2026-06-17"
         }
       ]
     },
@@ -81,7 +86,7 @@
       "id": "q-app-attest-nullability",
       "kind": "question",
       "title": "App Attest field \u2014 null ok until M5?",
-      "status": "open",
+      "status": "resolved",
       "raisedBy": "ios",
       "needs": "backend",
       "detail": "The API contract shows an attestation field on POST /memories and POST /memories/:id/unlock. iOS currently sends null for both. Needs backend confirmation that null/omitted attestation is accepted for M1-M4 and enforcement only lands at M5 (ios-app-attest task). This affects whether iOS needs to guard or stub the field earlier than planned.",
@@ -1044,14 +1049,14 @@
     {
       "id": "ios-clvisit",
       "title": "iOS: Background \u2014 CLVisit monitoring: secondary re-arm trigger on arrive/depart at OS-recognized places",
-      "status": "todo",
+      "status": "done",
       "owner": "ios",
       "phase": 1,
       "milestone": "M4",
       "blockedBy": [
         "ios-clmonitor-regions"
       ],
-      "notes": ""
+      "notes": "startMonitoringVisits + didVisit \u2192 rotateRegions; CLVisitEvent helper tested."
     },
     {
       "id": "ios-region-entry-scan",
@@ -1069,14 +1074,14 @@
     {
       "id": "ios-apns-registration",
       "title": "iOS: APNs \u2014 register for push notifications, send device token to backend, handle token refresh",
-      "status": "todo",
+      "status": "done",
       "owner": "ios",
       "phase": 1,
       "milestone": "M4",
       "blockedBy": [
         "ios-region-entry-scan"
       ],
-      "notes": "Token-based APNs auth. iOS-only in Phase 1 \u2014 no FCM/OneSignal."
+      "notes": "AppDelegate token capture, POST /v1/devices/apns, permission sheet bundles notification ask with Always upgrade."
     },
     {
       "id": "backend-apns-push",

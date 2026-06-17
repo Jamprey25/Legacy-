@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import CoreLocation
 import AuthFeature
 import WanderFeature
 import DropFeature
@@ -105,6 +106,7 @@ private struct MainTabView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var backgroundLocation = BackgroundLocationCoordinator()
     @State private var wanderCoordinator: WanderCoordinator
+    @State private var showBackgroundDiscoveryPrompt = false
 
     init(apiClient: LegacyAPIClient, locationEngine: LocationEngine) {
         self.apiClient = apiClient
@@ -114,6 +116,13 @@ private struct MainTabView: View {
             locationEngine: locationEngine,
             networkMonitor: NetworkMonitor.shared
         ))
+    }
+
+    private var shouldOfferBackgroundDiscovery: Bool {
+        guard !BackgroundLocationPermissionGate.hasUserDismissedPrompt else { return false }
+        guard !backgroundLocation.isAuthorizedForBackground else { return false }
+        guard locationEngine.authorizationStatus == .authorizedWhenInUse else { return false }
+        return !wanderCoordinator.teasers.isEmpty || !wanderCoordinator.cachedOwnPins.isEmpty
     }
 
     var body: some View {
@@ -151,6 +160,31 @@ private struct MainTabView: View {
             }
         }
         .tint(LegacyColor.accent)
+        .sheet(isPresented: $showBackgroundDiscoveryPrompt) {
+            BackgroundDiscoveryPermissionSheet(
+                onEnable: {
+                    backgroundLocation.requestAlwaysAuthorization()
+                    Task {
+                        _ = await APNsRegistrationService.requestAuthorizationAndRegister()
+                        await APNsRegistrationService.uploadTokenIfNeeded(apiClient: apiClient)
+                    }
+                    showBackgroundDiscoveryPrompt = false
+                },
+                onDismiss: {
+                    BackgroundLocationPermissionGate.markPromptDismissed()
+                    showBackgroundDiscoveryPrompt = false
+                }
+            )
+            .presentationDetents([.medium])
+        }
+        .onChange(of: wanderCoordinator.teasers.count) { _, _ in
+            if shouldOfferBackgroundDiscovery {
+                showBackgroundDiscoveryPrompt = true
+            }
+        }
+        .onChange(of: APNsTokenStore.tokenHex) { _, _ in
+            Task { await APNsRegistrationService.uploadTokenIfNeeded(apiClient: apiClient) }
+        }
         .task {
             locationEngine.requestWhenInUseAuthorization()
             NetworkMonitor.shared.start()
@@ -165,6 +199,10 @@ private struct MainTabView: View {
                 }
             }
             await backgroundLocation.startIfAuthorized()
+            await APNsRegistrationService.uploadTokenIfNeeded(apiClient: apiClient)
+            if shouldOfferBackgroundDiscovery {
+                showBackgroundDiscoveryPrompt = true
+            }
         }
     }
 }

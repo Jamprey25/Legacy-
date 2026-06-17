@@ -90,6 +90,18 @@ public struct EmailVerifyRequest: Encodable, Sendable {
     }
 }
 
+public struct APNsTokenRequest: Encodable, Sendable {
+    public let apnsToken: String
+
+    public init(apnsToken: String) {
+        self.apnsToken = apnsToken
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case apnsToken = "apns_token"
+    }
+}
+
 // MARK: - Memory creation (§3)
 
 public struct CreateMemoryRequest: Encodable, Sendable {
@@ -431,6 +443,11 @@ extension LegacyAPIClient {
 
     public func logout() async throws {
         try await sendNoContent(LegacyRequest(method: .post, path: "/v1/auth/logout", body: Data("{}".utf8)))
+    }
+
+    /// Register or refresh the APNs device token for this install (contract §7 / M4).
+    public func registerAPNsToken(_ body: APNsTokenRequest) async throws {
+        try await sendNoContent(request(.post, "/v1/devices/apns", body))
     }
 
     /// Notify the backend that an upload completed so it can run the CSAM pipeline stub.

@@ -30,3 +30,19 @@ export async function revokeSession(userId: string, deviceId: string): Promise<v
     WHERE user_id = ${userId} AND device_id = ${deviceId}
   `;
 }
+
+/** Store or refresh the APNs token for a signed-in device row. */
+export async function updateApnsToken(
+  userId: string,
+  deviceId: string,
+  apnsToken: string
+): Promise<void> {
+  await sql`
+    INSERT INTO sessions (user_id, device_id, apns_token, last_seen_at)
+    VALUES (${userId}, ${deviceId}, ${apnsToken}, now())
+    ON CONFLICT (user_id, device_id)
+    DO UPDATE SET apns_token = EXCLUDED.apns_token,
+                  last_seen_at = now(),
+                  revoked_at = NULL
+  `;
+}

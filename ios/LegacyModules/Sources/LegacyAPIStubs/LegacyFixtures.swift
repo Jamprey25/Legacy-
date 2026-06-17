@@ -157,6 +157,7 @@ extension StubHTTPTransport {
         transport.enqueue("GET /memories/22222222-2222-2222-2222-222222222222", .ok(LegacyFixtures.memoryDetail))
         transport.enqueue("POST /v1/memories/import", .json(201, LegacyFixtures.importMemories))
         transport.enqueue("/v1/discovery/scan", .ok(LegacyFixtures.scanWithTeasers))
+        transport.enqueue("POST /v1/devices/apns", .noContent)
         transport.enqueue("/unlock", .json(423, LegacyFixtures.lockedDwell), .ok(LegacyFixtures.unlock))
         return transport
     }

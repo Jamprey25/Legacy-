@@ -17,6 +17,15 @@ export interface SignedPutResult {
   expiresAt: string; // ISO-8601
 }
 
+/**
+ * True when the active backend uploads via a client-token handshake (Vercel Blob)
+ * rather than a presigned PUT URL. In that mode POST /memories returns upload: null
+ * and the client uses POST /v1/uploads instead. S3/R2/stub use presigned PUT.
+ */
+export function usesClientUpload(): boolean {
+  return BACKEND === "vercel-blob";
+}
+
 /** Generate a signed PUT URL for a new media upload. */
 export async function generateSignedPutUrl(
   memoryId: string,
@@ -104,8 +113,12 @@ async function s3PutUrl(mediaKey: string, expiresAt: string): Promise<SignedPutR
   throw new Error("S3 backend not yet implemented. Add AWS credentials.");
 }
 
-async function vercelBlobGetUrl(_mediaKey: string, _expiresAt: string): Promise<SignedGetResult> {
-  throw new Error("vercel-blob GET backend not yet implemented.");
+async function vercelBlobGetUrl(mediaKey: string, expiresAt: string): Promise<SignedGetResult> {
+  // Vercel Blob upload stores the full public blob URL as media_key (uploads route,
+  // onUploadCompleted). The URL is an unguessable bearer capability (addRandomSuffix),
+  // so we return it directly. NOTE: public blobs do not expire — `expiresAt` is the
+  // client-side view window, not an enforced TTL. Revisit before public-tier (DEC-23).
+  return { signedGetUrl: mediaKey, expiresAt };
 }
 
 async function r2GetUrl(_mediaKey: string, _expiresAt: string): Promise<SignedGetResult> {

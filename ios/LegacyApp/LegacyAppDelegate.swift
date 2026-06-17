@@ -13,4 +13,20 @@ final class LegacyAppDelegate: NSObject, UIApplicationDelegate {
         }
         BackgroundUploadSessionDelegate.shared.setBackgroundCompletionHandler(completionHandler)
     }
+
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        Task { @MainActor in
+            APNsTokenStore.update(from: deviceToken)
+        }
+    }
+
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        print("[APNs] registration failed:", error.localizedDescription)
+    }
 }
