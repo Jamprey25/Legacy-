@@ -110,6 +110,7 @@ export default function Dashboard() {
 
   const { tasks, meta } = data;
   const decisions = data.decisions ?? [];
+  const openDecisions = decisions.filter((d) => d.status === "open");
   const total = tasks.length;
   const done = tasks.filter((t) => t.status === "done").length;
   const inProgress = tasks.filter((t) => t.status === "in-progress").length;
@@ -244,6 +245,16 @@ export default function Dashboard() {
           )}
         </div>
 
+        {/* ── Decisions (top priority when open) ── */}
+        {(openDecisions.length > 0 || decisions.some((d) => d.status === "decided")) && (
+          <DecisionsPanel
+            decisions={decisions}
+            tasks={tasks}
+            onResolved={fetchTasks}
+            prominent={openDecisions.length > 0}
+          />
+        )}
+
         {/* ── Phase swimlane ── */}
         {phases.length > 0 && (
           <div
@@ -348,9 +359,6 @@ export default function Dashboard() {
             )}
           </div>
         )}
-
-        {/* ── Decisions / blockers ── */}
-        <DecisionsPanel decisions={decisions} tasks={tasks} />
 
         {/* ── Milestones ── */}
         {byMilestone.map(({ milestone, tasks: mt }) => (

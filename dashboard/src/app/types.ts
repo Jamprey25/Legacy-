@@ -15,6 +15,14 @@ export interface Task {
 export type DecisionStatus = "open" | "decided";
 export type DecisionKind = "decision" | "blocker";
 
+/** One choosable path for an open decision — Joseph picks one in the dashboard. */
+export interface DecisionOption {
+  id: string;
+  label: string;
+  description?: string;
+  recommended?: boolean;
+}
+
 export interface Decision {
   id: string;
   kind: DecisionKind;          // "decision" needs a call; "blocker" is something stuck
@@ -23,8 +31,12 @@ export interface Decision {
   raisedBy: Owner;             // who flagged it
   needs: Owner | "joseph";     // who needs to act
   detail: string;
-  recommendation?: string;     // proposed answer, if any
+  /** Required when status is "open" — Joseph chooses one option in the dashboard. */
+  options?: DecisionOption[];
+  recommendation?: string;     // prose fallback / extra context
   blocks: string[];            // task ids this is holding up
+  chosenOptionId?: string;     // set when decided via dashboard
+  decidedAt?: string;          // ISO date when closed
   resolution?: string;         // filled in when decided
 }
 

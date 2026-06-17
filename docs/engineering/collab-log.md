@@ -11,15 +11,46 @@ Both sides append here. Joseph relays updates between sessions.
 
 When Cursor or Claude Code hits a decision that needs Joseph's input:
 
-1. **Write it up first** — append to **Open questions**, **💡 Ideas / Brainstorm**, or **`tasks.json` → `decisions[]`** (for blockers that gate work). Include context, options, and a recommendation.
+1. **Write it up first** — append to **Open questions**, **💡 Ideas / Brainstorm**, or **`tasks.json` → `decisions[]`** (for blockers that gate work). Include context, **`options[]`** (each with `id`, `label`, `description`, optional `recommended: true`), and a recommendation.
 2. **Give the other side a chance** — backend reads `collab-log.md` at session start; Joseph may relay or decide without a direct ping.
 3. **Ask Joseph only after** the item is in the docs — or if it's urgent and already documented there.
 
 Do not use interactive choice prompts or "which do you prefer?" in chat without a corresponding entry in this log or `tasks.json` first. The dashboard and collab log are the shared record; chat is not.
 
+**`decisions[]` shape (Joseph chooses in the dashboard):**
+
+```json
+{
+  "id": "unique-slug",
+  "kind": "decision",
+  "title": "Short question",
+  "status": "open",
+  "raisedBy": "backend",
+  "needs": "joseph",
+  "detail": "Why this matters and what it blocks.",
+  "recommendation": "Optional prose — same as before.",
+  "blocks": ["task-id-1", "task-id-2"],
+  "options": [
+    {
+      "id": "option-a",
+      "label": "Option A title",
+      "description": "One-line tradeoff summary.",
+      "recommended": true
+    },
+    {
+      "id": "option-b",
+      "label": "Option B title",
+      "description": "One-line tradeoff summary."
+    }
+  ]
+}
+```
+
+When Joseph clicks an option, the dashboard sets `status: "decided"`, `chosenOptionId`, `decidedAt`, and `resolution`, then commits to `tasks.json`.
+
 | Needs Joseph | Where to record it |
 |---|---|
-| Architectural fork (runtime, auth SDK, module layout) | `tasks.json` `decisions[]` + brainstorm reply |
+| Architectural fork (runtime, auth SDK, module layout) | `tasks.json` `decisions[]` with **`options[]`** + brainstorm reply — Joseph picks in the dashboard |
 | API shape ambiguity | Open questions → Backend → iOS, then `api-contract.md` if decided |
 | Product / UX call with privacy impact | Brainstorm + `architecture-decisions.md` if it graduates |
 | Routine implementation choice | Decide locally; log in **Decisions made** only if it affects the other side |

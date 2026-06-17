@@ -74,6 +74,8 @@ cd dashboard && npm install && npm run dev
 
 Production: [dashboard-two-orpin-63.vercel.app](https://dashboard-two-orpin-63.vercel.app)
 
+**Decisions:** When Claude/Cursor escalate something to you, it appears at the top of the dashboard with clickable **options**. Your choice is written to `tasks.json` (set `DECISIONS_SECRET` + `GITHUB_TOKEN` on Vercel; locally it updates `../tasks.json` without a token).
+
 ---
 
 ## Repository layout
