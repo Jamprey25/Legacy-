@@ -71,13 +71,13 @@ private struct AuthWelcomeView: View {
                             let tokenData = credential.identityToken,
                             let token = String(data: tokenData, encoding: .utf8)
                         else {
-                            coordinator.errorMessage = "Could not read Apple identity token."
+                            coordinator.reportError("Could not read Apple identity token.")
                             return
                         }
                         coordinator.appleSignInCompleted(identityToken: token)
                     case let .failure(error):
                         if (error as NSError).code != ASAuthorizationError.canceled.rawValue {
-                            coordinator.errorMessage = error.localizedDescription
+                            coordinator.reportError(error.localizedDescription)
                         }
                     }
                 }

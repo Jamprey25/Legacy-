@@ -52,6 +52,10 @@ public final class AuthCoordinator {
         errorMessage = "Google Sign In will be available once backend OAuth and a client ID are configured."
     }
 
+    public func reportError(_ message: String) {
+        errorMessage = message
+    }
+
     public func beginEmailSignIn() {
         errorMessage = nil
         route = .emailEntry
