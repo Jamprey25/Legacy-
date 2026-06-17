@@ -18,6 +18,8 @@
 		B10000000000000000000009 /* MemoryLaneFeature in Frameworks */ = {isa = PBXBuildFile; productRef = P10000000000000000000008 /* MemoryLaneFeature */; };
 		B10000000000000000000010 /* ImportFeature in Frameworks */ = {isa = PBXBuildFile; productRef = P10000000000000000000009 /* ImportFeature */; };
 		B10000000000000000000011 /* LegacyAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000004 /* LegacyAppDelegate.swift */; };
+		B10000000000000000000012 /* APNsTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000005 /* APNsTokenStore.swift */; };
+		B10000000000000000000013 /* APNsRegistrationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000006 /* APNsRegistrationService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -25,6 +27,8 @@
 		F10000000000000000000002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		F10000000000000000000003 /* Legacy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Legacy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F10000000000000000000004 /* LegacyAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyAppDelegate.swift; sourceTree = "<group>"; };
+		F10000000000000000000005 /* APNsTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APNsTokenStore.swift; sourceTree = "<group>"; };
+		F10000000000000000000006 /* APNsRegistrationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APNsRegistrationService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -60,6 +64,8 @@
 			children = (
 				F10000000000000000000001 /* LegacyApp.swift */,
 				F10000000000000000000004 /* LegacyAppDelegate.swift */,
+				F10000000000000000000005 /* APNsTokenStore.swift */,
+				F10000000000000000000006 /* APNsRegistrationService.swift */,
 				F10000000000000000000002 /* Info.plist */,
 			);
 			path = LegacyApp;
@@ -157,6 +163,8 @@
 			files = (
 				B10000000000000000000001 /* LegacyApp.swift in Sources */,
 				B10000000000000000000011 /* LegacyAppDelegate.swift in Sources */,
+				B10000000000000000000012 /* APNsTokenStore.swift in Sources */,
+				B10000000000000000000013 /* APNsRegistrationService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
