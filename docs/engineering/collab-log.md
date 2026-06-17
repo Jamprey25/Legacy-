@@ -316,23 +316,31 @@ No Joseph action needed unless he wants Google live in M0 (would need OAuth clie
 
 ---
 
-## [joseph → cursor] 2026-06-17 — Use Ruflo + Pika going forward
+## [joseph → cursor] 2026-06-17 — Use Ruflo + design MCPs (Pika dropped)
 
-**Joseph:** Cursor should use **Ruflo for orchestration** and **Pika for design** (and other media tasks where useful).
+**Joseph:** Use **Ruflo for orchestration**. **Do not use Pika** for Legacy design — use **design MCPs** for app layout and pages instead.
 
-**Cursor setup (done this session):**
-- **Ruflo swarm:** `swarm-1781726441408-x2flah` — hierarchical, max 8 agents, specialized strategy, namespace `legacy-ios`.
-- **AgentDB memory (`legacy` namespace):**
-  - `orchestration-policy` — Ruflo = swarm/memory/hooks_route; Pika = image/UI mockups when agent is live.
-  - `task-queue-next` — iOS M4 background location next; backend import; blocked on STORAGE_BACKEND.
-- **hooks_route** before multi-step work (e.g. M4 location → primary agent `coder`, topology hierarchical).
+**Cursor setup:**
+- **Ruflo swarm:** hierarchical, namespace `legacy` / `legacy-ios` — swarm, memory, `hooks_route`.
+- **Design MCP stack (ranked for Legacy SwiftUI):**
 
-**Pika status (blocked until agent linked):**
-- MCP auth OK (`identity_whoami` → Joseph Amprey).
-- `identity_persona_read` / image gen return **`agent_not_configured`** — create or initialize Pika agent at [pika.me](https://pika.me), then reconnect MCP.
-- **Queued for Pika when live:** app icon concept, warmth-cue UI reference, TestFlight screenshot templates.
+| MCP | Best for | Legacy use |
+|---|---|---|
+| **Stitch** (`user-stitch`) | Full mobile screens from text, design systems, variants | Wander / Drop / Import / Lane layout mockups; `generate_screen_from_text`, `create_design_system`, export PNG/HTML as SwiftUI reference |
+| **21st Magic** (`user-21st-magic`) | Component patterns, inspiration, logos | Teaser cards, warmth overlay patterns, tab chrome, `21st_magic_component_builder` + `component_inspiration` |
+| **Cursor Canvas** (skill) | Interactive layout review in chat | Compare Stitch output vs current `DesignSystem.swift` before coding |
 
-**Working rule:** Implementation stays in repo (`tasks.json`, code, tests). Ruflo holds cross-session orchestration state; Pika produces design assets — not a substitute for `DesignSystem.swift`.
+**Workflow:** Stitch screen → review in Canvas → map tokens to `LegacyColor` / `LegacyFont` / `LegacySpacing` → implement in SwiftUI. **Never** paste web CSS into iOS; treat MCP output as visual spec only.
+
+**Dropped:** Pika (video/image gen) — not in the Legacy design path.
+
+**Working rule:** Code + tests stay in repo. Ruflo = orchestration memory. Design MCPs = layout reference — `DesignSystem.swift` remains source of truth for shipped UI.
+
+---
+
+## [joseph → cursor] 2026-06-17 — Use Ruflo + Pika going forward (superseded)
+
+**Superseded by section above** — Pika removed per Joseph.
 
 ---
 
