@@ -24,6 +24,12 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Legacy uses your location to find memories you dropped nearby and unlock them when you return.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Legacy monitors places you care about in the background so it can notify you when you return to a memory — using low-power significant-change location, not continuous GPS.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Legacy reads photo locations to find places you have visited and lets you drop or import memories from your library.</string>
 	<key>NSCameraUsageDescription</key>

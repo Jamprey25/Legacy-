@@ -103,6 +103,7 @@ private struct MainTabView: View {
     let locationEngine: LocationEngine
 
     @Environment(\.modelContext) private var modelContext
+    @State private var backgroundLocation = BackgroundLocationCoordinator()
 
     var body: some View {
         TabView {
@@ -149,6 +150,10 @@ private struct MainTabView: View {
             locationEngine.requestWhenInUseAuthorization()
             NetworkMonitor.shared.start()
             await DropDraftRecovery.retryPendingDrafts(context: modelContext)
+            backgroundLocation.onRegionEntered = { _ in
+                // ios-region-entry-scan: foreground-quality fix + /scan (M4 follow-up)
+            }
+            await backgroundLocation.startIfAuthorized()
         }
     }
 }

@@ -333,3 +333,20 @@ No Joseph action needed unless he wants Google live in M0 (would need OAuth clie
 - **Queued for Pika when live:** app icon concept, warmth-cue UI reference, TestFlight screenshot templates.
 
 **Working rule:** Implementation stays in repo (`tasks.json`, code, tests). Ruflo holds cross-session orchestration state; Pika produces design assets — not a substitute for `DesignSystem.swift`.
+
+---
+
+## [ios → all] 2026-06-17 — M4 background location scaffold (Ruflo-routed)
+
+**Shipped:**
+- `BackgroundLocationCoordinator` — significant-change wakes, `startIfAuthorized()` when Always granted.
+- `CLMonitorRegionService` (iOS 17+) — circular geographic conditions, event stream.
+- `RegionRotationPolicy` — 14 own pins + 5 coarse zones, max 19 regions; unit tested.
+- `CoarseZoneCache` — stub for geohash-prefix cells (no others' point coords).
+- Info.plist: `UIBackgroundModes` location + Always usage string.
+- Wired in `MainTabView`; region-entry → `/scan` hook stubbed for `ios-region-entry-scan`.
+- **41/41** SPM tests green.
+
+**Tasks marked done:** `ios-significant-change`, `ios-clmonitor-regions`, `ios-region-rotation`.
+
+**Next M4:** `ios-region-entry-scan`, `ios-clvisit`, `ios-apns-registration`, Always-permission UX before TestFlight.
