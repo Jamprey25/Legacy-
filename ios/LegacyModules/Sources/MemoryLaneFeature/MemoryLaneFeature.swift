@@ -107,12 +107,15 @@ public struct MemoryLaneFeatureRootView: View {
             #endif
             .task { await coordinator.loadInitial() }
             .refreshable { await coordinator.loadInitial() }
-
-            if let message = coordinator.errorMessage {
-                Text(message)
-                    .font(LegacyFont.caption)
-                    .foregroundStyle(LegacyColor.danger)
-                    .padding(LegacySpacing.md)
+            .safeAreaInset(edge: .bottom) {
+                if let message = coordinator.errorMessage {
+                    Text(message)
+                        .font(LegacyFont.caption)
+                        .foregroundStyle(LegacyColor.danger)
+                        .padding(LegacySpacing.md)
+                        .frame(maxWidth: .infinity)
+                        .background(LegacyColor.background)
+                }
             }
         }
     }

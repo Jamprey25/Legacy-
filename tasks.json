@@ -13,7 +13,7 @@
       "raisedBy": "backend",
       "needs": "joseph",
       "detail": "All auth endpoints and everything downstream need a runtime before they can be built. Now the critical path: blocks all 4 M0 auth tasks and transitively ios-auth-ui (Cursor's next task).",
-      "recommendation": "TypeScript/Node (Hono or Fastify) + pg on Vercel Functions — one language across dashboard + backend, easy contract type-sharing, trivial deploy. Alternative: Go for a single fast binary off serverless.",
+      "recommendation": "TypeScript/Node (Hono or Fastify) + pg on Vercel Functions \u2014 one language across dashboard + backend, easy contract type-sharing, trivial deploy. Alternative: Go for a single fast binary off serverless.",
       "blocks": [
         "auth-apple-oauth",
         "auth-google-oauth",
@@ -33,11 +33,11 @@
       "phase": 0,
       "milestone": "M0",
       "blockedBy": [],
-      "notes": "PhotoDNA application submitted 2026-06-16. Approval is the long pole — everything else builds around the stub."
+      "notes": "PhotoDNA application submitted 2026-06-16. Approval is the long pole \u2014 everything else builds around the stub."
     },
     {
       "id": "api-contract-doc",
-      "title": "Write API contract doc — all endpoints, exact request/response shapes, error codes, headers",
+      "title": "Write API contract doc \u2014 all endpoints, exact request/response shapes, error codes, headers",
       "status": "done",
       "owner": "backend",
       "phase": 0,
@@ -47,27 +47,27 @@
     },
     {
       "id": "github-ci-setup",
-      "title": "GitHub Actions CI — lint, type-check, run migrations against local Postgres, privacy gate grep",
+      "title": "GitHub Actions CI \u2014 lint, type-check, run migrations against local Postgres, privacy gate grep",
       "status": "done",
       "owner": "backend",
       "phase": 0,
       "milestone": "M0",
       "blockedBy": [],
-      "notes": "Done 2026-06-17: .github/workflows/ci.yml — backend typecheck + vitest + privacy gate grep (bans lat/lng/geohash in audit_log migrations). Runs on push/PR to main."
+      "notes": "Done 2026-06-17: .github/workflows/ci.yml \u2014 backend typecheck + vitest + privacy gate grep (bans lat/lng/geohash in audit_log migrations). Runs on push/PR to main."
     },
     {
       "id": "schema-users-sessions",
-      "title": "DB schema: users + sessions tables — id, dob, created_at, device_id, session_token, expires_at",
+      "title": "DB schema: users + sessions tables \u2014 id, dob, created_at, device_id, session_token, expires_at",
       "status": "done",
       "owner": "backend",
       "phase": 0,
       "milestone": "M0",
       "blockedBy": [],
-      "notes": "DOB stored at signup for age gate. Sessions are stateless bearer tokens — no server-side session store."
+      "notes": "DOB stored at signup for age gate. Sessions are stateless bearer tokens \u2014 no server-side session store."
     },
     {
       "id": "schema-memories",
-      "title": "DB schema: memories table — id, owner_id, lat, lng, geohash, source, scan_status, discoverable_after, privacy_tier, media_type, created_at",
+      "title": "DB schema: memories table \u2014 id, owner_id, lat, lng, geohash, source, scan_status, discoverable_after, privacy_tier, media_type, created_at",
       "status": "done",
       "owner": "backend",
       "phase": 0,
@@ -99,11 +99,11 @@
       "blockedBy": [
         "schema-memories"
       ],
-      "notes": "finds tracks nth_return counts. presence_pings is UNLOGGED (no WAL) with ~3min TTL — auto-purge job keeps it empty at steady state."
+      "notes": "finds tracks nth_return counts. presence_pings is UNLOGGED (no WAL) with ~3min TTL \u2014 auto-purge job keeps it empty at steady state."
     },
     {
       "id": "schema-audit-log",
-      "title": "DB schema: audit_log table — event, actor_id, request_id, metadata (jsonb), created_at. No lat/lng ever.",
+      "title": "DB schema: audit_log table \u2014 event, actor_id, request_id, metadata (jsonb), created_at. No lat/lng ever.",
       "status": "done",
       "owner": "backend",
       "phase": 0,
@@ -115,7 +115,7 @@
     },
     {
       "id": "auth-apple-oauth",
-      "title": "Auth: Apple Sign In — validate identity token, extract sub + email, create/fetch user",
+      "title": "Auth: Apple Sign In \u2014 validate identity token, extract sub + email, create/fetch user",
       "status": "done",
       "owner": "backend",
       "phase": 0,
@@ -127,7 +127,7 @@
     },
     {
       "id": "auth-google-oauth",
-      "title": "Auth: Google Sign In — validate ID token, extract sub + email, create/fetch user",
+      "title": "Auth: Google Sign In \u2014 validate ID token, extract sub + email, create/fetch user",
       "status": "done",
       "owner": "backend",
       "phase": 0,
@@ -139,7 +139,7 @@
     },
     {
       "id": "auth-email-otp",
-      "title": "Auth: email OTP — generate 6-digit code, send via email, verify within 10min window",
+      "title": "Auth: email OTP \u2014 generate 6-digit code, send via email, verify within 10min window",
       "status": "done",
       "owner": "backend",
       "phase": 0,
@@ -151,7 +151,7 @@
     },
     {
       "id": "auth-age-gate",
-      "title": "Auth: age gate — collect DOB at token exchange, reject under-13, flag 13-15 for parental consent path",
+      "title": "Auth: age gate \u2014 collect DOB at token exchange, reject under-13, flag 13-15 for parental consent path",
       "status": "done",
       "owner": "backend",
       "phase": 0,
@@ -161,11 +161,11 @@
         "auth-google-oauth",
         "auth-email-otp"
       ],
-      "notes": "Done: src/lib/age.ts resolveAgeTier — under-13 throws 403 age_restricted (never created); 13-15 minor; 16+ adult. 8 unit tests in test/age.test.ts. Parental-consent flow for minors deferred to Phase 2."
+      "notes": "Done: src/lib/age.ts resolveAgeTier \u2014 under-13 throws 403 age_restricted (never created); 13-15 minor; 16+ adult. 8 unit tests in test/age.test.ts. Parental-consent flow for minors deferred to Phase 2."
     },
     {
       "id": "auth-session-tokens",
-      "title": "Auth: session token issuance + validation middleware — JWT, expiry, clock-skew tolerance",
+      "title": "Auth: session token issuance + validation middleware \u2014 JWT, expiry, clock-skew tolerance",
       "status": "done",
       "owner": "backend",
       "phase": 0,
@@ -173,11 +173,11 @@
       "blockedBy": [
         "auth-age-gate"
       ],
-      "notes": "Done: signSession/verifySession (HS256, ~30d) in src/lib/jwt.ts; requireAuth + clockSkew (±5min) middleware in src/middleware/auth.ts. Full auth routes in src/routes/auth.ts. typecheck + tests green."
+      "notes": "Done: signSession/verifySession (HS256, ~30d) in src/lib/jwt.ts; requireAuth + clockSkew (\u00b15min) middleware in src/middleware/auth.ts. Full auth routes in src/routes/auth.ts. typecheck + tests green."
     },
     {
       "id": "spm-scaffold",
-      "title": "iOS: SPM module scaffold — LocationEngine, APIClient, DropFeature, WanderFeature, MemoryLaneFeature, ImportFeature, DesignSystem as local packages",
+      "title": "iOS: SPM module scaffold \u2014 LocationEngine, APIClient, DropFeature, WanderFeature, MemoryLaneFeature, ImportFeature, DesignSystem as local packages",
       "status": "done",
       "owner": "ios",
       "phase": 0,
@@ -187,7 +187,7 @@
     },
     {
       "id": "ios-design-system",
-      "title": "iOS: DesignSystem module — typography, colors, spacing tokens, warmth gradient component, button styles",
+      "title": "iOS: DesignSystem module \u2014 typography, colors, spacing tokens, warmth gradient component, button styles",
       "status": "done",
       "owner": "ios",
       "phase": 0,
@@ -195,11 +195,11 @@
       "blockedBy": [
         "spm-scaffold"
       ],
-      "notes": "Warmth gradient is screen-edge ambient only — no directional component ever."
+      "notes": "Warmth gradient is screen-edge ambient only \u2014 no directional component ever."
     },
     {
       "id": "ios-apiclient-base",
-      "title": "iOS: APIClient base — typed request builder, Authorization header injection, X-Request-Timestamp, error model, 401 surfacing",
+      "title": "iOS: APIClient base \u2014 typed request builder, Authorization header injection, X-Request-Timestamp, error model, 401 surfacing",
       "status": "done",
       "owner": "ios",
       "phase": 0,
@@ -208,11 +208,11 @@
         "spm-scaffold",
         "api-contract-doc"
       ],
-      "notes": "Session token read from Keychain. Codes to the contract doc — not the real API yet."
+      "notes": "Session token read from Keychain. Codes to the contract doc \u2014 not the real API yet."
     },
     {
       "id": "ios-keychain-session",
-      "title": "iOS: Keychain session storage — store/read/delete session token securely (kSecAttrAccessibleAfterFirstUnlock)",
+      "title": "iOS: Keychain session storage \u2014 store/read/delete session token securely (kSecAttrAccessibleAfterFirstUnlock)",
       "status": "done",
       "owner": "ios",
       "phase": 0,
@@ -224,7 +224,7 @@
     },
     {
       "id": "ios-auth-ui",
-      "title": "iOS: Auth screens — Apple/Google sign-in buttons, email OTP entry, DOB picker, age gate rejection screen",
+      "title": "iOS: Auth screens \u2014 Apple/Google sign-in buttons, email OTP entry, DOB picker, age gate rejection screen",
       "status": "done",
       "owner": "ios",
       "phase": 0,
@@ -234,7 +234,7 @@
     },
     {
       "id": "endpoint-memories-list",
-      "title": "Backend: GET /memories — paginated owner list for Memory Lane (teaser shape, no coordinates, oldest-first)",
+      "title": "Backend: GET /memories \u2014 paginated owner list for Memory Lane (teaser shape, no coordinates, oldest-first)",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -246,7 +246,7 @@
     },
     {
       "id": "endpoint-memories-post",
-      "title": "Backend: POST /memories — validate input, enforce cooldown, create memory record (scan_status: pending), return memory_id",
+      "title": "Backend: POST /memories \u2014 validate input, enforce cooldown, create memory record (scan_status: pending), return memory_id",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -259,7 +259,7 @@
     },
     {
       "id": "s3-signed-put-url",
-      "title": "Backend: S3 signed PUT URL generation — generate per-asset URL, 15-min TTL, return alongside memory_id",
+      "title": "Backend: S3 signed PUT URL generation \u2014 generate per-asset URL, 15-min TTL, return alongside memory_id",
       "status": "blocked",
       "owner": "backend",
       "phase": 1,
@@ -272,7 +272,7 @@
     },
     {
       "id": "csam-server-exif-strip",
-      "title": "Backend: Server-side EXIF strip on storage webhook — belt-and-braces metadata removal after client upload",
+      "title": "Backend: Server-side EXIF strip on storage webhook \u2014 belt-and-braces metadata removal after client upload",
       "status": "todo",
       "owner": "backend",
       "phase": 1,
@@ -284,7 +284,7 @@
     },
     {
       "id": "csam-pipeline-stub",
-      "title": "Backend: CSAM pipeline stub — storage webhook flips scan_status to 'clear' immediately in dev/staging",
+      "title": "Backend: CSAM pipeline stub \u2014 storage webhook flips scan_status to 'clear' immediately in dev/staging",
       "status": "todo",
       "owner": "backend",
       "phase": 1,
@@ -296,7 +296,7 @@
     },
     {
       "id": "csam-thumbnail-generation",
-      "title": "Backend: Server-side thumbnail generation — fires post-clear, stores compressed thumbnail key alongside original",
+      "title": "Backend: Server-side thumbnail generation \u2014 fires post-clear, stores compressed thumbnail key alongside original",
       "status": "todo",
       "owner": "backend",
       "phase": 1,
@@ -308,7 +308,7 @@
     },
     {
       "id": "ios-v1-camera-picker",
-      "title": "iOS: V1 Pin — camera capture + photo library picker, single photo selection, preview before drop",
+      "title": "iOS: V1 Pin \u2014 camera capture + photo library picker, single photo selection, preview before drop",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -320,7 +320,7 @@
     },
     {
       "id": "ios-exif-strip",
-      "title": "iOS: Client-side EXIF strip — rewrite image via ImageIO, remove all metadata before upload",
+      "title": "iOS: Client-side EXIF strip \u2014 rewrite image via ImageIO, remove all metadata before upload",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -330,7 +330,7 @@
     },
     {
       "id": "ios-background-upload",
-      "title": "iOS: Background URLSession upload — PUT to signed URL, resumable, progress tracking, retry on failure",
+      "title": "iOS: Background URLSession upload \u2014 PUT to signed URL, resumable, progress tracking, retry on failure",
       "status": "todo",
       "owner": "ios",
       "phase": 1,
@@ -343,7 +343,7 @@
     },
     {
       "id": "ios-draft-store",
-      "title": "iOS: SwiftData draft store — persist interrupted drops (camera roll picked, not yet uploaded)",
+      "title": "iOS: SwiftData draft store \u2014 persist interrupted drops (camera roll picked, not yet uploaded)",
       "status": "todo",
       "owner": "ios",
       "phase": 1,
@@ -355,7 +355,7 @@
     },
     {
       "id": "ios-v1-pin-drop-flow",
-      "title": "iOS: V1 Pin drop end-to-end — 1-tap: capture → strip EXIF → POST /memories → background upload → confirmation",
+      "title": "iOS: V1 Pin drop end-to-end \u2014 1-tap: capture \u2192 strip EXIF \u2192 POST /memories \u2192 background upload \u2192 confirmation",
       "status": "todo",
       "owner": "ios",
       "phase": 1,
@@ -364,11 +364,11 @@
         "ios-draft-store",
         "endpoint-memories-post"
       ],
-      "notes": "DropCoordinator orchestration shipped (strip → POST → PUT). Blocked on picker + draft store + live backend."
+      "notes": "DropCoordinator orchestration shipped (strip \u2192 POST \u2192 PUT). Blocked on picker + draft store + live backend."
     },
     {
       "id": "endpoint-scan-geohash-query",
-      "title": "Backend: /scan — geohash prefix query to find nearby memories within coarse bounding box",
+      "title": "Backend: /scan \u2014 geohash prefix query to find nearby memories within coarse bounding box",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -381,7 +381,7 @@
     },
     {
       "id": "endpoint-scan-eligibility",
-      "title": "Backend: /scan — eligibility filter: privacy_tier check (owner, recipient, friend, public+age), scan_status=clear, discoverable_after elapsed",
+      "title": "Backend: /scan \u2014 eligibility filter: privacy_tier check (owner, recipient, friend, public+age), scan_status=clear, discoverable_after elapsed",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -393,7 +393,7 @@
     },
     {
       "id": "endpoint-scan-bubble-math",
-      "title": "Backend: /scan — asymmetric proximity bubble: own memories base 25m + min(accuracy,75m) cushion; others' 20m + min(accuracy,25m), reject if accuracy>50m",
+      "title": "Backend: /scan \u2014 asymmetric proximity bubble: own memories base 25m + min(accuracy,75m) cushion; others' 20m + min(accuracy,25m), reject if accuracy>50m",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -401,11 +401,11 @@
       "blockedBy": [
         "endpoint-scan-eligibility"
       ],
-      "notes": "Accuracy rejection for others' memories is silent — same response as 'not in range'. Numbers tunable via config table."
+      "notes": "Accuracy rejection for others' memories is silent \u2014 same response as 'not in range'. Numbers tunable via config table."
     },
     {
       "id": "endpoint-scan-presence-ping",
-      "title": "Backend: /scan — upsert presence_ping (memory_id, user_id, last_seen_at) for co-presence evaluation",
+      "title": "Backend: /scan \u2014 upsert presence_ping (memory_id, user_id, last_seen_at) for co-presence evaluation",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -414,11 +414,11 @@
         "endpoint-scan-bubble-math",
         "schema-finds-pings"
       ],
-      "notes": "Upsert with ~3min TTL. No coordinates stored — only boolean proximity outcome. Table auto-purged."
+      "notes": "Upsert with ~3min TTL. No coordinates stored \u2014 only boolean proximity outcome. Table auto-purged."
     },
     {
       "id": "endpoint-scan-teaser-response",
-      "title": "Backend: /scan — build teaser response: no coordinates, no media URLs, only memory_id + thumbnail_url + drop_date + owner_display",
+      "title": "Backend: /scan \u2014 build teaser response: no coordinates, no media URLs, only memory_id + thumbnail_url + drop_date + owner_display",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -426,11 +426,11 @@
       "blockedBy": [
         "endpoint-scan-presence-ping"
       ],
-      "notes": "Location submitted → validated → discarded. 204 when nothing nearby. Privacy invariant: no coords ever sent to non-owner."
+      "notes": "Location submitted \u2192 validated \u2192 discarded. 204 when nothing nearby. Privacy invariant: no coords ever sent to non-owner."
     },
     {
       "id": "endpoint-unlock-dwell",
-      "title": "Backend: /unlock — enforce two-check dwell rule: require two passing proximity checks ≥20s apart (scan counts as check #1)",
+      "title": "Backend: /unlock \u2014 enforce two-check dwell rule: require two passing proximity checks \u226520s apart (scan counts as check #1)",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -442,7 +442,7 @@
     },
     {
       "id": "endpoint-unlock-seal-eval",
-      "title": "Backend: /unlock — seal evaluation: none, fixed_date, duration, age_based, recurring",
+      "title": "Backend: /unlock \u2014 seal evaluation: none, fixed_date, duration, age_based, recurring",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -455,7 +455,7 @@
     },
     {
       "id": "endpoint-unlock-condition-eval",
-      "title": "Backend: /unlock — condition evaluation: time_of_day, season, weather (15min cache), co_presence, long_absence, nth_return",
+      "title": "Backend: /unlock \u2014 condition evaluation: time_of_day, season, weather (15min cache), co_presence, long_absence, nth_return",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -467,7 +467,7 @@
     },
     {
       "id": "endpoint-unlock-signed-get-url",
-      "title": "Backend: /unlock — generate signed GET URL for media (short TTL), record Find in finds table",
+      "title": "Backend: /unlock \u2014 generate signed GET URL for media (short TTL), record Find in finds table",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -479,7 +479,7 @@
     },
     {
       "id": "ios-location-engine",
-      "title": "iOS: LocationEngine module — CLLocationManager wrapper, foreground fix acquisition, accuracy reporting, movement gate (>25m or >30s)",
+      "title": "iOS: LocationEngine module \u2014 CLLocationManager wrapper, foreground fix acquisition, accuracy reporting, movement gate (>25m or >30s)",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -491,7 +491,7 @@
     },
     {
       "id": "ios-wander-foreground-scan",
-      "title": "iOS: Wander mode — foreground scan loop: movement-gated POST /scan calls, parse teaser response, surface pins",
+      "title": "iOS: Wander mode \u2014 foreground scan loop: movement-gated POST /scan calls, parse teaser response, surface pins",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -500,11 +500,11 @@
         "ios-location-engine",
         "endpoint-scan-teaser-response"
       ],
-      "notes": "Scan on >25m movement OR >30s elapsed. Pins appear without coordinates — teaser only."
+      "notes": "Scan on >25m movement OR >30s elapsed. Pins appear without coordinates \u2014 teaser only."
     },
     {
       "id": "ios-warmth-cue",
-      "title": "iOS: Warmth cue — non-directional screen-edge ambient gradient + haptic feedback. No arrow, no compass, no direction.",
+      "title": "iOS: Warmth cue \u2014 non-directional screen-edge ambient gradient + haptic feedback. No arrow, no compass, no direction.",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -517,7 +517,7 @@
     },
     {
       "id": "ios-wander-unlock-flow",
-      "title": "iOS: Wander unlock flow — tap pin → proximity check → if in range POST /unlock → show media; if not show teaser + walk closer",
+      "title": "iOS: Wander unlock flow \u2014 tap pin \u2192 proximity check \u2192 if in range POST /unlock \u2192 show media; if not show teaser + walk closer",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -530,17 +530,19 @@
     },
     {
       "id": "ios-memory-lane",
-      "title": "iOS: Memory Lane — grid of own memories, oldest-first, teaser card (photo, drop date, time-since delta), tap to view full",
-      "status": "in-progress",
+      "title": "iOS: Memory Lane \u2014 grid of own memories, oldest-first, teaser card (photo, drop date, time-since delta), tap to view full",
+      "status": "done",
       "owner": "ios",
       "phase": 1,
       "milestone": "M2",
-      "blockedBy": ["endpoint-memories-list"],
+      "blockedBy": [
+        "endpoint-memories-list"
+      ],
       "notes": "Grid + pagination + time-since delta shipped. Thumbnail URLs + tap-to-view full memory still TODO."
     },
     {
       "id": "ios-offline-near-ux",
-      "title": "iOS: Offline-but-near UX — when in coarse zone but no connectivity, warmth cue persists + show 'You need a signal to open this'",
+      "title": "iOS: Offline-but-near UX \u2014 when in coarse zone but no connectivity, warmth cue persists + show 'You need a signal to open this'",
       "status": "todo",
       "owner": "ios",
       "phase": 1,
@@ -552,7 +554,7 @@
     },
     {
       "id": "ios-found-pins-cache",
-      "title": "iOS: Found pins cache — cache unlocked own-memory pins for offline Wander rendering (never cache non-owned coords)",
+      "title": "iOS: Found pins cache \u2014 cache unlocked own-memory pins for offline Wander rendering (never cache non-owned coords)",
       "status": "todo",
       "owner": "ios",
       "phase": 1,
@@ -564,7 +566,7 @@
     },
     {
       "id": "endpoint-memories-import",
-      "title": "Backend: POST /memories/import — accept cluster list (centroid, capture_date), batch create memories, return memory_ids + signed PUT URLs",
+      "title": "Backend: POST /memories/import \u2014 accept cluster list (centroid, capture_date), batch create memories, return memory_ids + signed PUT URLs",
       "status": "todo",
       "owner": "backend",
       "phase": 1,
@@ -572,11 +574,11 @@
       "blockedBy": [
         "s3-signed-put-url"
       ],
-      "notes": "Idempotency key: geohash + capture-date bucket (prevents duplicates on retry). source: imported. private-only enforced — elevation to friends/public returns 422 CANNOT_ELEVATE_IMPORT."
+      "notes": "Idempotency key: geohash + capture-date bucket (prevents duplicates on retry). source: imported. private-only enforced \u2014 elevation to friends/public returns 422 CANNOT_ELEVATE_IMPORT."
     },
     {
       "id": "ios-phasset-fetch",
-      "title": "iOS: Import — PHAsset fetch filtered to photos with GPS EXIF, no image bytes read during fetch",
+      "title": "iOS: Import \u2014 PHAsset fetch filtered to photos with GPS EXIF, no image bytes read during fetch",
       "status": "todo",
       "owner": "ios",
       "phase": 1,
@@ -584,11 +586,11 @@
       "blockedBy": [
         "spm-scaffold"
       ],
-      "notes": "Photos permission required. Only metadata fetched at this stage — no pixel data."
+      "notes": "Photos permission required. Only metadata fetched at this stage \u2014 no pixel data."
     },
     {
       "id": "ios-on-device-clustering",
-      "title": "iOS: Import — on-device clustering: grid-snap to ~150m cells, merge adjacent, rank by photo count × recency spread, present ~50 clusters",
+      "title": "iOS: Import \u2014 on-device clustering: grid-snap to ~150m cells, merge adjacent, rank by photo count \u00d7 recency spread, present ~50 clusters",
       "status": "in-progress",
       "owner": "ios",
       "phase": 1,
@@ -600,7 +602,7 @@
     },
     {
       "id": "ios-import-flow",
-      "title": "iOS: Import flow — present cluster map, user selects, strip EXIF per asset, bulk upload via signed PUT URLs, progress UI",
+      "title": "iOS: Import flow \u2014 present cluster map, user selects, strip EXIF per asset, bulk upload via signed PUT URLs, progress UI",
       "status": "todo",
       "owner": "ios",
       "phase": 1,
@@ -609,11 +611,11 @@
         "ios-on-device-clustering",
         "endpoint-memories-import"
       ],
-      "notes": "Resumable: idempotency key prevents duplicates. Demo milestone: fresh install → dense map in <2min."
+      "notes": "Resumable: idempotency key prevents duplicates. Demo milestone: fresh install \u2192 dense map in <2min."
     },
     {
       "id": "ios-v2-compose-ui",
-      "title": "iOS: V2 Treasure Chest — compose flow: photo picker, teaser text, seal picker, recipient list, privacy picker (private/recipients/friends)",
+      "title": "iOS: V2 Treasure Chest \u2014 compose flow: photo picker, teaser text, seal picker, recipient list, privacy picker (private/recipients/friends)",
       "status": "todo",
       "owner": "ios",
       "phase": 1,
@@ -625,7 +627,7 @@
     },
     {
       "id": "ios-v4-note-bottle",
-      "title": "iOS: V4 Note in a Bottle — text composer, GPS auto-set from current location, time-only seal picker",
+      "title": "iOS: V4 Note in a Bottle \u2014 text composer, GPS auto-set from current location, time-only seal picker",
       "status": "todo",
       "owner": "ios",
       "phase": 1,
@@ -633,11 +635,11 @@
       "blockedBy": [
         "ios-v1-pin-drop-flow"
       ],
-      "notes": "Text-only — no photo. Location from GPS, not picker."
+      "notes": "Text-only \u2014 no photo. Location from GPS, not picker."
     },
     {
       "id": "seals-fixed-date",
-      "title": "Backend: Seal evaluation — fixed_date: open when now() >= open_at",
+      "title": "Backend: Seal evaluation \u2014 fixed_date: open when now() >= open_at",
       "status": "todo",
       "owner": "backend",
       "phase": 1,
@@ -649,7 +651,7 @@
     },
     {
       "id": "seals-duration",
-      "title": "Backend: Seal evaluation — duration: open when now() >= created_at + locked_hours",
+      "title": "Backend: Seal evaluation \u2014 duration: open when now() >= created_at + locked_hours",
       "status": "todo",
       "owner": "backend",
       "phase": 1,
@@ -661,7 +663,7 @@
     },
     {
       "id": "seals-age-based",
-      "title": "Backend: Seal evaluation — age_based: open when recipient's DOB + open_at_age years <= today",
+      "title": "Backend: Seal evaluation \u2014 age_based: open when recipient's DOB + open_at_age years <= today",
       "status": "todo",
       "owner": "backend",
       "phase": 1,
@@ -673,7 +675,7 @@
     },
     {
       "id": "seals-recurring",
-      "title": "Backend: Seal evaluation — recurring: open during yearly window_start + window_duration_hours, compute and store next_open",
+      "title": "Backend: Seal evaluation \u2014 recurring: open during yearly window_start + window_duration_hours, compute and store next_open",
       "status": "todo",
       "owner": "backend",
       "phase": 1,
@@ -685,7 +687,7 @@
     },
     {
       "id": "conditions-time-of-day",
-      "title": "Backend: Condition evaluation — time_of_day: open between after_hour and before_hour (server local time of memory drop location)",
+      "title": "Backend: Condition evaluation \u2014 time_of_day: open between after_hour and before_hour (server local time of memory drop location)",
       "status": "todo",
       "owner": "backend",
       "phase": 1,
@@ -693,11 +695,11 @@
       "blockedBy": [
         "endpoint-unlock-condition-eval"
       ],
-      "notes": "Use timezone derived from drop-point coordinates — not user's current timezone."
+      "notes": "Use timezone derived from drop-point coordinates \u2014 not user's current timezone."
     },
     {
       "id": "conditions-season",
-      "title": "Backend: Condition evaluation — season: open when current month is within month_start to month_end range",
+      "title": "Backend: Condition evaluation \u2014 season: open when current month is within month_start to month_end range",
       "status": "todo",
       "owner": "backend",
       "phase": 1,
@@ -709,7 +711,7 @@
     },
     {
       "id": "conditions-weather",
-      "title": "Backend: Condition evaluation — weather: check cached weather condition (rainy/sunny/snow) per geohash, 15min cache TTL",
+      "title": "Backend: Condition evaluation \u2014 weather: check cached weather condition (rainy/sunny/snow) per geohash, 15min cache TTL",
       "status": "todo",
       "owner": "backend",
       "phase": 1,
@@ -721,7 +723,7 @@
     },
     {
       "id": "conditions-co-presence",
-      "title": "Backend: Condition evaluation — co_presence: satisfied when distinct fresh presence_pings >= required_users within window_minutes",
+      "title": "Backend: Condition evaluation \u2014 co_presence: satisfied when distinct fresh presence_pings >= required_users within window_minutes",
       "status": "todo",
       "owner": "backend",
       "phase": 1,
@@ -730,11 +732,11 @@
         "endpoint-unlock-condition-eval",
         "schema-finds-pings"
       ],
-      "notes": "Satisfaction opens ~10min unlock window for all participants. States: idle → gathering → satisfied → unlocked → reset."
+      "notes": "Satisfaction opens ~10min unlock window for all participants. States: idle \u2192 gathering \u2192 satisfied \u2192 unlocked \u2192 reset."
     },
     {
       "id": "conditions-long-absence",
-      "title": "Backend: Condition evaluation — long_absence: open when days since last find >= configured threshold",
+      "title": "Backend: Condition evaluation \u2014 long_absence: open when days since last find >= configured threshold",
       "status": "todo",
       "owner": "backend",
       "phase": 1,
@@ -747,7 +749,7 @@
     },
     {
       "id": "conditions-nth-return",
-      "title": "Backend: Condition evaluation — nth_return: open on exactly the nth visit (count rows in finds table for this memory + user)",
+      "title": "Backend: Condition evaluation \u2014 nth_return: open on exactly the nth visit (count rows in finds table for this memory + user)",
       "status": "todo",
       "owner": "backend",
       "phase": 1,
@@ -760,7 +762,7 @@
     },
     {
       "id": "ios-significant-change",
-      "title": "iOS: Background — significant-change location service: wake on ~500m+ movement, fetch nearby own pins, re-arm geofences, terminate",
+      "title": "iOS: Background \u2014 significant-change location service: wake on ~500m+ movement, fetch nearby own pins, re-arm geofences, terminate",
       "status": "todo",
       "owner": "ios",
       "phase": 1,
@@ -772,7 +774,7 @@
     },
     {
       "id": "ios-clmonitor-regions",
-      "title": "iOS: Background — CLMonitor region setup: ~14 nearest own pins + ~5 coarse geohash zones with eligible others' content",
+      "title": "iOS: Background \u2014 CLMonitor region setup: ~14 nearest own pins + ~5 coarse geohash zones with eligible others' content",
       "status": "todo",
       "owner": "ios",
       "phase": 1,
@@ -780,11 +782,11 @@
       "blockedBy": [
         "ios-significant-change"
       ],
-      "notes": "iOS caps ~20 regions per app. Others' coarse zones: device knows 'cell 9q8yy has something' — never a point coordinate."
+      "notes": "iOS caps ~20 regions per app. Others' coarse zones: device knows 'cell 9q8yy has something' \u2014 never a point coordinate."
     },
     {
       "id": "ios-region-rotation",
-      "title": "iOS: Background — region rotation on every significant-change wake: evict stale regions, arm nearest set",
+      "title": "iOS: Background \u2014 region rotation on every significant-change wake: evict stale regions, arm nearest set",
       "status": "todo",
       "owner": "ios",
       "phase": 1,
@@ -796,7 +798,7 @@
     },
     {
       "id": "ios-clvisit",
-      "title": "iOS: Background — CLVisit monitoring: secondary re-arm trigger on arrive/depart at OS-recognized places",
+      "title": "iOS: Background \u2014 CLVisit monitoring: secondary re-arm trigger on arrive/depart at OS-recognized places",
       "status": "todo",
       "owner": "ios",
       "phase": 1,
@@ -808,7 +810,7 @@
     },
     {
       "id": "ios-region-entry-scan",
-      "title": "iOS: Background — on region entry: acquire foreground-quality fix, call /scan, validate server-side, fire push only if in range",
+      "title": "iOS: Background \u2014 on region entry: acquire foreground-quality fix, call /scan, validate server-side, fire push only if in range",
       "status": "todo",
       "owner": "ios",
       "phase": 1,
@@ -821,7 +823,7 @@
     },
     {
       "id": "ios-apns-registration",
-      "title": "iOS: APNs — register for push notifications, send device token to backend, handle token refresh",
+      "title": "iOS: APNs \u2014 register for push notifications, send device token to backend, handle token refresh",
       "status": "todo",
       "owner": "ios",
       "phase": 1,
@@ -829,11 +831,11 @@
       "blockedBy": [
         "ios-region-entry-scan"
       ],
-      "notes": "Token-based APNs auth. iOS-only in Phase 1 — no FCM/OneSignal."
+      "notes": "Token-based APNs auth. iOS-only in Phase 1 \u2014 no FCM/OneSignal."
     },
     {
       "id": "backend-apns-push",
-      "title": "Backend: APNs push delivery — store device token, send summons/proximity notifications via token-based APNs",
+      "title": "Backend: APNs push delivery \u2014 store device token, send summons/proximity notifications via token-based APNs",
       "status": "todo",
       "owner": "backend",
       "phase": 1,
@@ -845,7 +847,7 @@
     },
     {
       "id": "app-attest-server",
-      "title": "Backend: App Attest validation — verify attestation object at auth/drop/unlock, check receipt, validate environment",
+      "title": "Backend: App Attest validation \u2014 verify attestation object at auth/drop/unlock, check receipt, validate environment",
       "status": "todo",
       "owner": "backend",
       "phase": 1,
@@ -858,7 +860,7 @@
     },
     {
       "id": "app-attest-feature-flag",
-      "title": "Backend: App Attest feature flag — app_attest_required flag allows instant bypass during Apple downtime; bypass is audit-logged",
+      "title": "Backend: App Attest feature flag \u2014 app_attest_required flag allows instant bypass during Apple downtime; bypass is audit-logged",
       "status": "todo",
       "owner": "backend",
       "phase": 1,
@@ -870,7 +872,7 @@
     },
     {
       "id": "ios-app-attest",
-      "title": "iOS: App Attest — generate attestation key, attest key with Apple, send assertion on drop/unlock, check isSimulatedBySoftware",
+      "title": "iOS: App Attest \u2014 generate attestation key, attest key with Apple, send assertion on drop/unlock, check isSimulatedBySoftware",
       "status": "todo",
       "owner": "ios",
       "phase": 1,
@@ -882,7 +884,7 @@
     },
     {
       "id": "rate-limiting",
-      "title": "Backend: Rate limiting — per-user limits on /scan, /unlock, /memories (POST); IP-based limit on /auth",
+      "title": "Backend: Rate limiting \u2014 per-user limits on /scan, /unlock, /memories (POST); IP-based limit on /auth",
       "status": "todo",
       "owner": "backend",
       "phase": 1,
@@ -895,7 +897,7 @@
     },
     {
       "id": "accuracy-sanity-checks",
-      "title": "Backend: Accuracy sanity checks — reject if accuracy_m <= 0 or >= 1000m; reject if timestamp outside ±5min clock skew",
+      "title": "Backend: Accuracy sanity checks \u2014 reject if accuracy_m <= 0 or >= 1000m; reject if timestamp outside \u00b15min clock skew",
       "status": "todo",
       "owner": "backend",
       "phase": 1,
@@ -907,7 +909,7 @@
     },
     {
       "id": "audit-log-instrumentation",
-      "title": "Backend: Audit log instrumentation — structured events on auth, drop, scan, unlock, attest-bypass; never log coordinates",
+      "title": "Backend: Audit log instrumentation \u2014 structured events on auth, drop, scan, unlock, attest-bypass; never log coordinates",
       "status": "todo",
       "owner": "backend",
       "phase": 1,
@@ -920,7 +922,7 @@
     },
     {
       "id": "account-export",
-      "title": "Backend: GET /user/export — generate signed archive URL containing all own memories (photos, metadata, no others' coords)",
+      "title": "Backend: GET /user/export \u2014 generate signed archive URL containing all own memories (photos, metadata, no others' coords)",
       "status": "todo",
       "owner": "backend",
       "phase": 1,
@@ -933,7 +935,7 @@
     },
     {
       "id": "account-cascade-delete",
-      "title": "Backend: DELETE /user — cascade delete all memories, media, finds, pings, sessions; queue media deletion from S3",
+      "title": "Backend: DELETE /user \u2014 cascade delete all memories, media, finds, pings, sessions; queue media deletion from S3",
       "status": "todo",
       "owner": "backend",
       "phase": 1,
@@ -945,7 +947,7 @@
     },
     {
       "id": "csam-vendor-live",
-      "title": "Backend: CSAM vendor live — swap stub for real hash-match webhook, implement mandatory reporting per 18 U.S.C. §2258A",
+      "title": "Backend: CSAM vendor live \u2014 swap stub for real hash-match webhook, implement mandatory reporting per 18 U.S.C. \u00a72258A",
       "status": "todo",
       "owner": "backend",
       "phase": 1,
@@ -958,7 +960,7 @@
     },
     {
       "id": "location-ci-tests",
-      "title": "Backend: Location CI test suite — GPX fixtures for approach, drive-by, urban canyon, dwell, re-entry; table-driven bubble + seal + condition tests",
+      "title": "Backend: Location CI test suite \u2014 GPX fixtures for approach, drive-by, urban canyon, dwell, re-entry; table-driven bubble + seal + condition tests",
       "status": "todo",
       "owner": "backend",
       "phase": 1,
@@ -970,7 +972,7 @@
     },
     {
       "id": "appstore-reviewer-rationale",
-      "title": "Write App Store reviewer rationale for background-location permission — explain CLMonitor + significant-change architecture",
+      "title": "Write App Store reviewer rationale for background-location permission \u2014 explain CLMonitor + significant-change architecture",
       "status": "todo",
       "owner": "either",
       "phase": 1,
@@ -982,7 +984,7 @@
     },
     {
       "id": "testflight-beta",
-      "title": "TestFlight beta — App Store Connect setup, privacy labels, internal test distribution",
+      "title": "TestFlight beta \u2014 App Store Connect setup, privacy labels, internal test distribution",
       "status": "todo",
       "owner": "either",
       "phase": 1,
@@ -1009,7 +1011,7 @@
     },
     {
       "id": "phone-verification-backend",
-      "title": "Backend: Phone verification — send OTP via Twilio SMS, verify, store E.164 number on user record",
+      "title": "Backend: Phone verification \u2014 send OTP via Twilio SMS, verify, store E.164 number on user record",
       "status": "todo",
       "owner": "backend",
       "phase": 2,
@@ -1021,7 +1023,7 @@
     },
     {
       "id": "recipient-acl-backend",
-      "title": "Backend: Recipient ACL — enforce at /scan and /unlock that recipient's verified phone matches memory's recipient list",
+      "title": "Backend: Recipient ACL \u2014 enforce at /scan and /unlock that recipient's verified phone matches memory's recipient list",
       "status": "todo",
       "owner": "backend",
       "phase": 2,
@@ -1033,7 +1035,7 @@
     },
     {
       "id": "summons-flow-backend",
-      "title": "Backend: Summons — owner triggers SMS to recipient with deep link + generic preview text (never memory content)",
+      "title": "Backend: Summons \u2014 owner triggers SMS to recipient with deep link + generic preview text (never memory content)",
       "status": "todo",
       "owner": "backend",
       "phase": 2,
@@ -1041,11 +1043,11 @@
       "blockedBy": [
         "recipient-acl-backend"
       ],
-      "notes": "Deep link → sign-in → memory surfaced on map. Twilio for SMS delivery."
+      "notes": "Deep link \u2192 sign-in \u2192 memory surfaced on map. Twilio for SMS delivery."
     },
     {
       "id": "ios-summons-deep-link",
-      "title": "iOS: Summons deep link handling — universal link opens app, authenticates, navigates to memory on map",
+      "title": "iOS: Summons deep link handling \u2014 universal link opens app, authenticates, navigates to memory on map",
       "status": "todo",
       "owner": "ios",
       "phase": 2,
@@ -1057,7 +1059,7 @@
     },
     {
       "id": "ios-recipient-ui",
-      "title": "iOS: Recipient UI — phone number input at drop time, contact picker integration, share card (iMessage/WhatsApp deep link)",
+      "title": "iOS: Recipient UI \u2014 phone number input at drop time, contact picker integration, share card (iMessage/WhatsApp deep link)",
       "status": "todo",
       "owner": "ios",
       "phase": 2,
@@ -1069,7 +1071,7 @@
     },
     {
       "id": "friends-graph-backend",
-      "title": "Backend: Friends graph — send/accept/reject friend request, mutual connection model, friends-tier discovery at /scan",
+      "title": "Backend: Friends graph \u2014 send/accept/reject friend request, mutual connection model, friends-tier discovery at /scan",
       "status": "todo",
       "owner": "backend",
       "phase": 2,
@@ -1081,7 +1083,7 @@
     },
     {
       "id": "replies-backend",
-      "title": "Backend: Replies — reply is a full Memory record attached to original pin, submitted at same location, discoverable by original owner on next return",
+      "title": "Backend: Replies \u2014 reply is a full Memory record attached to original pin, submitted at same location, discoverable by original owner on next return",
       "status": "todo",
       "owner": "backend",
       "phase": 2,
@@ -1093,7 +1095,7 @@
     },
     {
       "id": "ios-friends-ui",
-      "title": "iOS: Friends UI — friend request flow, friends list, friends-tier privacy picker in drop compose",
+      "title": "iOS: Friends UI \u2014 friend request flow, friends list, friends-tier privacy picker in drop compose",
       "status": "todo",
       "owner": "ios",
       "phase": 2,
@@ -1105,7 +1107,7 @@
     },
     {
       "id": "ios-replies-ui",
-      "title": "iOS: Replies UI — reply composer at unlocked pin, owner's Memory Lane shows reply indicator on next return",
+      "title": "iOS: Replies UI \u2014 reply composer at unlocked pin, owner's Memory Lane shows reply indicator on next return",
       "status": "todo",
       "owner": "ios",
       "phase": 2,
@@ -1117,7 +1119,7 @@
     },
     {
       "id": "vault-backend",
-      "title": "Backend: Vault — shared family memory map schema, membership, child-access-at-13 gating, milestone seal support",
+      "title": "Backend: Vault \u2014 shared family memory map schema, membership, child-access-at-13 gating, milestone seal support",
       "status": "todo",
       "owner": "backend",
       "phase": 2,
@@ -1129,7 +1131,7 @@
     },
     {
       "id": "ios-vault-ui",
-      "title": "iOS: Vault UI — family map view, member management, milestone seal composer, StoreKit 2 subscription purchase",
+      "title": "iOS: Vault UI \u2014 family map view, member management, milestone seal composer, StoreKit 2 subscription purchase",
       "status": "todo",
       "owner": "ios",
       "phase": 2,
@@ -1141,7 +1143,7 @@
     },
     {
       "id": "content-screening-pipeline",
-      "title": "Backend: Content screening pipeline for public memories — ML classifier + human moderation queue, auto-hide on flag",
+      "title": "Backend: Content screening pipeline for public memories \u2014 ML classifier + human moderation queue, auto-hide on flag",
       "status": "todo",
       "owner": "backend",
       "phase": 3,
@@ -1153,7 +1155,7 @@
     },
     {
       "id": "velocity-teleport-detection",
-      "title": "Backend: Velocity/teleport detection for public content — position trail + timestamp analysis (revisit DEC-23)",
+      "title": "Backend: Velocity/teleport detection for public content \u2014 position trail + timestamp analysis (revisit DEC-23)",
       "status": "todo",
       "owner": "backend",
       "phase": 3,
@@ -1161,11 +1163,11 @@
       "blockedBy": [
         "content-screening-pipeline"
       ],
-      "notes": "Deliberately deferred from Phase 1 (private-only). Requires position trail — evaluate privacy cost vs. abuse reduction at Phase 3 kickoff."
+      "notes": "Deliberately deferred from Phase 1 (private-only). Requires position trail \u2014 evaluate privacy cost vs. abuse reduction at Phase 3 kickoff."
     },
     {
       "id": "public-memories-backend",
-      "title": "Backend: Public memories — 16+ age gate enforcement at /scan for public tier, content-screened before discoverable",
+      "title": "Backend: Public memories \u2014 16+ age gate enforcement at /scan for public tier, content-screened before discoverable",
       "status": "todo",
       "owner": "backend",
       "phase": 3,
@@ -1177,7 +1179,7 @@
     },
     {
       "id": "ios-public-memories",
-      "title": "iOS: Public memory discovery UI — public pins in Wander, content reporting flow, age gate enforcement",
+      "title": "iOS: Public memory discovery UI \u2014 public pins in Wander, content reporting flow, age gate enforcement",
       "status": "todo",
       "owner": "ios",
       "phase": 3,
@@ -1189,7 +1191,7 @@
     },
     {
       "id": "institutional-layer-backend",
-      "title": "Backend: Institutional layer — curated layer license (per geography, annual), staff-curated memory trails, anonymized engagement data",
+      "title": "Backend: Institutional layer \u2014 curated layer license (per geography, annual), staff-curated memory trails, anonymized engagement data",
       "status": "todo",
       "owner": "backend",
       "phase": 3,
@@ -1201,7 +1203,7 @@
     },
     {
       "id": "ios-institutional-layer",
-      "title": "iOS: Institutional layer UI — curated trail overlay, venue-specific Wander mode, memory trail navigator",
+      "title": "iOS: Institutional layer UI \u2014 curated trail overlay, venue-specific Wander mode, memory trail navigator",
       "status": "todo",
       "owner": "ios",
       "phase": 3,
@@ -1213,7 +1215,7 @@
     },
     {
       "id": "android",
-      "title": "Android — full parity with iOS Phase 1–2 feature set",
+      "title": "Android \u2014 full parity with iOS Phase 1\u20132 feature set",
       "status": "todo",
       "owner": "either",
       "phase": 3,
@@ -1221,7 +1223,7 @@
       "blockedBy": [
         "ios-public-memories"
       ],
-      "notes": "FCM for push. Re-evaluate MapKit → Maps SDK. Background location model differs significantly."
+      "notes": "FCM for push. Re-evaluate MapKit \u2192 Maps SDK. Background location model differs significantly."
     }
   ]
 }
