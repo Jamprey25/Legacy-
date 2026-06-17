@@ -1130,7 +1130,7 @@
     {
       "id": "rate-limiting",
       "title": "Backend: Rate limiting \u2014 per-user limits on /scan, /unlock, /memories (POST); IP-based limit on /auth",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 1,
       "milestone": "M5",

@@ -9,10 +9,14 @@ import { generateSignedGetUrl } from "../lib/storage.js";
 import { findNearbyMemories } from "../db/memories.js";
 import { upsertPresencePing } from "../db/presencePings.js";
 import { requireAuth, type AuthVars } from "../middleware/auth.js";
+import { rateLimit } from "../middleware/rateLimit.js";
 
 export const discoveryRoutes = new Hono<{ Variables: AuthVars }>();
 
 discoveryRoutes.use("*", requireAuth);
+// Per-user scan cap — foreground scans are movement-gated client-side, but guard the
+// server against a runaway/abusive client. 60 scans / minute per user.
+discoveryRoutes.use("*", rateLimit({ name: "scan", limit: 60, windowSec: 60, keyBy: "user" }));
 
 // ---------------------------------------------------------------------------
 // POST /discovery/scan

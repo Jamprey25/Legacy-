@@ -17,10 +17,17 @@ import { ownMemoryProximity, othersMemoryProximity } from "../lib/proximity.js";
 import { evaluateSeal } from "../lib/sealEval.js";
 import { evaluateCondition } from "../lib/conditionEval.js";
 import { requireAuth, type AuthVars } from "../middleware/auth.js";
+import { rateLimit } from "../middleware/rateLimit.js";
 
 export const memoriesRoutes = new Hono<{ Variables: AuthVars }>();
 
 memoriesRoutes.use("*", requireAuth);
+
+// Per-user write/unlock limits (GET list is unthrottled — cheap, owner-scoped).
+// Drops: 20 / hour (a 24h cooldown already gates rediscovery, this guards bulk abuse).
+// Unlocks: 30 / minute (legitimate dwell-retry needs a few; this stops brute-forcing).
+const dropLimit = rateLimit({ name: "drop", limit: 20, windowSec: 3600, keyBy: "user" });
+const unlockLimit = rateLimit({ name: "unlock", limit: 30, windowSec: 60, keyBy: "user" });
 
 // ---------------------------------------------------------------------------
 // GET /memories — paginated oldest-first owner list (Memory Lane)
@@ -173,7 +180,7 @@ function parseCondition(raw: unknown): {
 }
 
 
-memoriesRoutes.post("/", async (c) => {
+memoriesRoutes.post("/", dropLimit, async (c) => {
   const body = (await c.req.json().catch(() => null)) as PostMemoriesBody | null;
   if (!body) throw new ApiError("invalid_request", "Request body must be JSON.");
 
@@ -325,8 +332,9 @@ memoriesRoutes.get("/:id", async (c) => {
 
 const DWELL_REQUIRED_SECONDS = 20;
 
-memoriesRoutes.post("/:id/unlock", async (c) => {
+memoriesRoutes.post("/:id/unlock", unlockLimit, async (c) => {
   const memoryId = c.req.param("id");
+  if (!memoryId) throw new ApiError("not_found", "Memory not found.");
   const userId: string = c.get("userId");
 
   const body = (await c.req.json().catch(() => null)) as {

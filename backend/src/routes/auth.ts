@@ -21,8 +21,13 @@ import {
 import { issueCode, verifyCode } from "../db/otp.js";
 import { upsertSession, revokeSession, type DeviceInfo } from "../db/sessions.js";
 import { requireAuth, type AuthVars } from "../middleware/auth.js";
+import { rateLimit } from "../middleware/rateLimit.js";
 
 export const authRoutes = new Hono<{ Variables: AuthVars }>();
+
+// IP-based limit on all auth endpoints — blunts credential stuffing / OTP spam.
+// 20 requests / 10 min per IP across social, email/start, email/verify, logout.
+authRoutes.use("*", rateLimit({ name: "auth", limit: 20, windowSec: 600, keyBy: "ip" }));
 
 /** Build the contract-shaped session response (§2). */
 async function sessionResponse(user: User, device: DeviceInfo | undefined) {
