@@ -74,6 +74,20 @@ cd dashboard && npm install && npm run dev
 
 Production: [dashboard-two-orpin-63.vercel.app](https://dashboard-two-orpin-63.vercel.app)
 
+### Vercel setup (required — monorepo)
+
+The Next.js app lives in **`dashboard/`**, not the repo root. In Vercel → Project → **Settings → General**:
+
+| Setting | Value |
+|---|---|
+| **Root Directory** | `dashboard` |
+| **Framework Preset** | Next.js |
+| **Production Branch** | `main` |
+
+If Root Directory is `.` (repo root), builds fail silently or never update — there is no root `package.json`.
+
+After saving, open **Deployments** → **Redeploy** the latest `main` commit.
+
 **Decisions:** When Claude/Cursor escalate something to you, it appears at the top of the dashboard with clickable **options**. Your choice is written to `tasks.json` (set `DECISIONS_SECRET` + `GITHUB_TOKEN` on Vercel; locally it updates `../tasks.json` without a token).
 
 ---
