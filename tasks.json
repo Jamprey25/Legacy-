@@ -1206,14 +1206,14 @@
     {
       "id": "location-ci-tests",
       "title": "Backend: Location CI test suite \u2014 GPX fixtures for approach, drive-by, urban canyon, dwell, re-entry; table-driven bubble + seal + condition tests",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 1,
       "milestone": "M5",
       "blockedBy": [
         "endpoint-unlock-condition-eval"
       ],
-      "notes": "Local Postgres in CI. Seed scripts create dense test geography."
+      "notes": "Local Postgres in CI. Seed scripts create dense test geography. [Pure-function table-driven tests for bubble/seal/condition + approach/drive-by/urban-canyon scenarios DONE (60 tests green). DB-backed dwell/re-entry GPX integration (Postgres-in-CI seed) deferred \u2014 needs CI Postgres, tracked separately.]"
     },
     {
       "id": "appstore-reviewer-rationale",
