@@ -104,16 +104,21 @@ private struct MainTabView: View {
 
     @Environment(\.modelContext) private var modelContext
     @State private var backgroundLocation = BackgroundLocationCoordinator()
+    @State private var wanderCoordinator: WanderCoordinator
+
+    init(apiClient: LegacyAPIClient, locationEngine: LocationEngine) {
+        self.apiClient = apiClient
+        self.locationEngine = locationEngine
+        _wanderCoordinator = State(initialValue: WanderCoordinator(
+            apiClient: apiClient,
+            locationEngine: locationEngine,
+            networkMonitor: NetworkMonitor.shared
+        ))
+    }
 
     var body: some View {
         TabView {
-            WanderFeatureRootView(
-                coordinator: WanderCoordinator(
-                    apiClient: apiClient,
-                    locationEngine: locationEngine,
-                    networkMonitor: NetworkMonitor.shared
-                )
-            )
+            WanderFeatureRootView(coordinator: wanderCoordinator)
             .tabItem {
                 Label("Wander", systemImage: "map")
             }
@@ -150,8 +155,14 @@ private struct MainTabView: View {
             locationEngine.requestWhenInUseAuthorization()
             NetworkMonitor.shared.start()
             await DropDraftRecovery.retryPendingDrafts(context: modelContext)
-            backgroundLocation.onRegionEntered = { _ in
-                // ios-region-entry-scan: foreground-quality fix + /scan (M4 follow-up)
+            backgroundLocation.onRegionEntered = { regionID in
+                if let result = await BackgroundRegionScanService.scanOnRegionEntry(
+                    regionIdentifier: regionID,
+                    apiClient: apiClient,
+                    locationEngine: locationEngine
+                ) {
+                    wanderCoordinator.ingestBackgroundScan(result)
+                }
             }
             await backgroundLocation.startIfAuthorized()
         }

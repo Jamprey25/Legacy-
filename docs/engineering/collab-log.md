@@ -3,6 +3,8 @@
 Cross-AI communication between backend (Claude Code) and iOS (Cursor).
 Both sides append here. Joseph relays updates between sessions.
 
+**Full sync protocol:** [`AGENT_WORKFLOW.md`](./AGENT_WORKFLOW.md) — session start/end checklists, edit boundaries, relay template. Read it at session start.
+
 ---
 
 ## Working agreement
@@ -12,7 +14,7 @@ Both sides append here. Joseph relays updates between sessions.
 When Cursor or Claude Code hits a decision that needs Joseph's input:
 
 1. **Write it up first** — append to **Open questions**, **💡 Ideas / Brainstorm**, or **`tasks.json` → `decisions[]`** (for blockers that gate work). Include context, **`options[]`** (each with `id`, `label`, `description`, optional `recommended: true`), and a recommendation.
-2. **Give the other side a chance** — backend reads `collab-log.md` at session start; Joseph may relay or decide without a direct ping.
+2. **Give the other side a chance** — both agents run the session-start checklist in `AGENT_WORKFLOW.md` (read this log + `tasks.json`); Joseph may relay or decide without a direct ping.
 3. **Ask Joseph only after** the item is in the docs — or if it's urgent and already documented there.
 
 Do not use interactive choice prompts or "which do you prefer?" in chat without a corresponding entry in this log or `tasks.json` first. The dashboard and collab log are the shared record; chat is not.
@@ -382,4 +384,18 @@ No Joseph action needed unless he wants Google live in M0 (would need OAuth clie
 
 **Tasks marked done:** `ios-significant-change`, `ios-clmonitor-regions`, `ios-region-rotation`.
 
-**Next M4:** `ios-region-entry-scan`, `ios-clvisit`, `ios-apns-registration`, Always-permission UX before TestFlight.
+**Next M4:** `ios-clvisit`, `ios-apns-registration`, Always-permission UX before TestFlight.
+
+---
+
+## [ios → all] 2026-06-17 — Region-entry scan + Wander UI polish
+
+**Shipped:**
+- `BackgroundRegionScanService` — CLMonitor region entry → foreground fix → `POST /scan`; updates `WanderScanCache` via `WanderCoordinator.ingestBackgroundScan`.
+- `MainTabView` lifts `WanderCoordinator` so background callbacks refresh the Wander tab.
+- Wander tab UI: header with warmth badge, card layout, improved empty state (non-directional copy).
+- Stitch **Wander tab** mockup: project `2584295932051549313`, screen `833aeadbd57d4032a59547a4884a62e5` (Aurelian Noir design system — glass cards, warmth chips, no directional cues).
+
+**Tasks marked done:** `ios-region-entry-scan`.
+
+**Next M4:** `ios-clvisit`, `ios-apns-registration`, Always-permission UX before TestFlight.

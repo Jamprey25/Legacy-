@@ -30,6 +30,16 @@ public enum WarmthLevel: String, Sendable, CaseIterable {
         default: self = .none
         }
     }
+
+    /// Maps a stored intensity back to the nearest warmth band (for UI badges).
+    public init(intensity: Double) {
+        switch intensity {
+        case ..<0.01: self = .none
+        case ..<0.4: self = .coarse
+        case ..<0.75: self = .approaching
+        default: self = .inBubble
+        }
+    }
 }
 
 /// Non-directional, screen-edge ambient gradient. Radial-from-edges so no single

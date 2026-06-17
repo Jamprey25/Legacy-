@@ -211,6 +211,20 @@ public final class WanderCoordinator {
             previousWarmthLevel = level
         }
     }
+
+    /// Apply teasers from a background region-entry scan (push notification path comes later).
+    public func ingestBackgroundScan(_ result: BackgroundRegionScanService.Result) {
+        teasers = result.teasers
+        if result.teasers.isEmpty {
+            WanderScanCache.clear()
+        } else {
+            WanderScanCache.save(teasers: result.teasers)
+        }
+        applyWarmth(from: result.teasers)
+        if result.hasInRangeMemory {
+            statusMessage = "You're near a memory — open it when you're ready."
+        }
+    }
 }
 
 public struct WanderFeatureRootView: View {
@@ -233,28 +247,38 @@ public struct WanderFeatureRootView: View {
             #endif
 
             LegacyColor.background
-                .opacity(0.92)
+                .opacity(coordinator.teasers.isEmpty ? 0.94 : 0.88)
                 .ignoresSafeArea()
 
-            VStack(spacing: LegacySpacing.lg) {
+            VStack(spacing: 0) {
+                WanderHeaderBar(
+                    warmthLevel: WarmthLevel(intensity: coordinator.warmthIntensity),
+                    isScanning: coordinator.isScanning
+                )
+                .padding(.horizontal, LegacySpacing.lg)
+                .padding(.top, LegacySpacing.sm)
+
                 if coordinator.teasers.isEmpty {
-                    ContentUnavailableView(
-                        "Wander",
-                        systemImage: "map",
-                        description: Text("Walk to discover memories nearby.")
-                    )
+                    WanderEmptyState()
+                        .frame(maxHeight: .infinity)
                 } else {
-                    List(coordinator.teasers, id: \.memoryID) { teaser in
-                        TeaserRow(teaser: teaser) {
-                            Task { await coordinator.unlock(teaser: teaser) }
+                    ScrollView {
+                        LazyVStack(spacing: LegacySpacing.md) {
+                            ForEach(coordinator.teasers, id: \.memoryID) { teaser in
+                                TeaserCard(teaser: teaser) {
+                                    Task { await coordinator.unlock(teaser: teaser) }
+                                }
+                            }
                         }
+                        .padding(.horizontal, LegacySpacing.lg)
+                        .padding(.vertical, LegacySpacing.md)
                     }
-                    .scrollContentBackground(.hidden)
                 }
 
                 if coordinator.isScanning || coordinator.isUnlocking {
                     ProgressView()
                         .tint(LegacyColor.accent)
+                        .padding(.bottom, LegacySpacing.sm)
                 }
 
                 if let message = coordinator.statusMessage, !coordinator.isShowingUnlockedMedia {
@@ -263,9 +287,8 @@ public struct WanderFeatureRootView: View {
                         .foregroundStyle(LegacyColor.textSecondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, LegacySpacing.lg)
+                        .padding(.bottom, LegacySpacing.sm)
                 }
-
-                Spacer(minLength: 0)
             }
             .overlay(alignment: .bottom) {
                 if coordinator.showsOfflineNearUX {
@@ -292,7 +315,82 @@ public struct WanderFeatureRootView: View {
     }
 }
 
-private struct TeaserRow: View {
+private struct WanderHeaderBar: View {
+    let warmthLevel: WarmthLevel
+    let isScanning: Bool
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: LegacySpacing.xxs) {
+                Text("Wander")
+                    .font(LegacyFont.title)
+                    .foregroundStyle(LegacyColor.textPrimary)
+                Text(subtitle)
+                    .font(LegacyFont.caption)
+                    .foregroundStyle(LegacyColor.textSecondary)
+            }
+            Spacer()
+            if isScanning {
+                ProgressView()
+                    .tint(LegacyColor.accent)
+            } else if warmthLevel != .none {
+                WarmthBadge(level: warmthLevel)
+            }
+        }
+    }
+
+    private var subtitle: String {
+        switch warmthLevel {
+        case .none: return "Walk to discover memories"
+        case .coarse: return "Something is in the area"
+        case .approaching: return "Getting warmer"
+        case .inBubble: return "Very close"
+        }
+    }
+}
+
+private struct WarmthBadge: View {
+    let level: WarmthLevel
+
+    var body: some View {
+        Text(label)
+            .font(LegacyFont.caption)
+            .foregroundStyle(LegacyColor.textOnAccent)
+            .padding(.horizontal, LegacySpacing.sm)
+            .padding(.vertical, LegacySpacing.xxs)
+            .background(LegacyColor.accent.opacity(0.9))
+            .clipShape(Capsule())
+    }
+
+    private var label: String {
+        switch level {
+        case .none: return ""
+        case .coarse: return "Nearby"
+        case .approaching: return "Closer"
+        case .inBubble: return "Here"
+        }
+    }
+}
+
+private struct WanderEmptyState: View {
+    var body: some View {
+        VStack(spacing: LegacySpacing.lg) {
+            Image(systemName: "figure.walk")
+                .font(.system(size: 44))
+                .foregroundStyle(LegacyColor.accent.opacity(0.85))
+            Text("Walk to discover")
+                .font(LegacyFont.headline)
+                .foregroundStyle(LegacyColor.textPrimary)
+            Text("Memories appear as you move — no pins, no directions, just warmth.")
+                .font(LegacyFont.callout)
+                .foregroundStyle(LegacyColor.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, LegacySpacing.xl)
+        }
+    }
+}
+
+private struct TeaserCard: View {
     let teaser: Teaser
     let onUnlock: () -> Void
 
@@ -308,19 +406,37 @@ private struct TeaserRow: View {
                     .font(LegacyFont.caption)
                     .foregroundStyle(LegacyColor.textSecondary)
                 HStack {
-                    Text(teaser.inRange ? "In range" : "Nearby")
-                        .font(LegacyFont.caption)
-                        .foregroundStyle(teaser.inRange ? LegacyColor.accent : LegacyColor.textSecondary)
+                    Label(
+                        teaser.inRange ? "In range" : warmthLabel,
+                        systemImage: teaser.inRange ? "location.fill" : "sparkles"
+                    )
+                    .font(LegacyFont.caption)
+                    .foregroundStyle(teaser.inRange ? LegacyColor.accent : LegacyColor.textSecondary)
                     Spacer()
                     if teaser.inRange {
                         Button("Open", action: onUnlock)
                             .buttonStyle(.legacyPrimary)
-                            .frame(maxWidth: 120)
+                            .frame(maxWidth: 100)
                     }
                 }
             }
         }
-        .listRowBackground(LegacyColor.surface)
+        .padding(LegacySpacing.md)
+        .background(LegacyColor.surface.opacity(0.92))
+        .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.md))
+        .overlay(
+            RoundedRectangle(cornerRadius: LegacyRadius.md)
+                .stroke(LegacyColor.separator, lineWidth: 1)
+        )
+    }
+
+    private var warmthLabel: String {
+        switch WarmthLevel(contractValue: teaser.warmth) {
+        case .inBubble: return "Very close"
+        case .approaching: return "Nearby"
+        case .coarse: return "In the area"
+        case .none: return "Nearby"
+        }
     }
 
     @ViewBuilder
@@ -329,25 +445,26 @@ private struct TeaserRow: View {
             AsyncImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
+                    image.resizable().scaledToFill()
                 default:
-                    Image(systemName: "photo")
-                        .foregroundStyle(LegacyColor.textSecondary)
+                    placeholderThumb
                 }
             }
-            .frame(width: 56, height: 56)
+            .frame(width: 64, height: 64)
             .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.sm))
         } else {
-            RoundedRectangle(cornerRadius: LegacyRadius.sm)
-                .fill(LegacyColor.surface)
-                .frame(width: 56, height: 56)
-                .overlay {
-                    Image(systemName: "photo")
-                        .foregroundStyle(LegacyColor.textSecondary)
-                }
+            placeholderThumb
         }
+    }
+
+    private var placeholderThumb: some View {
+        RoundedRectangle(cornerRadius: LegacyRadius.sm)
+            .fill(LegacyColor.background)
+            .frame(width: 64, height: 64)
+            .overlay {
+                Image(systemName: "photo")
+                    .foregroundStyle(LegacyColor.textSecondary)
+            }
     }
 }
 

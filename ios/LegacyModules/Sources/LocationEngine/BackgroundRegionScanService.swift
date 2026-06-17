@@ -1,0 +1,40 @@
+import APIClient
+import CoreLocation
+import Foundation
+
+/// Background region entry → foreground-quality fix → `/scan` (M4, engineering-plan §7).
+@MainActor
+public enum BackgroundRegionScanService {
+    public struct Result: Sendable {
+        public let teasers: [Teaser]
+        public let hasInRangeMemory: Bool
+
+        public init(teasers: [Teaser], hasInRangeMemory: Bool) {
+            self.teasers = teasers
+            self.hasInRangeMemory = hasInRangeMemory
+        }
+    }
+
+    /// Performs one scan after a CLMonitor region fires. Returns nil on location/network failure.
+    public static func scanOnRegionEntry(
+        regionIdentifier: String,
+        apiClient: LegacyAPIClient,
+        locationEngine: LocationEngine
+    ) async -> Result? {
+        _ = regionIdentifier
+        do {
+            let fix = try await locationEngine.acquireFix()
+            let body = LocationRequest(lat: fix.lat, lng: fix.lng, accuracyM: fix.accuracyM)
+
+            if let response = try await apiClient.scan(body) {
+                let inRange = response.teasers.contains { $0.inRange }
+                locationEngine.recordScan(at: CLLocation(latitude: fix.lat, longitude: fix.lng))
+                return Result(teasers: response.teasers, hasInRangeMemory: inRange)
+            }
+
+            return Result(teasers: [], hasInRangeMemory: false)
+        } catch {
+            return nil
+        }
+    }
+}

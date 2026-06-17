@@ -1056,7 +1056,7 @@
     {
       "id": "ios-region-entry-scan",
       "title": "iOS: Background \u2014 on region entry: acquire foreground-quality fix, call /scan, validate server-side, fire push only if in range",
-      "status": "todo",
+      "status": "done",
       "owner": "ios",
       "phase": 1,
       "milestone": "M4",
@@ -1064,7 +1064,7 @@
         "ios-clvisit",
         "ios-region-rotation"
       ],
-      "notes": ""
+      "notes": "BackgroundRegionScanService + MainTabView wiring; push deferred to ios-apns-registration."
     },
     {
       "id": "ios-apns-registration",
