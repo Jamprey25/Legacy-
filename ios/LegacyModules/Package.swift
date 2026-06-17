@@ -45,7 +45,7 @@ let package = Package(
         ),
         .target(
             name: "ImportFeature",
-            dependencies: ["DesignSystem", "APIClient", "LocationEngine"]
+            dependencies: ["DesignSystem", "APIClient", "LocationEngine", "DropFeature"]
         ),
         .target(
             name: "AuthFeature",

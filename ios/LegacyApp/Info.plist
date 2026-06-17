@@ -25,7 +25,7 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Legacy uses your location to find memories you dropped nearby and unlock them when you return.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Legacy needs access to your photo library so you can drop a memory from an existing photo.</string>
+	<string>Legacy reads photo locations to find places you have visited and lets you drop or import memories from your library.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Legacy uses the camera so you can capture and drop a memory at your current location.</string>
 	<key>UIApplicationSceneManifest</key>

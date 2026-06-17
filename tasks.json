@@ -557,7 +557,7 @@
     {
       "id": "ios-offline-near-ux",
       "title": "iOS: Offline-but-near UX \u2014 when in coarse zone but no connectivity, warmth cue persists + show 'You need a signal to open this'",
-      "status": "todo",
+      "status": "done",
       "owner": "ios",
       "phase": 1,
       "milestone": "M2",
@@ -569,7 +569,7 @@
     {
       "id": "ios-found-pins-cache",
       "title": "iOS: Found pins cache \u2014 cache unlocked own-memory pins for offline Wander rendering (never cache non-owned coords)",
-      "status": "todo",
+      "status": "done",
       "owner": "ios",
       "phase": 1,
       "milestone": "M2",
@@ -593,7 +593,7 @@
     {
       "id": "ios-phasset-fetch",
       "title": "iOS: Import \u2014 PHAsset fetch filtered to photos with GPS EXIF, no image bytes read during fetch",
-      "status": "todo",
+      "status": "done",
       "owner": "ios",
       "phase": 1,
       "milestone": "M3",
@@ -605,7 +605,7 @@
     {
       "id": "ios-on-device-clustering",
       "title": "iOS: Import \u2014 on-device clustering: grid-snap to ~150m cells, merge adjacent, rank by photo count \u00d7 recency spread, present ~50 clusters",
-      "status": "in-progress",
+      "status": "done",
       "owner": "ios",
       "phase": 1,
       "milestone": "M3",
@@ -617,7 +617,7 @@
     {
       "id": "ios-import-flow",
       "title": "iOS: Import flow \u2014 present cluster map, user selects, strip EXIF per asset, bulk upload via signed PUT URLs, progress UI",
-      "status": "todo",
+      "status": "done",
       "owner": "ios",
       "phase": 1,
       "milestone": "M3",

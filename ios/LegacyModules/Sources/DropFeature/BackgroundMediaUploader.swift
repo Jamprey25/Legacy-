@@ -14,7 +14,11 @@ public final class BackgroundMediaUploader: MediaUploading, @unchecked Sendable 
             let config = URLSessionConfiguration.background(withIdentifier: Self.sessionIdentifier)
             config.isDiscretionary = false
             config.sessionSendsLaunchEvents = true
-            self.session = URLSession(configuration: config)
+            self.session = URLSession(
+                configuration: config,
+                delegate: BackgroundUploadSessionDelegate.shared,
+                delegateQueue: nil
+            )
         }
     }
 

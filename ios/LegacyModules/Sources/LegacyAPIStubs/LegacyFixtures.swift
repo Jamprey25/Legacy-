@@ -108,6 +108,22 @@ public enum LegacyFixtures {
     }
     """.utf8)
 
+    public static let importMemories = Data("""
+    {
+      "import_id": "44444444-4444-4444-4444-444444444444",
+      "memories": [
+        {
+          "cluster_index": 0,
+          "memory_id": "55555555-5555-5555-5555-555555555555",
+          "upload": {
+            "signed_put_url": "https://s3.stub/import?sig=abc",
+            "expires_at": "2026-06-16T21:10:00Z"
+          }
+        }
+      ]
+    }
+    """.utf8)
+
     /// 423 Locked — dwell not yet satisfied (contract §4).
     public static let lockedDwell = Data("""
     {
@@ -124,6 +140,7 @@ public enum LegacyFixtures {
         _ = try decoder.decode(UnlockResponse.self, from: unlock)
         _ = try decoder.decode(ListMemoriesResponse.self, from: memoryList)
         _ = try decoder.decode(MemoryDetail.self, from: memoryDetail)
+        _ = try decoder.decode(ImportMemoriesResponse.self, from: importMemories)
     }
 }
 
@@ -138,6 +155,7 @@ extension StubHTTPTransport {
         transport.enqueue("POST /v1/memories", .json(201, LegacyFixtures.createMemory))
         transport.enqueue("GET /v1/memories", .ok(LegacyFixtures.memoryList))
         transport.enqueue("GET /memories/22222222-2222-2222-2222-222222222222", .ok(LegacyFixtures.memoryDetail))
+        transport.enqueue("POST /v1/memories/import", .json(201, LegacyFixtures.importMemories))
         transport.enqueue("/v1/discovery/scan", .ok(LegacyFixtures.scanWithTeasers))
         transport.enqueue("/unlock", .json(423, LegacyFixtures.lockedDwell), .ok(LegacyFixtures.unlock))
         return transport

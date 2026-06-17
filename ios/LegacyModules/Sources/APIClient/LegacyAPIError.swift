@@ -29,6 +29,12 @@ public enum LegacyAPIError: Error, Sendable, Equatable {
     case transport(String)
     /// Response was not an HTTP response or had an unexpected status.
     case invalidResponse(statusCode: Int)
+
+    /// True for transport failures where retry may succeed once connectivity returns.
+    public var isConnectivityFailure: Bool {
+        if case .transport = self { return true }
+        return false
+    }
 }
 
 /// Extra body fields carried on `423 Locked` responses (contract §4).

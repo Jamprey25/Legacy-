@@ -16,12 +16,15 @@
 		B10000000000000000000007 /* LegacyAPIStubs in Frameworks */ = {isa = PBXBuildFile; productRef = P10000000000000000000006 /* LegacyAPIStubs */; };
 		B10000000000000000000008 /* DropFeature in Frameworks */ = {isa = PBXBuildFile; productRef = P10000000000000000000007 /* DropFeature */; };
 		B10000000000000000000009 /* MemoryLaneFeature in Frameworks */ = {isa = PBXBuildFile; productRef = P10000000000000000000008 /* MemoryLaneFeature */; };
+		B10000000000000000000010 /* ImportFeature in Frameworks */ = {isa = PBXBuildFile; productRef = P10000000000000000000009 /* ImportFeature */; };
+		B10000000000000000000011 /* LegacyAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000004 /* LegacyAppDelegate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		F10000000000000000000001 /* LegacyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyApp.swift; sourceTree = "<group>"; };
 		F10000000000000000000002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		F10000000000000000000003 /* Legacy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Legacy.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F10000000000000000000004 /* LegacyAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyAppDelegate.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -37,6 +40,7 @@
 				B10000000000000000000007 /* LegacyAPIStubs in Frameworks */,
 				B10000000000000000000008 /* DropFeature in Frameworks */,
 				B10000000000000000000009 /* MemoryLaneFeature in Frameworks */,
+				B10000000000000000000010 /* ImportFeature in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -55,6 +59,7 @@
 			isa = PBXGroup;
 			children = (
 				F10000000000000000000001 /* LegacyApp.swift */,
+				F10000000000000000000004 /* LegacyAppDelegate.swift */,
 				F10000000000000000000002 /* Info.plist */,
 			);
 			path = LegacyApp;
@@ -93,6 +98,7 @@
 				P10000000000000000000006 /* LegacyAPIStubs */,
 				P10000000000000000000007 /* DropFeature */,
 				P10000000000000000000008 /* MemoryLaneFeature */,
+				P10000000000000000000009 /* ImportFeature */,
 			);
 			productName = Legacy;
 			productReference = F10000000000000000000003 /* Legacy.app */;
@@ -150,6 +156,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B10000000000000000000001 /* LegacyApp.swift in Sources */,
+				B10000000000000000000011 /* LegacyAppDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -313,6 +320,10 @@
 		P10000000000000000000008 /* MemoryLaneFeature */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = MemoryLaneFeature;
+		};
+		P10000000000000000000009 /* ImportFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ImportFeature;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

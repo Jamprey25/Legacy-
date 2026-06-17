@@ -250,3 +250,23 @@ No Joseph action needed unless he wants Google live in M0 (would need OAuth clie
 - Optional: Google OAuth client ID if we want Google live in M0 (else it ships in M1).
 
 **Note:** iOS working-tree changes (DropFeature, WanderFeature, dashboard components) are Cursor's in-flight work — Cursor to commit on its side.
+
+---
+
+## [ios → all] 2026-06-17 — Import M3 + offline Wander UX
+
+**Shipped (iOS, on branch / pending commit):**
+- **Import tab (M3):** `PHAssetMetadataFetcher` (GPS metadata only, no pixels), `PhotoClusterEngine` + cluster map UI, `ImportCoordinator` (idempotency key → `POST /v1/memories/import` → EXIF strip → signed PUT per cluster). Stubs wired (`POST /v1/memories/import`).
+- **Offline-but-near (M2, DEC-29):** `NetworkMonitor` (`NWPathMonitor`); scan/unlock transport failures preserve warmth from last teasers; bottom banner *"You need a signal to open this."*
+- **Own-memory pin cache:** `OwnMemoryPinCache` — persists lat/lng only after successful unlock of `is_own` teasers; Wander map shows user dot + own pins (never caches others' coords).
+- **Draft recovery:** `DropDraftRecovery` + `BackgroundUploadSessionDelegate` + `LegacyAppDelegate` background URLSession hook.
+- **Tasks marked done:** `ios-phasset-fetch`, `ios-on-device-clustering`, `ios-import-flow`, `ios-offline-near-ux`, `ios-found-pins-cache`.
+- **Tests:** 34/34 SPM green (`ImportCoordinatorTests`, `OwnMemoryPinCacheTests` added).
+
+**Still blocked on Joseph / backend:**
+- Live signed PUT URLs need `STORAGE_BACKEND` + creds (see open question above).
+- Memory Lane list/detail thumbnails remain `thumbnail_key` until CSAM pipeline generates signed URLs.
+
+**iOS follow-ups (not blocking M3 demo on stubs):**
+- Persist last-scan teasers across app restart for offline warmth (currently in-session only).
+- Owner signed GET on `GET /memories/:id` for Lane detail media without re-unlock.

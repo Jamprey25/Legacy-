@@ -4,6 +4,7 @@ import AuthFeature
 import WanderFeature
 import DropFeature
 import MemoryLaneFeature
+import ImportFeature
 import DesignSystem
 import APIClient
 import LocationEngine
@@ -29,6 +30,8 @@ final class AppModel {
 
 @main
 struct LegacyApp: App {
+    @UIApplicationDelegateAdaptor(LegacyAppDelegate.self) private var appDelegate
+
     private let apiClient: LegacyAPIClient
     private let locationEngine = LocationEngine()
     @State private var appModel = AppModel()
@@ -99,12 +102,15 @@ private struct MainTabView: View {
     let apiClient: LegacyAPIClient
     let locationEngine: LocationEngine
 
+    @Environment(\.modelContext) private var modelContext
+
     var body: some View {
         TabView {
             WanderFeatureRootView(
                 coordinator: WanderCoordinator(
                     apiClient: apiClient,
-                    locationEngine: locationEngine
+                    locationEngine: locationEngine,
+                    networkMonitor: NetworkMonitor.shared
                 )
             )
             .tabItem {
@@ -121,6 +127,13 @@ private struct MainTabView: View {
                 Label("Drop", systemImage: "mappin.and.ellipse")
             }
 
+            ImportFeatureRootView(
+                coordinator: ImportCoordinator(apiClient: apiClient)
+            )
+            .tabItem {
+                Label("Import", systemImage: "square.stack.3d.up")
+            }
+
             MemoryLaneFeatureRootView(
                 coordinator: MemoryLaneCoordinator(
                     apiClient: apiClient,
@@ -134,6 +147,8 @@ private struct MainTabView: View {
         .tint(LegacyColor.accent)
         .task {
             locationEngine.requestWhenInUseAuthorization()
+            NetworkMonitor.shared.start()
+            await DropDraftRecovery.retryPendingDrafts(context: modelContext)
         }
     }
 }
