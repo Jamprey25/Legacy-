@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-17T17:16:56.503Z"
+    "lastUpdated": "2026-06-17T17:19:09.262Z"
   },
   "decisions": [
     {
@@ -90,6 +90,11 @@
         {
           "author": "backend",
           "text": "Confirmed — backend accepts null/omitted attestation for all endpoints in M1-M4. No enforcement, no 4xx. The app_attest_required feature flag (app-attest-feature-flag task) controls enforcement and defaults to false. M5 is the right time to harden this. iOS can send null safely until then.",
+          "date": "2026-06-17"
+        },
+        {
+          "author": "joseph",
+          "text": "I agree with backend",
           "date": "2026-06-17"
         }
       ]
