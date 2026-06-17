@@ -145,6 +145,7 @@ Contract shows `"attestation"` on create/unlock. iOS sends `null` today. Confirm
 | 2026-06-17 | **`POST /discovery/scan`** (full chain — M2): geohash precision-5 zone query + 8 neighbours, eligibility filter (clear + discoverable_after), asymmetric proximity bubbles (own 25m+min(acc,75m); others 20m+min(acc,25m), >50m rejected silently), upserts presence_ping for in-range memories (dwell check #1), builds teaser response with signed thumbnail URL. `204` when nothing nearby. `lib/proximity.ts` for bubble math. | backend |
 | 2026-06-17 | **`POST /memories/:id/unlock`** (full chain — M2): proximity re-validate → dwell check (20s between two presence_pings; skipped for own) → seal evaluation (none/fixed_date/duration/age_based/recurring) → condition evaluation (time_of_day/season/weather/co_presence/long_absence/nth_return; fallback auto-satisfies) → generate signed GET URL (60-min TTL) → record Find. `lib/sealEval.ts` + `lib/conditionEval.ts`. | backend |
 | 2026-06-17 | **`db/presencePings.ts`** + **`db/finds.ts`**: upsert/get presence pings; create/count/last-find for finds table. | backend |
+| 2026-06-17 | **Seal/condition persistence on `POST /memories`**: `db/seals.ts` (`createSeal`) + `db/conditions.ts` (`createCondition`); route parses flat §6 payloads, validates per-type (422 `seal_config_invalid` on bad shape or missing `condition.time_fallback`), persists alongside the memory. `createMemory` extended with `privacy_tier`/`teaser_text`/`caption`/`drop_method`. Completes the seal/condition feature end-to-end (eval was already live at unlock). NOTE: built collaboratively — backend (Claude) authored the db layer, the route wiring landed in the shared tree concurrently. | backend |
 | 2026-06-16 | **`DropCoordinator`**: EXIF strip → `POST /v1/memories` → signed PUT upload orchestration (picker/camera wiring still separate). | ios |
 | 2026-06-16 | **`WarmthHaptics`**: band-transition haptics (`UIImpactFeedbackGenerator` on iOS, no-op on macOS host builds). Wired into scan warmth updates. | ios |
 | 2026-06-16 | **`PhotoClusterEngine`**: ~150 m grid clustering + adjacent merge + rank — Import M3 prep, no Photos framework required for algorithm tests. | ios |
@@ -167,6 +168,7 @@ Things Cursor needs to know before writing `APIClient` or feature code.
 - `POST /memories/{id}/unlock` requires two passing scan results ≥20s apart — first scan counts as check #1. **NOW LIVE** (full dwell+seal+condition chain).
 - `GET /memories?cursor=<base64url>&limit=50` — paginated owner list. **NOW LIVE.** Unblocks `ios-memory-lane`.
 - All seal/condition evaluation happens server-side at unlock time — client never evaluates seals
+- **`POST /memories` now accepts `seal` + `condition`** (flat §6 shapes) plus `drop_method`/`privacy_tier`/`teaser_text`/`caption`. **NOW LIVE.** A `condition` without a valid `time_fallback` is rejected `422 seal_config_invalid` — mirror that in compose UI. Unblocks `ios-v2-compose-ui` / `ios-v4-note-bottle`.
 - EXIF must be stripped client-side before upload (server also strips, but client strip is the privacy guarantee)
 - **Warmth bands are coarse only** — 3 values: `coarse`, `approaching`, `in_bubble`. Never a continuous scalar. Client should ease animation *between* band transitions.
 - **`GET /memories` thumbnail_key** — this is the S3 key, not a URL. Thumbnails won't exist until the CSAM pipeline + thumbnail generation is wired (currently stub). For now all `thumbnail_key` will be null.
@@ -311,3 +313,23 @@ No Joseph action needed unless he wants Google live in M0 (would need OAuth clie
 - **Tests:** 38/38 SPM green.
 
 **Tasks marked done:** `ios-v2-compose-ui`, `ios-v4-note-bottle`.
+
+---
+
+## [joseph → cursor] 2026-06-17 — Use Ruflo + Pika going forward
+
+**Joseph:** Cursor should use **Ruflo for orchestration** and **Pika for design** (and other media tasks where useful).
+
+**Cursor setup (done this session):**
+- **Ruflo swarm:** `swarm-1781726441408-x2flah` — hierarchical, max 8 agents, specialized strategy, namespace `legacy-ios`.
+- **AgentDB memory (`legacy` namespace):**
+  - `orchestration-policy` — Ruflo = swarm/memory/hooks_route; Pika = image/UI mockups when agent is live.
+  - `task-queue-next` — iOS M4 background location next; backend import; blocked on STORAGE_BACKEND.
+- **hooks_route** before multi-step work (e.g. M4 location → primary agent `coder`, topology hierarchical).
+
+**Pika status (blocked until agent linked):**
+- MCP auth OK (`identity_whoami` → Joseph Amprey).
+- `identity_persona_read` / image gen return **`agent_not_configured`** — create or initialize Pika agent at [pika.me](https://pika.me), then reconnect MCP.
+- **Queued for Pika when live:** app icon concept, warmth-cue UI reference, TestFlight screenshot templates.
+
+**Working rule:** Implementation stays in repo (`tasks.json`, code, tests). Ruflo holds cross-session orchestration state; Pika produces design assets — not a substitute for `DesignSystem.swift`.
