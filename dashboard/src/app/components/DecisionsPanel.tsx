@@ -363,20 +363,36 @@ function ThreadCard({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(!isResolved);
+  const [needsSecret, setNeedsSecret] = useState(false);
+  const [secretInput, setSecretInput] = useState("");
 
-  const submit = useCallback(async () => {
+  const submit = useCallback(async (secret?: string) => {
     if (!replyText.trim()) return;
     setSubmitting(true);
     setError(null);
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      const stored = secret ?? getStoredSecret();
+      if (stored) headers["X-Decisions-Secret"] = stored;
+
       const res = await fetch("/api/discussions/respond", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId: d.id, author: "joseph", text: replyText.trim() }),
+        headers,
+        body: JSON.stringify({ itemId: d.id, author: "joseph", text: replyText.trim(), secret: stored || undefined }),
       });
       const json = (await res.json()) as { error?: string };
+
+      if (res.status === 401) {
+        setNeedsSecret(true);
+        setError("Enter your decision PIN to post replies.");
+        setSubmitting(false);
+        return;
+      }
       if (!res.ok) throw new Error(json.error ?? `Request failed (${res.status})`);
+
+      if (secret) sessionStorage.setItem(SECRET_KEY, secret);
       setReplyText("");
+      setNeedsSecret(false);
       onResponded();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save reply");
@@ -384,6 +400,15 @@ function ThreadCard({
       setSubmitting(false);
     }
   }, [d.id, replyText, onResponded]);
+
+  const handleReplyClick = () => {
+    if (!replyText.trim()) return;
+    if (needsSecret && !secretInput.trim()) {
+      setError("PIN required");
+      return;
+    }
+    void submit(needsSecret ? secretInput.trim() : undefined);
+  };
 
   return (
     <div style={{
@@ -453,11 +478,32 @@ function ThreadCard({
                   resize: "vertical", fontFamily: "inherit",
                 }}
               />
+
+              {needsSecret && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <label style={{ fontSize: 11, color: "#888" }}>Decision PIN (set in Vercel as DECISIONS_SECRET)</label>
+                  <input
+                    type="password"
+                    value={secretInput}
+                    onChange={(e) => setSecretInput(e.target.value)}
+                    placeholder="Enter PIN"
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: 6,
+                      border: "1px solid #333",
+                      background: "#0e0e0e",
+                      color: "#e8e8e8",
+                      fontSize: 13,
+                    }}
+                  />
+                </div>
+              )}
+
               {error && <p style={{ color: "#ff6b6b", fontSize: 11, margin: 0 }}>{error}</p>}
               <button
                 type="button"
                 disabled={!replyText.trim() || submitting}
-                onClick={() => void submit()}
+                onClick={handleReplyClick}
                 style={{
                   alignSelf: "flex-start", padding: "6px 14px", borderRadius: 6,
                   border: "none", fontWeight: 600, fontSize: 12, cursor: "pointer",
