@@ -55,6 +55,14 @@ public final class WanderCoordinator {
         defer { isScanning = false }
 
         do {
+            // Ensure we have authorization before requesting a fix. If undetermined,
+            // prompt and let the delegate update; the user re-triggers scan on grant.
+            if locationEngine.authorizationStatus == .notDetermined {
+                locationEngine.requestWhenInUseAuthorization()
+                statusMessage = "Waiting for location permission…"
+                return
+            }
+
             let fix = try await locationEngine.acquireFix()
 
             if !force, !locationEngine.shouldScan(for: fix) {
@@ -74,8 +82,16 @@ public final class WanderCoordinator {
             locationEngine.recordScan(
                 at: CLLocation(latitude: fix.lat, longitude: fix.lng)
             )
+        } catch LocationEngineError.unauthorized {
+            statusMessage = "Location access is off. Enable it in Settings to wander."
+        } catch LocationEngineError.fixUnavailable {
+            statusMessage = "Couldn't get your location. In Simulator: Features → Location → set one."
+        } catch let error as LocationEngineError {
+            statusMessage = "Location error: \(error)."
         } catch {
-            statusMessage = "Scan failed. Check location permission and connectivity."
+            // Surface the real error so we can diagnose (network, decode, etc.).
+            statusMessage = "Scan failed: \(error.localizedDescription)"
+            print("[Wander] scan failed:", error)
         }
     }
 
