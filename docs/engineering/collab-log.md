@@ -40,9 +40,18 @@ Do not use interactive choice prompts or "which do you prefer?" in chat without 
 ---
 
 ### [either → joseph] Media object storage for signed PUT URLs
-M1 backend (`endpoint-memories-post`, `s3-signed-put-url`) and iOS upload path are waiting on a bucket/provider choice: Vercel Blob vs Cloudflare R2 vs AWS S3. iOS `DropCoordinator` orchestration is coded against the contract's `upload.signed_put_url` shape — provider-agnostic.
+M1 backend (`endpoint-memories-post`, `s3-signed-put-url`) and iOS upload path are waiting on a bucket/provider choice. `POST /memories` is now **built and green** — the memory record creates fine; the signed URL step is behind a `STORAGE_BACKEND` env-var abstraction in `backend/src/lib/storage.ts`. Stub returns a placeholder URL so dev/CI work without credentials.
 
-**Recommendation:** R2 or Vercel Blob for Phase 1 (simple signed PUT, no AWS account friction if avoidable).
+**Options:**
+| Option | Pros | Cons |
+|---|---|---|
+| **Vercel Blob** | Zero-config on Vercel; same billing; client-upload token flow built-in | Less lifecycle control; Vercel-tied |
+| **Cloudflare R2** | No egress fees at scale; S3-compatible | Separate Cloudflare account |
+| **AWS S3** | Most flexible; PhotoDNA native path | Egress costs; another vendor |
+
+**Recommendation:** **Vercel Blob** for Phase 1 — already on Vercel, zero extra infrastructure, swap to R2 if egress bites at scale.
+
+**Joseph: add `STORAGE_BACKEND=vercel-blob|r2|s3` + credentials to `backend/.env.local`; backend will implement the chosen backend in `storage.ts` same session.**
 
 ---
 
@@ -78,6 +87,10 @@ Contract shows `"attestation"` on create/unlock. iOS sends `null` today. Confirm
 | 2026-06-16 | **Xcode-less iOS workflow:** `swift build` in `ios/LegacyModules` host-compiles all library targets on macOS (Command Line Tools). `swift test` / XCTest / SwiftUI previews / device run require full Xcode — tests are written but not runnable until disk space allows install. | ios |
 | 2026-06-16 | **`EXIFStripper`** (DropFeature): ImageIO rewrite strips GPS/EXIF/TIFF before upload; `hasMetadata(in:)` for unit tests. **`URLSessionMediaUploader`** scaffold for signed PUT (background URLSession still TODO). | ios |
 | 2026-06-16 | **`WanderCoordinator`**: movement-gated `/discovery/scan`, teaser list UI, max-warmth → `WarmthCueOverlay`, unlock with `423` dwell/not-in-range messaging. `WanderScanPolicy` pure helper for tests. | ios |
+| 2026-06-17 | **GitHub Actions CI** (`.github/workflows/ci.yml`): backend typecheck + vitest + privacy gate grep (lat/lng/geohash banned from audit_log migrations). | backend |
+| 2026-06-17 | **`POST /memories`** (`endpoint-memories-post`): validates input, encodes geohash (precision 9), inserts memory record (`scan_status: pending`), returns `memory_id + signed_put_url + expires_at`. Text-only memories skip the signed URL. Storage backend is abstracted behind `STORAGE_BACKEND` env var — stub active until Joseph picks provider. | backend |
+| 2026-06-17 | **`GET /memories/:id`** (owner-only): returns full memory row including coordinates (owner is entitled to their own drop point per privacy invariant). | backend |
+| 2026-06-17 | **`lib/geohash.ts`**: pure Niemeyer geohash encode + haversine `distanceMetres` + neighbour cells — 7 unit tests green. | backend |
 | 2026-06-16 | **`DropCoordinator`**: EXIF strip → `POST /v1/memories` → signed PUT upload orchestration (picker/camera wiring still separate). | ios |
 | 2026-06-16 | **`WarmthHaptics`**: band-transition haptics (`UIImpactFeedbackGenerator` on iOS, no-op on macOS host builds). Wired into scan warmth updates. | ios |
 | 2026-06-16 | **`PhotoClusterEngine`**: ~150 m grid clustering + adjacent merge + rank — Import M3 prep, no Photos framework required for algorithm tests. | ios |

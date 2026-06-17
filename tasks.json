@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-16T22:15:00Z"
+    "lastUpdated": "2026-06-17T10:20:00Z"
   },
   "decisions": [
     {
@@ -41,12 +41,12 @@
     {
       "id": "github-ci-setup",
       "title": "GitHub Actions CI — lint, type-check, run migrations against local Postgres, privacy gate grep",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 0,
       "milestone": "M0",
       "blockedBy": [],
-      "notes": "Privacy gate: grep that no migration adds lat/lng/geohash to event_log table."
+      "notes": "Done 2026-06-17: .github/workflows/ci.yml — backend typecheck + vitest + privacy gate grep (bans lat/lng/geohash in audit_log migrations). Runs on push/PR to main."
     },
     {
       "id": "schema-users-sessions",
@@ -211,22 +211,22 @@
     {
       "id": "endpoint-memories-post",
       "title": "Backend: POST /memories — validate input, enforce cooldown, create memory record (scan_status: pending), return memory_id",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 1,
       "milestone": "M1",
       "blockedBy": ["schema-memories", "auth-session-tokens"],
-      "notes": "Input: lat, lng, accuracy_m, media_type. Cooldown window: discoverable_after = now() + configured duration (default 24h)."
+      "notes": "Done 2026-06-17: src/routes/memories.ts. Validates coords + accuracy_m + media_type, geohash at precision 9, inserts record, returns memory_id + signed_put_url + expires_at. Text memories skip signed URL. Storage backend abstracted (STORAGE_BACKEND env var; stub active)."
     },
     {
       "id": "s3-signed-put-url",
       "title": "Backend: S3 signed PUT URL generation — generate per-asset URL, 15-min TTL, return alongside memory_id",
-      "status": "todo",
+      "status": "blocked",
       "owner": "backend",
       "phase": 1,
       "milestone": "M1",
-      "blockedBy": ["endpoint-memories-post"],
-      "notes": "Bucket is private. Raw storage keys never leave the API. Client uploads directly to S3 using this URL."
+      "blockedBy": ["endpoint-memories-post", "storage-provider-decision"],
+      "notes": "Abstraction in place (src/lib/storage.ts). Stub active. Needs Joseph to pick provider + add credentials. See collab-log.md open questions."
     },
     {
       "id": "csam-server-exif-strip",

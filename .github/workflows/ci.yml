@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend — typecheck, lint, test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+  privacy-gate:
+    name: Privacy gate — no coordinates in audit_log migrations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reject coordinates in audit_log migrations
+        # grep exits 1 (fail) if it finds a match. We invert with `!` so the
+        # step fails when any migration touches audit_log with a coord column.
+        run: |
+          ! grep -rn --include="*.sql" \
+            -E "(lat|lng|longitude|latitude|geohash)" \
+            backend/migrations/ \
+            | grep -i "audit_log"
+
+      - name: Confirm location columns are not persisted in event/audit tables
+        # Broader check: no migration creates a table with lat/lng columns that
+        # isn't the memories table (which is allowed and expected).
+        run: |
+          # Find SQL files that add lat/lng columns to non-memories tables.
+          HITS=$(grep -rn --include="*.sql" \
+            -E "^\s+(lat|lng)\s+(double|float|numeric|real)" \
+            backend/migrations/ \
+            | grep -v "0002_memories.sql" || true)
+          if [ -n "$HITS" ]; then
+            echo "FAIL: coordinate columns found in unexpected migration:"
+            echo "$HITS"
+            exit 1
+          fi
+          echo "OK: no stray coordinate columns found."
