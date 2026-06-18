@@ -299,7 +299,32 @@ export default function ManualTestPanel({
 }) {
   const [showPassed, setShowPassed] = useState(false);
 
-  if (tests.length === 0) return null;
+  if (tests.length === 0) {
+    return (
+      <div
+        id="manual-qa"
+        style={{
+          marginBottom: 32,
+          padding: "16px 18px",
+          background: "#121218",
+          border: "1px dashed #333",
+          borderRadius: 10,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+          <span style={{ fontSize: 18 }}>📱</span>
+          <h2 style={{ fontSize: 17, fontWeight: 800, color: "#e8e8e8", margin: 0 }}>
+            Manual QA — Xcode
+          </h2>
+        </div>
+        <p style={{ color: "#888", fontSize: 12, margin: 0, lineHeight: 1.5 }}>
+          No checklist items yet. Agents add entries to{" "}
+          <code style={{ color: "#aaa" }}>tasks.json → manualTests[]</code> — they appear here
+          automatically after the next refresh.
+        </p>
+      </div>
+    );
+  }
 
   const pending = tests.filter((t) => t.status === "pending");
   const passed = tests.filter((t) => t.status === "passed");
@@ -308,6 +333,7 @@ export default function ManualTestPanel({
 
   return (
     <div
+      id="manual-qa"
       style={{
         marginBottom: 32,
         padding: "16px 18px",

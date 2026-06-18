@@ -2,7 +2,10 @@
 import { useState, useEffect, useCallback } from "react";
 import type { TasksFile, Task, Owner } from "./types";
 import TaskCard from "./components/TaskCard";
-import MilestoneGroup from "./components/MilestoneGroup";
+import MilestoneGroup, {
+  collapseMilestones,
+  expandAllMilestones,
+} from "./components/MilestoneGroup";
 import DecisionsPanel from "./components/DecisionsPanel";
 import ManualTestPanel from "./components/ManualTestPanel";
 
@@ -71,6 +74,7 @@ export default function Dashboard() {
   const [countdown, setCountdown] = useState(POLL_INTERVAL);
   const [flashKey, setFlashKey] = useState(0);
   const [readyOpen, setReadyOpen] = useState(false);
+  const [milestoneCollapseRevision, setMilestoneCollapseRevision] = useState(0);
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -112,6 +116,8 @@ export default function Dashboard() {
   const { tasks, meta } = data;
   const decisions = data.decisions ?? [];
   const manualTests = data.manualTests ?? [];
+  const qaPassed = manualTests.filter((t) => t.status === "passed").length;
+  const qaPending = manualTests.filter((t) => t.status === "pending").length;
   const openDecisions = decisions.filter((d) => d.status === "open");
   const total = tasks.length;
   const done = tasks.filter((t) => t.status === "done").length;
@@ -146,7 +152,13 @@ export default function Dashboard() {
     })
     .filter((p) => p.total > 0);
 
-  const milestoneOrder = [...new Set(tasks.map((t) => t.milestone))];
+  const milestoneOrder = [...new Set(tasks.map((t) => t.milestone))].sort((a, b) => {
+    const num = (m: string) => {
+      const match = /^M(\d+)$/i.exec(m.trim());
+      return match ? parseInt(match[1], 10) : 9999;
+    };
+    return num(a) - num(b);
+  });
   const byMilestone = milestoneOrder.map((m) => ({
     milestone: m,
     tasks: tasks.filter((t) => t.milestone === m),
@@ -207,7 +219,37 @@ export default function Dashboard() {
                 <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>{label}</div>
               </div>
             ))}
+            {manualTests.length > 0 && (
+              <a
+                href="#manual-qa"
+                style={{
+                  textDecoration: "none",
+                  marginLeft: "auto",
+                  padding: "10px 14px",
+                  background: qaPending > 0 ? "#0ea5e918" : "#16a34a18",
+                  border: `1px solid ${qaPending > 0 ? "#0ea5e955" : "#16a34a55"}`,
+                  borderRadius: 8,
+                  flexShrink: 0,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 22,
+                    fontWeight: 800,
+                    color: qaPending > 0 ? "#0ea5e9" : "#16a34a",
+                  }}
+                >
+                  {qaPassed}/{manualTests.length}
+                </div>
+                <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>
+                  Manual QA {qaPending > 0 ? `· ${qaPending} to test` : "· all passed"}
+                </div>
+              </a>
+            )}
           </div>
+
+          {/* Manual QA — Joseph's Xcode checklist (prominent, near top) */}
+          <ManualTestPanel tests={manualTests} onUpdate={fetchTasks} />
 
           {/* Segmented progress bar */}
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14 }}>
@@ -255,11 +297,6 @@ export default function Dashboard() {
             onResolved={fetchTasks}
             prominent={openDecisions.length > 0}
           />
-        )}
-
-        {/* ── Manual QA checklist (Xcode) ── */}
-        {manualTests.length > 0 && (
-          <ManualTestPanel tests={manualTests} onUpdate={fetchTasks} />
         )}
 
         {/* ── Phase swimlane ── */}
@@ -367,9 +404,77 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ── Milestones ── */}
+        {/* ── Milestones (M0 … M11) ── */}
+        {byMilestone.length > 0 && (
+          <div style={{ marginBottom: 8 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                marginBottom: 12,
+              }}
+            >
+              <h2 style={{ fontSize: 15, fontWeight: 800, color: "#e8e8e8", margin: 0 }}>
+                Milestones
+              </h2>
+              <span style={{ color: "#555", fontSize: 11 }}>
+                Click ▼ on any row to collapse
+              </span>
+              <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const complete = byMilestone
+                      .filter(
+                        ({ tasks: mt }) => mt.length > 0 && mt.every((t) => t.status === "done")
+                      )
+                      .map(({ milestone: m }) => m);
+                    collapseMilestones(complete);
+                    setMilestoneCollapseRevision((n) => n + 1);
+                  }}
+                  style={{
+                    background: "#141414",
+                    border: "1px solid #333",
+                    borderRadius: 4,
+                    color: "#aaa",
+                    fontSize: 11,
+                    padding: "4px 10px",
+                    cursor: "pointer",
+                  }}
+                >
+                  Collapse completed
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    expandAllMilestones();
+                    setMilestoneCollapseRevision((n) => n + 1);
+                  }}
+                  style={{
+                    background: "#141414",
+                    border: "1px solid #333",
+                    borderRadius: 4,
+                    color: "#aaa",
+                    fontSize: 11,
+                    padding: "4px 10px",
+                    cursor: "pointer",
+                  }}
+                >
+                  Expand all
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {byMilestone.map(({ milestone, tasks: mt }) => (
-          <MilestoneGroup key={milestone} milestone={milestone} tasks={mt} allTasks={tasks} />
+          <MilestoneGroup
+            key={milestone}
+            milestone={milestone}
+            tasks={mt}
+            allTasks={tasks}
+            collapseRevision={milestoneCollapseRevision}
+          />
         ))}
       </main>
     </>
