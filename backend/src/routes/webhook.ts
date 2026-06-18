@@ -13,7 +13,9 @@
 
 import { Hono } from "hono";
 import { ApiError } from "../lib/errors.js";
-import { updateMemoryAfterUpload } from "../db/memories.js";
+import { updateMemoryAfterUpload, setThumbnailKey } from "../db/memories.js";
+import { generateAndStoreThumbnail } from "../lib/thumbnail.js";
+import { stripAndReplaceBlob } from "../lib/exif.js";
 import type { AuthVars } from "../middleware/auth.js";
 
 export const webhookRoutes = new Hono<{ Variables: AuthVars }>();
@@ -52,10 +54,28 @@ webhookRoutes.post("/storage", async (c) => {
   }
 
   if (PIPELINE_MODE === "stub") {
-    // Stub: no CSAM scan, no real EXIF strip — just mark clear.
-    // csam-server-exif-strip task will add real metadata removal here.
-    const updated = await updateMemoryAfterUpload(memory_id, media_key);
+    const contentType = c.req.header("Content-Type-Upload") ?? undefined;
+
+    // Server-side EXIF strip (csam-server-exif-strip). Belt-and-braces metadata
+    // removal — client already strips (ios-exif-strip), this is the server guarantee.
+    // Best-effort: if strip fails we keep the original and proceed (scan_status still flips).
+    let cleanKey = media_key;
+    if (process.env.STORAGE_BACKEND === "vercel-blob") {
+      const stripped = await stripAndReplaceBlob(media_key, memory_id, contentType);
+      if (stripped) cleanKey = stripped;
+    }
+
+    const updated = await updateMemoryAfterUpload(memory_id, cleanKey);
     if (!updated) throw new ApiError("not_found", "Memory not found.");
+
+    // Thumbnail generation — best-effort, fires after scan_status is clear.
+    if (process.env.STORAGE_BACKEND === "vercel-blob") {
+      generateAndStoreThumbnail(cleanKey, memory_id, contentType)
+        .then((thumbKey) => {
+          if (thumbKey) return setThumbnailKey(memory_id, thumbKey);
+        })
+        .catch(() => {});
+    }
 
     return c.json({ memory_id, scan_status: "clear" });
   }

@@ -9,7 +9,7 @@ import { generateSignedGetUrl } from "../lib/storage.js";
 import { findNearbyMemories } from "../db/memories.js";
 import { validateLocationInput } from "../lib/locationInput.js";
 import { audit } from "../lib/audit.js";
-import { upsertPresencePing } from "../db/presencePings.js";
+import { upsertPresencePing, debouncedWarmth, type WarmthBand } from "../db/presencePings.js";
 import { requireAuth, type AuthVars } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { getApnsTokensForUser, clearApnsToken } from "../db/sessions.js";
@@ -64,6 +64,9 @@ discoveryRoutes.post("/scan", async (c) => {
         await upsertPresencePing(mem.id, userId);
       }
 
+      // Warmth debounce: upgrades immediate, downgrades held for 2 scans ≥15s.
+      const emittedWarmth = await debouncedWarmth(mem.id, userId, prox.warmth as WarmthBand);
+
       // Thumbnail URL — null for text, sealed thumbnails, or pending scan_status.
       let thumbnailUrl: string | null = null;
       if (mem.thumbnail_key && mem.scan_status === "clear") {
@@ -78,7 +81,7 @@ discoveryRoutes.post("/scan", async (c) => {
         owner_display: isOwn ? "you" : "unknown", // Phase 2: display names for others
         is_own: isOwn,
         in_range: prox.inBubble,
-        warmth: prox.warmth,
+        warmth: emittedWarmth,
         scan_status: mem.scan_status,
       };
     }),

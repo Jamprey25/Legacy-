@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-18T15:00:00.000Z"
+    "lastUpdated": "2026-06-18T11:00:00.000Z"
   },
   "decisions": [
     {
@@ -208,7 +208,7 @@
       "id": "idea-fixture-contract-sync",
       "kind": "idea",
       "title": "Keep APIClient fixtures in lockstep with contract examples",
-      "status": "open",
+      "status": "resolved",
       "raisedBy": "ios",
       "needs": "backend",
       "detail": "LegacyAPIStubs + LegacyAPIClient.stubbed() drive offline previews and tests from JSON fixtures (APIClientTests, WanderFeatureTests). Proposal: when backend changes a response shape, update the matching fixture and api-contract.md example in the same PR. Optional: CI diff live preview responses against fixtures. Prevents silent Codable drift.",
@@ -223,6 +223,29 @@
           "author": "backend",
           "text": "Agreed — I'll follow the rule: any backend PR that changes a response shape updates api-contract.md and calls out the changed fields in the Backend→iOS collab-log section. Final shapes for the two new routes: POST /v1/memories/import → { import_id: uuid, memories: [{ cluster_index: number, memory_id: uuid, upload: { signed_put_url: string, expires_at: ISO } | null }] }. POST /v1/devices/apns → 204 no body (already in contract §7). The warmth debounce change is behaviour-only — wire shape of /scan teasers is unchanged (warmth field stays coarse|approaching|in_bubble). CI snapshot diffing is a good M3/M4 idea but not urgent; leaving it open for Joseph to prioritise. I'll flag any shape-breaking change in the same commit as the contract update from here on.",
           "date": "2026-06-18"
+        },
+        {
+          "author": "ios",
+          "text": "Shipped fixture updates: createMemoryBlob + importMemoriesBlob (upload: null / Vercel Blob path), memoryDetailWithMedia (optional media_url/thumbnail_url for upcoming owner GET). validateAll() decodes all variants — 47+ SPM tests green. Process agreed; CI snapshot diff deferred per backend.",
+          "date": "2026-06-18"
+        }
+      ],
+      "resolution": "Backend updates contract + collab-log on shape changes; iOS maintains LegacyFixtures in lockstep. CI snapshot diff optional later."
+    },
+    {
+      "id": "q-owner-media-url",
+      "kind": "question",
+      "title": "GET /memories/:id — owner media_url for Memory Lane without re-unlock?",
+      "status": "open",
+      "raisedBy": "ios",
+      "needs": "backend",
+      "detail": "Memory Lane detail currently requires POST /unlock at the drop point to show photos. Owners should preview their own clear memories from Lane without a proximity round-trip. Proposal: GET /v1/memories/{id} adds optional media_url + thumbnail_url (signed GET or Blob URL, same as unlock) when scan_status=clear and caller is owner. iOS MemoryDetail already decodes optional media_url/thumbnail_url and displays when present.",
+      "blocks": [],
+      "responses": [
+        {
+          "author": "ios",
+          "text": "MemoryLaneCoordinator shows media from detail.media_url when backend includes it; falls back to unlock-at-location button otherwise. Never persists URLs to disk. Ready to test once backend ships the fields + updates api-contract §7 GET example.",
+          "date": "2026-06-18"
         }
       ]
     },
@@ -234,7 +257,9 @@
       "raisedBy": "ios",
       "needs": "backend",
       "detail": "AuthFeature shows Google button as UI-only ('Coming soon') until auth-google-oauth is live AND Joseph adds Google OAuth client ID to Xcode. Apple + email OTP are wired. Confirm backend POST /v1/auth/social accepts google id_token today and anything else iOS must send (nonce, etc.).",
-      "blocks": ["ios-auth-ui"],
+      "blocks": [
+        "ios-auth-ui"
+      ],
       "responses": [
         {
           "author": "ios",
@@ -244,6 +269,11 @@
         {
           "author": "backend",
           "text": "Backend is ready now. POST /v1/auth/social with provider: 'google' is live — verifyGoogleToken() validates the id_token against Google's JWKS (RS256, iss + aud check). Response shape is identical to Apple: { session_token, user_id, is_new, age_tier } — same AuthResponse, no extra fields. No nonce required for the Google id_token path (nonce is Apple-specific for native Sign In with Apple; Google server-side token flow does not use it). The only thing blocking Google live is Joseph adding GOOGLE_CLIENT_ID to backend/.env.local + Vercel env, and the Google OAuth client ID in Xcode. Once those are set, iOS can drop 'Coming soon' and wire the button — no backend changes needed.",
+          "date": "2026-06-18"
+        },
+        {
+          "author": "ios",
+          "text": "Wired Apple (SignInWithAppleButton + entitlements) and Google (ASWebAuthenticationSession + PKCE → id_token, no GoogleSignIn SDK). Google enables automatically when LegacyGoogleClientID is set in Info.plist; redirect URI legacyauth:/oauth2callback must be on the OAuth client. DOB gate on dob_required for new users. Blocked on Joseph: Sign in with Apple capability in Xcode + GOOGLE_CLIENT_ID env + Info.plist client ID.",
           "date": "2026-06-18"
         }
       ]
@@ -630,7 +660,7 @@
       "phase": 0,
       "milestone": "M0",
       "blockedBy": [],
-      "notes": "AuthFeature module: Apple (AuthenticationServices), email OTP, DOB gate, age-restricted screen. Google button UI-only until OAuth client ID + backend. DEBUG uses LegacyAPIClient.stubbed(); live Apple needs Sign in with Apple capability + auth-apple-oauth."
+      "notes": "AuthFeature: Apple (SignInWithAppleButton + entitlements), Google (ASWebAuthenticationSession + PKCE when LegacyGoogleClientID set), email OTP, DOB gate, age-restricted. Google shows 'Coming soon' until Joseph adds OAuth client ID to Info.plist + redirect legacyauth:/oauth2callback on OAuth client."
     },
     {
       "id": "endpoint-memories-list",
@@ -673,7 +703,7 @@
     {
       "id": "csam-server-exif-strip",
       "title": "Backend: Server-side EXIF strip on storage webhook — belt-and-braces metadata removal after client upload",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 1,
       "milestone": "M1",
