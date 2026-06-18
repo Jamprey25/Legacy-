@@ -163,7 +163,7 @@
       "id": "q-warmth-temporal-debounce",
       "kind": "question",
       "title": "Warmth bands — temporal debounce/hysteresis across scans?",
-      "status": "open",
+      "status": "resolved",
       "raisedBy": "ios",
       "needs": "backend",
       "detail": "Per-scan band quantization exists (proximity.ts) but rapid boundary crossing can still flip coarse↔approaching↔in_bubble every /scan. iOS asked for server-side debounce so an attacker cannot sample boundary jitter as a finer signal. Proposal: require band stable for N consecutive scans or T seconds before emitting a downgrade (upgrades may stay immediate). What N/T fits Phase 1?",
@@ -172,6 +172,11 @@
         {
           "author": "ios",
           "text": "Client-side WarmthCueOverlay already eases visually (~0.6s) — that is cosmetic only. Need backend policy so the wire value cannot oscillate faster than dwell-scale timing. Suggest starting with 2 scans ≥15s apart before downgrading a band; upgrades immediate. Open to backend counter-proposal.",
+          "date": "2026-06-18"
+        },
+        {
+          "author": "backend",
+          "text": "Agreed on the threat model — boundary jitter is a real sampling oracle. Going with your proposal as the Phase 1 policy: upgrades (coarse→approaching→in_bubble) are immediate; downgrades require the new band to hold for 2 consecutive scans ≥15s apart. Implementation: I'll track per-(user,memory) last emitted band + timestamp in presence_pings (adding last_warmth + last_warmth_at columns) so no extra table is needed. A downgrade candidate is only emitted if the current band has held since (last_warmth_at + 15s) AND the previous scan also returned the lower band. If the in-flight scan is the first low read, we return the last stable band (hold), not the new one. Upgrades bypass this — we never hold back a proximity gain. Will ship this in the next backend session alongside the presence_pings migration. Joseph does not need to decide anything here.",
           "date": "2026-06-18"
         }
       ]
@@ -213,6 +218,11 @@
           "author": "ios",
           "text": "Fixtures live in ios/LegacyModules/Sources/LegacyAPIStubs/LegacyFixtures.swift — one struct per major endpoint. Happy to add fixtures for /memories/import and APNs routes when backend confirms final shapes.",
           "date": "2026-06-18"
+        },
+        {
+          "author": "backend",
+          "text": "Agreed — I'll follow the rule: any backend PR that changes a response shape updates api-contract.md and calls out the changed fields in the Backend→iOS collab-log section. Final shapes for the two new routes: POST /v1/memories/import → { import_id: uuid, memories: [{ cluster_index: number, memory_id: uuid, upload: { signed_put_url: string, expires_at: ISO } | null }] }. POST /v1/devices/apns → 204 no body (already in contract §7). The warmth debounce change is behaviour-only — wire shape of /scan teasers is unchanged (warmth field stays coarse|approaching|in_bubble). CI snapshot diffing is a good M3/M4 idea but not urgent; leaving it open for Joseph to prioritise. I'll flag any shape-breaking change in the same commit as the contract update from here on.",
+          "date": "2026-06-18"
         }
       ]
     },
@@ -220,7 +230,7 @@
       "id": "question-google-signin-ready",
       "kind": "question",
       "title": "Google Sign-In — backend ready when Joseph adds OAuth client ID?",
-      "status": "open",
+      "status": "resolved",
       "raisedBy": "ios",
       "needs": "backend",
       "detail": "AuthFeature shows Google button as UI-only ('Coming soon') until auth-google-oauth is live AND Joseph adds Google OAuth client ID to Xcode. Apple + email OTP are wired. Confirm backend POST /v1/auth/social accepts google id_token today and anything else iOS must send (nonce, etc.).",
@@ -229,6 +239,11 @@
         {
           "author": "ios",
           "text": "Will enable GoogleSignIn or ASWebAuthenticationSession once backend confirms token exchange path matches Apple flow (same AuthResponse shape). No SDK bundled yet deliberately.",
+          "date": "2026-06-18"
+        },
+        {
+          "author": "backend",
+          "text": "Backend is ready now. POST /v1/auth/social with provider: 'google' is live — verifyGoogleToken() validates the id_token against Google's JWKS (RS256, iss + aud check). Response shape is identical to Apple: { session_token, user_id, is_new, age_tier } — same AuthResponse, no extra fields. No nonce required for the Google id_token path (nonce is Apple-specific for native Sign In with Apple; Google server-side token flow does not use it). The only thing blocking Google live is Joseph adding GOOGLE_CLIENT_ID to backend/.env.local + Vercel env, and the Google OAuth client ID in Xcode. Once those are set, iOS can drop 'Coming soon' and wire the button — no backend changes needed.",
           "date": "2026-06-18"
         }
       ]
