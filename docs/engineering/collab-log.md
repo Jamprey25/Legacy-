@@ -95,24 +95,21 @@ When Joseph clicks an option, the dashboard sets `status: "decided"`, `chosenOpt
 
 ---
 
-### [either → joseph] Media object storage for signed PUT URLs
-M1 backend (`endpoint-memories-post`, `s3-signed-put-url`) and iOS upload path are waiting on a bucket/provider choice. `POST /memories` is now **built and green** — the memory record creates fine; the signed URL step is behind a `STORAGE_BACKEND` env-var abstraction in `backend/src/lib/storage.ts`. Stub returns a placeholder URL so dev/CI work without credentials.
-
-**Options:**
-| Option | Pros | Cons |
-|---|---|---|
-| **Vercel Blob** | Zero-config on Vercel; same billing; client-upload token flow built-in | Less lifecycle control; Vercel-tied |
-| **Cloudflare R2** | No egress fees at scale; S3-compatible | Separate Cloudflare account |
-| **AWS S3** | Most flexible; PhotoDNA native path | Egress costs; another vendor |
-
-**Recommendation:** **Vercel Blob** for Phase 1 — already on Vercel, zero extra infrastructure, swap to R2 if egress bites at scale.
-
-**Joseph: add `STORAGE_BACKEND=vercel-blob|r2|s3` + credentials to `backend/.env.local`; backend will implement the chosen backend in `storage.ts` same session.**
+### ~~[either → joseph] Media object storage for signed PUT URLs~~ ✅ RESOLVED 2026-06-17
+Joseph: Vercel Blob Phase 1, AWS S3 later. Backend Blob handshake live; iOS client-upload shipped 2026-06-18. `BLOB_READ_WRITE_TOKEN` set on Vercel.
 
 ---
 
-### [ios → backend] App Attest `attestation` field optional until M5?
-Contract shows `"attestation"` on create/unlock. iOS sends `null` today. Confirm backend accepts omitted/null attestation for M1–M4 and rejects only when M5 enforcement lands.
+### ~~[ios → backend] App Attest `attestation` field optional until M5?~~ ✅ RESOLVED 2026-06-17
+Backend + Joseph confirmed. iOS closing reply in `tasks.json` → `q-app-attest-nullability` (2026-06-18).
+
+---
+
+### [ios → backend] Open dashboard threads (2026-06-18)
+Formalized in `tasks.json` `decisions[]` — **backend to reply next session:**
+- `q-warmth-temporal-debounce` — hysteresis across /scan calls
+- `idea-fixture-contract-sync` — LegacyAPIStubs ↔ contract examples
+- `question-google-signin-ready` — enable Google button when OAuth client ID lands
 
 ---
 
@@ -457,6 +454,20 @@ No Joseph action needed unless he wants Google live in M0 (would need OAuth clie
 - **Tests:** 47/47 SPM green (+4 Blob upload unit tests).
 
 **Tasks board:** replied to `concern-blob-public-url` (iOS client mitigations; Joseph still owns Phase 3 decision).
+
+---
+
+## [ios → all] 2026-06-18 — Dashboard thread replies (iOS-raised items)
+
+**tasks.json updates:**
+- **`q-app-attest-nullability`** — iOS closing reply (null until M5, no early guard).
+- **`concern-blob-public-url`** — resolved: Joseph Phase 3 → AWS S3; iOS ack + Blob handshake shipped; BLOB token set.
+- **`idea-openapi-contract`** — resolved: all agree defer OpenAPI until contract churns.
+- **`q-warmth-temporal-debounce`** — new iOS → backend question (hysteresis across scans; band quantization alone insufficient).
+- **`idea-fixture-contract-sync`** — new iOS → backend idea (LegacyAPIStubs lockstep with contract).
+- **`question-google-signin-ready`** — new iOS → backend question (enable Google button when OAuth client ID lands).
+
+**Needs backend next session:** reply to `q-warmth-temporal-debounce`, `idea-fixture-contract-sync`, `question-google-signin-ready`.
 
 **Blocked on Joseph:** `BLOB_READ_WRITE_TOKEN` on Vercel for live device upload verification; manual QA items in `manualTests[]`.
 
