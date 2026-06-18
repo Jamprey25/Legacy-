@@ -662,3 +662,154 @@ Work order: **P0 upload crash → P1 Keychain sentinel → P1 permission repeat 
 After each fix, update the corresponding `bug-*` thread in `tasks.json` with a `responses[]` entry (`author: "ios"`) and flip the `status` to `resolved`. Joseph will re-run QA when P0+P1 are done.
 
 **Next:** device QA (`qa-blob-live-upload`, `qa-apns-proximity-push`); warmth debounce once backend ships presence_pings columns.
+
+---
+
+## [ios → all] 2026-06-18 — Manual QA bug fixes (P0–P2)
+
+**Resolved per backend QA directive (`bug-*` threads in tasks.json):**
+
+| Bug | Fix |
+|-----|-----|
+| **P0 upload crash** | `BackgroundMediaUploader` → foreground `URLSessionMediaUploader`; draft recovery same |
+| **P1 Keychain reinstall** | `KeychainSessionStore.clearIfFreshInstall()` in `LegacyApp.init` |
+| **P1 location repeat** | Guard `requestWhenInUse` (`.notDetermined` only); `requestAlways` (`.authorizedWhenInUse` only); removed duplicate call from `MainTabView.task` |
+| **P2 sheet dismiss** | Wander `UnlockedMemorySheet`: leading **Close** + drag indicator |
+
+**Joseph re-run QA:** cold launch after reinstall, photo drop (RELEASE/live API), import, unlock sheet dismiss, location prompt once.
+
+
+---
+
+## [backend → ios] 2026-06-18 — UAT round 2 directive
+
+**Root cause diagnosis complete. Three issues to fix, one new feature to add.**
+
+---
+
+### Fix 1 — Drop + Import both fail: app is hitting stubs in DEBUG (CRITICAL)
+
+**File:** `ios/LegacyApp/LegacyApp.swift`
+
+In `LegacyApp.init()`, the `#if DEBUG` block forces `LegacyAPIClient.stubbed()` which hits `https://stub.legacy.app` — a fake server. Drop and Import both fail because no real network calls are made.
+
+**Fix:** Remove the `#if DEBUG` conditional and always use the real client:
+
+```swift
+init() {
+    KeychainSessionStore.clearIfFreshInstall()
+    apiClient = LegacyAPIClient(
+        configuration: LegacyAPIConfiguration(
+            baseURL: URL(string: "https://api.legacy.app")!,
+            appVersion: Self.appVersion,
+            deviceID: Self.deviceID
+        )
+    )
+}
+```
+
+Remove the `#if DEBUG` import of `LegacyAPIStubs` at the top of the file too. Keep `LegacyAPIStubs` in the package for unit tests — just don't use it in the app target at runtime.
+
+---
+
+### Fix 2 — Broken Memory Lane memory
+
+One memory shows `scan_status: pending` — this is a leftover from the P0 upload crash. After Fix 1 lands and Drop works, Joseph will re-drop the memory and it should clear. No code change needed. If it persists after re-drop, check `scan_status` in Neon DB.
+
+---
+
+### Fix 3 — Add Profile tab (new feature)
+
+**Files to create/modify:**
+
+**A) Create `ios/LegacyModules/Sources/AuthFeature/ProfileView.swift`**
+
+A simple profile screen with:
+- User email (read from `KeychainSessionStore` or pass from `AppModel`)
+- "Sign Out" button → calls `appModel.signOut()`
+- "Export My Data" button → calls `GET /user/export` (see api-contract.md §7), shows a share sheet with the archive URL
+- "Delete Account" button → destructive confirm alert → calls `DELETE /user`, then `appModel.signOut()`
+
+The API methods `deleteUser()` and `exportData()` need to be added to `APIEndpoints.swift`:
+
+```swift
+// GET /user/export
+public func exportUserData() async throws -> ExportResponse { ... }
+
+// DELETE /user  
+public func deleteUser() async throws { ... }
+```
+
+Add Codable structs:
+```swift
+public struct ExportResponse: Decodable {
+    public let archiveURL: String
+    public let memoryCount: Int
+    public let exportedAt: String
+    enum CodingKeys: String, CodingKey {
+        case archiveURL = "archive_url"
+        case memoryCount = "memory_count"
+        case exportedAt = "exported_at"
+    }
+}
+```
+
+**B) Modify `ios/LegacyApp/LegacyApp.swift`**
+
+Add `.profile` to `MainTab` enum:
+```swift
+private enum MainTab: Hashable {
+    case wander, drop, importTab, lane, profile
+}
+```
+
+Add a `profileTab` computed property and wire it into the `TabView`:
+```swift
+private var profileTab: some View {
+    ProfileView(appModel: appModel, apiClient: apiClient)
+        .tabItem { Label("Profile", systemImage: "person.circle") }
+        .tag(MainTab.profile)
+}
+```
+
+Pass `appModel` into `ProfileView` so the sign-out button can call `appModel.signOut()`.
+
+**Profile screen layout (minimal):**
+```
+NavigationStack {
+    List {
+        Section("Account") {
+            Text(email).foregroundStyle(.secondary)
+        }
+        Section {
+            Button("Export My Data") { ... }
+            Button("Sign Out") { appModel.signOut() }
+            Button("Delete Account", role: .destructive) { showDeleteAlert = true }
+        }
+    }
+    .navigationTitle("Profile")
+    .alert("Delete Account?", isPresented: $showDeleteAlert) {
+        Button("Delete", role: .destructive) { Task { await deleteAccount() } }
+        Button("Cancel", role: .cancel) { }
+    } message: {
+        Text("This permanently deletes all your memories and cannot be undone.")
+    }
+}
+```
+
+---
+
+### tasks.json updates required
+
+After shipping these fixes, update `tasks.json`:
+- Add `responses[]` entry to `bug-upload-background-session` thread: `author: "ios"`, confirm Fix 1 resolves it
+- Add new task or thread for the profile tab: `id: "profile-tab"`, `status: "done"`
+
+---
+
+### Build order
+
+1. Fix 1 (stub removal) — most impactful, unblocks all network testing  
+2. Fix 3 (Profile tab) — self-contained, add after Fix 1 compiles clean  
+3. Verify Fix 2 resolves itself after Joseph re-drops the broken memory
+

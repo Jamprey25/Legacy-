@@ -29,7 +29,7 @@ let package = Package(
         ),
         .target(
             name: "LocationEngine",
-            dependencies: []
+            dependencies: ["APIClient"]
         ),
         .target(
             name: "DropFeature",
