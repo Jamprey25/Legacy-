@@ -67,6 +67,14 @@ export async function findExistingByEmail(email: string): Promise<User | null> {
   return { id: row.id, age_tier: row.age_tier, is_new: false };
 }
 
+/** Look up a user by id. Returns null if absent. */
+export async function findById(userId: string): Promise<{ id: string; email: string | null; age_tier: AgeTier } | null> {
+  type FullRow = { id: string; email: string | null; age_tier: AgeTier };
+  const rows = await sql`SELECT id, email, age_tier FROM users WHERE id = ${userId} LIMIT 1`;
+  if (rows.length === 0) return null;
+  return rows[0] as unknown as FullRow;
+}
+
 /** Find-or-create by verified email (OTP path). */
 export async function findOrCreateByEmail(
   email: string,
@@ -86,4 +94,48 @@ export async function findOrCreateByEmail(
   `;
   const row = inserted[0] as UserRow;
   return { id: row.id, age_tier: row.age_tier, is_new: true };
+}
+
+/** Collect all media_key values for a user's memories (for storage cleanup before delete). */
+export async function listUserMediaKeys(userId: string): Promise<string[]> {
+  const rows = await sql`
+    SELECT media_key FROM memories
+    WHERE owner_id = ${userId} AND media_key IS NOT NULL
+  `;
+  return rows.map((r) => r.media_key as string);
+}
+
+/**
+ * Hard-delete the user and all their data.
+ * FK CASCADE handles: memories → finds, presence_pings, seals, conditions, imports, sessions.
+ * Caller must collect media keys BEFORE calling this and clean up storage separately.
+ */
+export async function deleteUser(userId: string): Promise<void> {
+  await sql`DELETE FROM users WHERE id = ${userId}`;
+}
+
+/** Fetch all memories for export (owner only, includes own lat/lng). */
+export async function listAllMemoriesForExport(userId: string): Promise<Array<{
+  id: string;
+  lat: number;
+  lng: number;
+  media_type: string;
+  source: string;
+  scan_status: string;
+  media_key: string | null;
+  caption: string | null;
+  teaser_text: string | null;
+  created_at: Date;
+}>> {
+  const rows = await sql`
+    SELECT id, lat, lng, media_type, source, scan_status, media_key, caption, teaser_text, created_at
+    FROM memories
+    WHERE owner_id = ${userId}
+    ORDER BY created_at ASC
+  `;
+  return rows as unknown as Array<{
+    id: string; lat: number; lng: number; media_type: string;
+    source: string; scan_status: string; media_key: string | null;
+    caption: string | null; teaser_text: string | null; created_at: Date;
+  }>;
 }

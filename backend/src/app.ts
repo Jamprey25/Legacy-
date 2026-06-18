@@ -10,6 +10,7 @@ import { discoveryRoutes } from "./routes/discovery.js";
 import { webhookRoutes } from "./routes/webhook.js";
 import { devicesRoutes } from "./routes/devices.js";
 import { uploadsRoutes } from "./routes/uploads.js";
+import { userRoutes } from "./routes/user.js";
 
 export function createApp() {
   const app = new Hono<{ Variables: AuthVars }>().basePath("/v1");
@@ -24,6 +25,7 @@ export function createApp() {
   app.route("/discovery", discoveryRoutes);
   app.route("/devices", devicesRoutes);
   app.route("/uploads", uploadsRoutes);
+  app.route("/user", userRoutes);
   app.route("/internal/webhook", webhookRoutes);
 
   return app;

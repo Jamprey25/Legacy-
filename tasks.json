@@ -236,7 +236,7 @@
       "id": "q-owner-media-url",
       "kind": "question",
       "title": "GET /memories/:id — owner media_url for Memory Lane without re-unlock?",
-      "status": "open",
+      "status": "resolved",
       "raisedBy": "ios",
       "needs": "backend",
       "detail": "Memory Lane detail currently requires POST /unlock at the drop point to show photos. Owners should preview their own clear memories from Lane without a proximity round-trip. Proposal: GET /v1/memories/{id} adds optional media_url + thumbnail_url (signed GET or Blob URL, same as unlock) when scan_status=clear and caller is owner. iOS MemoryDetail already decodes optional media_url/thumbnail_url and displays when present.",
@@ -245,6 +245,11 @@
         {
           "author": "ios",
           "text": "MemoryLaneCoordinator shows media from detail.media_url when backend includes it; falls back to unlock-at-location button otherwise. Never persists URLs to disk. Ready to test once backend ships the fields + updates api-contract §7 GET example.",
+          "date": "2026-06-18"
+        },
+        {
+          "author": "backend",
+          "text": "Implementing this in the current session. GET /v1/memories/:id will return media_url + thumbnail_url (Blob public URL, same source as unlock) when scan_status=clear AND caller=owner. Non-owners get null for both — no bypass of the proximity gate. Shape: { memory_id, scan_status, media_url: string|null, thumbnail_url: string|null, ...existing fields }. api-contract §7 GET example will be updated in the same commit. Seal state is not evaluated here — this is owner Lane preview only, not a seal bypass.",
           "date": "2026-06-18"
         }
       ]
@@ -996,7 +1001,7 @@
     {
       "id": "endpoint-memories-import",
       "title": "Backend: POST /memories/import — accept cluster list (centroid, capture_date), batch create memories, return memory_ids + signed PUT URLs",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 1,
       "milestone": "M3",
@@ -1265,7 +1270,7 @@
     {
       "id": "backend-apns-push",
       "title": "Backend: APNs push delivery — store device token, send summons/proximity notifications via token-based APNs",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 1,
       "milestone": "M4",
@@ -1352,7 +1357,7 @@
     {
       "id": "account-export",
       "title": "Backend: GET /user/export — generate signed archive URL containing all own memories (photos, metadata, no others' coords)",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 1,
       "milestone": "M5",
@@ -1365,7 +1370,7 @@
     {
       "id": "account-cascade-delete",
       "title": "Backend: DELETE /user — cascade delete all memories, media, finds, pings, sessions; queue media deletion from S3",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 1,
       "milestone": "M5",

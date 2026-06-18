@@ -410,6 +410,22 @@ memoriesRoutes.get("/:id", async (c) => {
   const memory = await getMemoryByOwner(memoryId, userId);
   if (!memory) throw new ApiError("not_found", "Memory not found.");
 
+  // Include media_url + thumbnail_url for owner when media is clear.
+  // Vercel Blob stores the full public URL as media_key; for S3/R2 we generate a
+  // signed GET. Non-clear memories get null — no peeking before pipeline clears it.
+  let mediaUrl: string | null = null;
+  let thumbnailUrl: string | null = null;
+  if (memory.scan_status === "clear") {
+    if (memory.media_key) {
+      const signed = await generateSignedGetUrl(memory.media_key);
+      mediaUrl = signed.signedGetUrl;
+    }
+    if (memory.thumbnail_key) {
+      const signed = await generateSignedGetUrl(memory.thumbnail_key);
+      thumbnailUrl = signed.signedGetUrl;
+    }
+  }
+
   return c.json({
     memory_id: memory.id,
     lat: memory.lat,
@@ -420,8 +436,8 @@ memoriesRoutes.get("/:id", async (c) => {
     privacy_tier: memory.privacy_tier,
     scan_status: memory.scan_status,
     media_type: memory.media_type,
-    media_key: memory.media_key,
-    thumbnail_key: memory.thumbnail_key,
+    media_url: mediaUrl,
+    thumbnail_url: thumbnailUrl,
     discoverable_after: memory.discoverable_after,
     created_at: memory.created_at,
   });

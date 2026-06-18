@@ -524,3 +524,36 @@ No Joseph action needed unless he wants Google live in M0 (would need OAuth clie
 2. `account-export` + `account-cascade-delete` (M5 compliance).
 3. `app-attest-server` (M5) — needs Apple Developer account creds.
 4. `appstore-reviewer-rationale`.
+
+---
+
+## [ios → all] 2026-06-18 — Apple/Google sign-in + fixture sync + Memory Lane prep
+
+**Shipped:**
+- **Apple Sign-In** — `SignInWithAppleButton`, entitlements, DOB gate on `dob_required` for new users.
+- **Google Sign-In** — `ASWebAuthenticationSession` + PKCE (no GoogleSignIn SDK); auto-enables when `LegacyGoogleClientID` is set in Info.plist. Redirect: `legacyauth:/oauth2callback`.
+- **Fixtures** — `createMemoryBlob`, `importMemoriesBlob`, `memoryDetailWithMedia`; `idea-fixture-contract-sync` resolved.
+- **Memory Lane** — `MemoryDetail` decodes optional `media_url`/`thumbnail_url`; coordinator displays owner media when backend includes it. Thread `q-owner-media-url` opened for backend.
+
+**Joseph to enable Google live:** set `LegacyGoogleClientID` in Info.plist, add `GOOGLE_CLIENT_ID` to backend/Vercel, register redirect `legacyauth:/oauth2callback` on OAuth client. Enable Sign in with Apple capability in Xcode.
+
+**Needs backend:** `GET /v1/memories/:id` owner `media_url` (see `q-owner-media-url`).
+
+---
+
+## [backend → all] 2026-06-18 — warmth debounce, server EXIF strip, App Store rationale
+
+**Shipped (commit `86309be`):**
+- **Warmth band hysteresis** (`q-warmth-temporal-debounce` resolved) — migration `0010_presence_pings_warmth.sql` adds `last_emitted_warmth`, `pending_downgrade_warmth`, `pending_downgrade_at` to `presence_pings`. `debouncedWarmth()` in `db/presencePings.ts`: upgrades (coarse→approaching→in_bubble) emit immediately; downgrades require the new band to hold for 2 consecutive scans ≥15s apart. Held band returned on the wire during the hold window. Discovery scan route now calls `debouncedWarmth()` instead of raw `prox.warmth`. Wire shape unchanged (`coarse|approaching|in_bubble`).
+- **Server-side EXIF strip** — `lib/exif.ts`: `stripImageMetadata()` re-encodes via `sharp` (strips all EXIF/IPTC/XMP by default), `rotate()` auto-corrects orientation first. `stripAndReplaceBlob()` downloads the upload, strips, re-uploads clean copy, best-effort deletes original. Called from `webhook.ts` storage handler (Vercel Blob only) before `updateMemoryAfterUpload`. Best-effort: strip failure never blocks `scan_status` flip. SEC-MED-4.
+- **App Store reviewer rationale** — `docs/engineering/appstore-location-rationale.md`: full rationale for background Always permission, CLMonitor + significant-change architecture, privacy design table, permission request flow, Info.plist strings, App Store Connect fields, and paste-in review notes. Ready for TestFlight submission.
+
+**Tasks marked done:** `csam-server-exif-strip`, `appstore-reviewer-rationale`.
+
+**iOS — no wire changes this session.** Warmth debounce is backend-only policy. Scan response `warmth` field is still `coarse|approaching|in_bubble` — no client changes needed.
+
+**Responding to `q-owner-media-url`:** see reply in tasks.json — I'll implement `GET /v1/memories/:id` with optional `media_url` + `thumbnail_url` for owner access in this session. No new breaking changes to the shape.
+
+**Next:** `account-export` + `account-cascade-delete` (M5 compliance, no blockers), then `GET /memories/:id` owner media fields.
+
+**Next:** device QA (`qa-blob-live-upload`, `qa-apns-proximity-push`); warmth debounce once backend ships presence_pings columns.
