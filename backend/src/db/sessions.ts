@@ -31,6 +31,25 @@ export async function revokeSession(userId: string, deviceId: string): Promise<v
   `;
 }
 
+/** Return all active APNs tokens for a user (for push delivery). */
+export async function getApnsTokensForUser(userId: string): Promise<string[]> {
+  const rows = await sql`
+    SELECT apns_token FROM sessions
+    WHERE user_id = ${userId}
+      AND apns_token IS NOT NULL
+      AND revoked_at IS NULL
+  `;
+  return rows.map((r) => r.apns_token as string);
+}
+
+/** Remove a stale APNs token (Unregistered / BadDeviceToken response from APNs). */
+export async function clearApnsToken(userId: string, apnsToken: string): Promise<void> {
+  await sql`
+    UPDATE sessions SET apns_token = NULL
+    WHERE user_id = ${userId} AND apns_token = ${apnsToken}
+  `;
+}
+
 /** Store or refresh the APNs token for a signed-in device row. */
 export async function updateApnsToken(
   userId: string,

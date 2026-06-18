@@ -444,3 +444,54 @@ No Joseph action needed unless he wants Google live in M0 (would need OAuth clie
 **Next session picks up:**
 1. Once `BLOB_READ_WRITE_TOKEN` is set — verify upload→scan_status flow on a Vercel preview deploy.
 2. `location-ci-tests` DB-integration half (dwell/re-entry GPX seed) when CI Postgres is available.
+
+---
+
+## [ios → all] 2026-06-18 — Vercel Blob client-upload handshake + CLMonitor ID fix
+
+**Shipped:**
+- **Vercel Blob upload (api-contract §3.2):** `generateBlobClientToken` → `POST /v1/uploads`; `VercelBlobUpload.put` replicates `@vercel/blob/client` wire protocol (Bearer client token + x-vercel-blob-* headers to `vercel.com/api/blob`).
+- **`MemoryMediaUploader`:** unified presigned-PUT (S3/stub) and Blob paths for Drop + Import.
+- **DropCoordinator / ImportCoordinator / draft recovery:** handle `upload: null` from POST /memories; DEBUG webhook stub unchanged for simulator.
+- **CLMonitor identifiers:** alphanumeric-only region IDs + monitor name (`legacyRegions`) — WWDC23 constraint.
+- **Tests:** 47/47 SPM green (+4 Blob upload unit tests).
+
+**Tasks board:** replied to `concern-blob-public-url` (iOS client mitigations; Joseph still owns Phase 3 decision).
+
+**Blocked on Joseph:** `BLOB_READ_WRITE_TOKEN` on Vercel for live device upload verification; manual QA items in `manualTests[]`.
+
+**Next session picks up:**
+1. Live Blob E2E on device once env creds set.
+2. `appstore-reviewer-rationale`, TestFlight prep.
+3. Optional: Stitch UI polish (Wander/Drop tabs).
+
+---
+
+## [backend → all] 2026-06-18 — APNs push delivery + POST /memories/import
+
+**Shipped:**
+- **`lib/apns.ts`** — token-based APNs push (ES256 JWT via `jose`, HTTP/2 `node:http2`). JWT cached 50 min. `sendProximityPush()` is fire-and-forget with 5s timeout, never blocks the scan response. Stale tokens (`Unregistered`/`BadDeviceToken`) are auto-cleared from `sessions.apns_token`.
+- **`db/sessions.ts`** — added `getApnsTokensForUser()` and `clearApnsToken()` for push delivery + stale-token cleanup.
+- **Discovery scan route wired** — after building teaser list, if any teasers are `in_range`, push fires to all registered device tokens for that user. Generic copy only: "Something is waiting for you."
+- **`POST /v1/memories/import`** (api-contract §5) — accepts `idempotency_key` + `clusters[]` (max 200), validates lat/lng + captured_at per cluster, batch-creates `source: imported, privacy_tier: private` memories, returns `import_id + memory_id + upload` per cluster. Idempotent: same key replays the original 201 result without re-inserting. Rate-limited 5/hr per user.
+- **Migration `0009_imports.sql`** — `imports` table with `UNIQUE(user_id, idempotency_key)` for replay.
+- **`db/imports.ts`** — `storeImportResult()` + `findImportByKey()`.
+- Route registered before `/:id` so `"import"` is not consumed as a memory ID param.
+- typecheck clean, 63/63 tests green.
+
+**Tasks marked done:** `backend-apns-push`, `endpoint-memories-import`.
+
+**Blocked on Joseph:** APNs env vars needed before push fires on a real device — `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_PRIVATE_KEY` (.p8 content), `APNS_BUNDLE_ID`, `APNS_ENV=production|sandbox`. Add to `backend/.env.local` + Vercel env. All other push logic is live.
+
+**iOS — import is now end-to-end unblocked:**
+- `POST /v1/memories/import` is live. `ios-import-flow` (done) + this endpoint = full import flow.
+- For Vercel Blob (active backend): `upload` in the response will be `null`; iOS should use the `POST /v1/uploads` handshake per cluster (same as drop flow, api-contract §3.2).
+- For S3/stub: `upload.signed_put_url` is returned directly.
+
+**Uncommitted / branch:** clean on `main`.
+
+**Next session picks up:**
+1. `csam-server-exif-strip` — EXIF strip on Blob `onUploadCompleted` webhook (currently just flips scan_status). No new blockers.
+2. `account-export` + `account-cascade-delete` (M5 compliance).
+3. `app-attest-server` (M5) — needs Apple Developer account creds.
+4. `appstore-reviewer-rationale`.

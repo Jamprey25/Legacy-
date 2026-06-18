@@ -1,8 +1,9 @@
-// Memory routes (api-contract.md §3, §4):
+// Memory routes (api-contract.md §3, §4, §5):
 //   POST /v1/memories            — drop a memory, get back memory_id + signed PUT URL
 //   GET  /v1/memories            — paginated owner list (Memory Lane)
 //   GET  /v1/memories/:id        — fetch own memory detail (owner only)
 //   POST /v1/memories/:id/unlock — proximity+dwell+seal+condition check, return media URL
+//   POST /v1/memories/import     — batch-create private memories from on-device clusters
 
 import { Hono } from "hono";
 import { ApiError } from "../lib/errors.js";
@@ -20,6 +21,7 @@ import { requireAuth, type AuthVars } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { validateLocationInput } from "../lib/locationInput.js";
 import { audit } from "../lib/audit.js";
+import { storeImportResult, findImportByKey } from "../db/imports.js";
 
 export const memoriesRoutes = new Hono<{ Variables: AuthVars }>();
 
@@ -304,6 +306,100 @@ memoriesRoutes.post("/", dropLimit, async (c) => {
 });
 
 // ---------------------------------------------------------------------------
+// POST /memories/import — batch-create private memories from on-device clusters
+// (api-contract.md §5)
+// Registered before /:id so "import" is not consumed as an id param.
+// ---------------------------------------------------------------------------
+
+const importLimit = rateLimit({ name: "import", limit: 5, windowSec: 3600, keyBy: "user" });
+
+memoriesRoutes.post("/import", importLimit, async (c) => {
+  const userId: string = c.get("userId");
+
+  const body = await c.req.json<{
+    idempotency_key?: unknown;
+    clusters?: unknown;
+  }>().catch(() => null);
+
+  if (!body) throw new ApiError("invalid_request", "Request body must be JSON.");
+
+  const idempotencyKey = typeof body.idempotency_key === "string" ? body.idempotency_key.trim() : null;
+  if (!idempotencyKey) {
+    throw new ApiError("invalid_request", "Missing idempotency_key.");
+  }
+
+  // Idempotency replay — return the prior result without re-inserting.
+  const prior = await findImportByKey(userId, idempotencyKey);
+  if (prior) {
+    return c.json(prior, 201);
+  }
+
+  if (!Array.isArray(body.clusters) || body.clusters.length === 0) {
+    throw new ApiError("invalid_request", "clusters must be a non-empty array.");
+  }
+
+  if (body.clusters.length > 200) {
+    throw new ApiError("invalid_request", "clusters exceeds maximum of 200 per import.");
+  }
+
+  const clusters = body.clusters as Array<{
+    lat?: unknown;
+    lng?: unknown;
+    captured_at?: unknown;
+    asset_count?: unknown;
+  }>;
+
+  clusters.forEach((cl, i) => {
+    const lat = typeof cl.lat === "number" ? cl.lat : NaN;
+    const lng = typeof cl.lng === "number" ? cl.lng : NaN;
+    if (isNaN(lat) || lat < -90 || lat > 90 || isNaN(lng) || lng < -180 || lng > 180) {
+      throw new ApiError("invalid_request", `clusters[${i}]: invalid lat/lng.`);
+    }
+    if (!cl.captured_at || typeof cl.captured_at !== "string") {
+      throw new ApiError("invalid_request", `clusters[${i}]: missing captured_at.`);
+    }
+  });
+
+  const importId = crypto.randomUUID();
+  const memories = await Promise.all(
+    clusters.map(async (cl, i) => {
+      const lat = cl.lat as number;
+      const lng = cl.lng as number;
+      const capturedAt = new Date(cl.captured_at as string);
+      const geohash = geohashEncode(lat, lng, 9);
+
+      const memory = await createMemory({
+        ownerId: userId,
+        lat,
+        lng,
+        geohash,
+        mediaType: "photo",
+        dropMethod: "import",
+        source: "imported",
+        mediaKey: null,
+        discoverableAfter: capturedAt,
+        privacyTier: "private",
+      });
+
+      // Blob: client-upload handshake (POST /v1/uploads). S3/R2/stub: presigned PUT.
+      let upload: { signed_put_url: string; expires_at: string } | null = null;
+      if (!usesClientUpload()) {
+        const { signedPutUrl, expiresAt } = await generateSignedPutUrl(memory.id, "photo");
+        upload = { signed_put_url: signedPutUrl, expires_at: expiresAt };
+      }
+
+      return { cluster_index: i, memory_id: memory.id, upload };
+    }),
+  );
+
+  await storeImportResult(userId, idempotencyKey, importId, memories);
+
+  audit(c, "import", { import_id: importId, cluster_count: memories.length });
+
+  return c.json({ import_id: importId, memories }, 201);
+});
+
+// ---------------------------------------------------------------------------
 // GET /memories/:id
 // ---------------------------------------------------------------------------
 
@@ -457,3 +553,4 @@ memoriesRoutes.post("/:id/unlock", unlockLimit, async (c) => {
     return_count: returnCount,
   });
 });
+

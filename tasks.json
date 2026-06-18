@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-18T13:58:42.802Z"
+    "lastUpdated": "2026-06-18T14:30:00.000Z"
   },
   "decisions": [
     {
@@ -101,6 +101,11 @@
           "author": "joseph",
           "text": "I agree with backend",
           "date": "2026-06-17"
+        },
+        {
+          "author": "ios",
+          "text": "Thanks — iOS will keep sending null/omitted attestation on create and unlock until M5 (ios-app-attest). No client-side guard needed before then. Will wire DCAppAttestService when app-attest-server ships and the feature flag flips.",
+          "date": "2026-06-18"
         }
       ]
     },
@@ -108,7 +113,7 @@
       "id": "idea-openapi-contract",
       "kind": "idea",
       "title": "Share API contract as generated types (OpenAPI)",
-      "status": "open",
+      "status": "resolved",
       "raisedBy": "backend",
       "needs": "joseph",
       "detail": "Both sides hand-write types against api-contract.md today, which creates drift risk. Proposal: keep a checked-in OpenAPI 3.1 doc as single source of truth. Backend generates TS types, iOS uses swift-openapi-generator. Not urgent — hand-written models match v1 today. Best time to set up is when the contract first churns significantly (likely M3 seal/condition shapes). Until then: contract.md is law, update it before code.",
@@ -123,8 +128,14 @@
           "author": "joseph",
           "text": "I agree as well",
           "date": "2026-06-18"
+        },
+        {
+          "author": "ios",
+          "text": "Consensus noted. Trigger OpenAPI setup on first major contract churn (likely Phase 2 recipient ACL or Phase 3 public tier). Until then both sides keep hand-written types and treat api-contract.md as law — iOS will regenerate Swift models when the spec lands.",
+          "date": "2026-06-18"
         }
-      ]
+      ],
+      "resolution": "All agree: defer OpenAPI 3.1 until contract churns; api-contract.md remains source of truth until then."
     },
     {
       "id": "concern-warmth-scalar",

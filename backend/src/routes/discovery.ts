@@ -12,6 +12,8 @@ import { audit } from "../lib/audit.js";
 import { upsertPresencePing } from "../db/presencePings.js";
 import { requireAuth, type AuthVars } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
+import { getApnsTokensForUser, clearApnsToken } from "../db/sessions.js";
+import { sendProximityPush } from "../lib/apns.js";
 
 export const discoveryRoutes = new Hono<{ Variables: AuthVars }>();
 
@@ -89,6 +91,21 @@ discoveryRoutes.post("/scan", async (c) => {
 
   if (filteredTeasers.length === 0) {
     return new Response(null, { status: 204 });
+  }
+
+  // Fire-and-forget proximity push if any teasers are in-range.
+  // Runs after response is assembled; never blocks or throws to the caller.
+  const hasInRange = filteredTeasers.some((t) => t && t.in_range);
+  if (hasInRange) {
+    getApnsTokensForUser(userId).then((tokens) => {
+      for (const token of tokens) {
+        sendProximityPush(token).then((result) => {
+          if (!result.ok && result.unregistered) {
+            clearApnsToken(userId, token).catch(() => {});
+          }
+        }).catch(() => {});
+      }
+    }).catch(() => {});
   }
 
   return c.json({ teasers: filteredTeasers });
