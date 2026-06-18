@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-18T15:58:15.608Z"
+    "lastUpdated": "2026-06-18T15:58:18.070Z"
   },
   "decisions": [
     {
@@ -288,7 +288,7 @@
     {
       "id": "qa-auth-cold-launch",
       "title": "Cold launch shows sign-in when logged out",
-      "status": "failed",
+      "status": "passed",
       "addedBy": "ios",
       "platform": "xcode",
       "milestone": "M0",
