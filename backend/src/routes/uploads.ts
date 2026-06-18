@@ -23,6 +23,7 @@
 
 import { Hono } from "hono";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
+import { put } from "@vercel/blob";
 import { ApiError } from "../lib/errors.js";
 import { getMemoryByOwner, updateMemoryAfterUpload, setThumbnailKey } from "../db/memories.js";
 import { generateAndStoreThumbnail } from "../lib/thumbnail.js";
@@ -37,6 +38,54 @@ uploadsRoutes.use("*", requireAuth);
 uploadsRoutes.use("*", rateLimit({ name: "upload", limit: 20, windowSec: 3600, keyBy: "user" }));
 
 const ALLOWED_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp", "video/mp4"];
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024; // 25 MB — generous for a phone photo/short clip
+
+function extFor(contentType: string): string {
+  if (contentType.includes("png")) return "png";
+  if (contentType.includes("webp")) return "webp";
+  if (contentType.includes("mp4")) return "mp4";
+  return "jpg";
+}
+
+// Server-side upload: the client POSTs the (already EXIF-stripped) bytes here and we
+// store them with the official @vercel/blob `put()`. This replaces the fragile
+// client-side reverse-engineering of Vercel's internal blob upload protocol.
+// Body: raw binary. Headers: Content-Type (asset type), X-Memory-Id.
+uploadsRoutes.post("/direct", async (c) => {
+  const userId: string = c.get("userId");
+  const memoryId = c.req.header("x-memory-id");
+  const contentType = c.req.header("content-type") ?? "application/octet-stream";
+
+  if (!memoryId) throw new ApiError("invalid_request", "X-Memory-Id header is required.");
+  if (!ALLOWED_CONTENT_TYPES.includes(contentType)) {
+    throw new ApiError("invalid_request", `Unsupported content type: ${contentType}`);
+  }
+
+  // Authorize: memory must exist and belong to the requesting user.
+  const memory = await getMemoryByOwner(memoryId, userId);
+  if (!memory) throw new ApiError("not_found", "Memory not found.");
+
+  const body = Buffer.from(await c.req.arrayBuffer());
+  if (body.byteLength === 0) throw new ApiError("invalid_request", "Empty upload body.");
+  if (body.byteLength > MAX_UPLOAD_BYTES) throw new ApiError("invalid_request", "File too large.");
+
+  const pathname = `memories/${memoryId}/original.${extFor(contentType)}`;
+  const blob = await put(pathname, body, {
+    access: "public",
+    addRandomSuffix: true,
+    contentType,
+  });
+
+  // Store the public blob URL as media_key and flip scan_status → clear.
+  await updateMemoryAfterUpload(memoryId, blob.url);
+
+  // Best-effort teaser thumbnail (images only; never blocks — sharp may be unavailable).
+  const thumbnailKey = await generateAndStoreThumbnail(blob.url, memoryId, contentType);
+  if (thumbnailKey) await setThumbnailKey(memoryId, thumbnailKey);
+
+  audit(c, "memory.upload_direct", {});
+  return c.json({ url: blob.url });
+});
 
 uploadsRoutes.post("/", async (c) => {
   const userId: string = c.get("userId");

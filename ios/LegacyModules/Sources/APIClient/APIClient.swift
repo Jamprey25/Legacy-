@@ -133,6 +133,50 @@ public struct LegacyAPIClient: LegacyAPIClientProtocol {
         return urlRequest
     }
 
+    // MARK: - Binary media upload
+
+    /// Server-side blob upload: POST the (EXIF-stripped) bytes to `/v1/uploads/direct`.
+    /// The backend stores them via the official @vercel/blob `put()` and flips scan_status.
+    /// Returns the stored public blob URL.
+    public func uploadMemoryMediaDirect(
+        memoryID: String,
+        data: Data,
+        contentType: String
+    ) async throws -> String {
+        guard let url = URL(string: "/v1/uploads/direct", relativeTo: configuration.baseURL) else {
+            throw LegacyAPIError.invalidRequest(code: "invalid_path", message: "Bad upload path.")
+        }
+        guard let token = tokenProvider() else {
+            throw LegacyAPIError.unauthorized(code: "no_token")
+        }
+
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.httpBody = data
+        req.setValue(contentType, forHTTPHeaderField: "Content-Type")
+        req.setValue(memoryID, forHTTPHeaderField: "X-Memory-Id")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue(configuration.appVersion, forHTTPHeaderField: "X-App-Version")
+        req.setValue(configuration.deviceID, forHTTPHeaderField: "X-Device-Id")
+        req.setValue(Self.timestampFormatter.string(from: Date()), forHTTPHeaderField: "X-Request-Timestamp")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await transport.data(for: req)
+        } catch {
+            throw LegacyAPIError.transport(error.localizedDescription)
+        }
+        guard let http = response as? HTTPURLResponse else {
+            throw LegacyAPIError.invalidResponse(statusCode: -1)
+        }
+        try Self.validate(status: http.statusCode, data: data, headers: http)
+        return try decode(data, as: DirectUploadResponse.self).url
+    }
+
+    private struct DirectUploadResponse: Decodable { let url: String }
+
     // MARK: - Status validation
 
     static func validate(status: Int, data: Data, headers: HTTPURLResponse) throws {
