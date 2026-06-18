@@ -212,7 +212,7 @@ public final class WanderCoordinator {
         }
     }
 
-    /// Apply teasers from a background region-entry scan (push notification path comes later).
+    /// Apply teasers from a background region-entry scan or proximity push refresh.
     public func ingestBackgroundScan(_ result: BackgroundRegionScanService.Result) {
         teasers = result.teasers
         if result.teasers.isEmpty {

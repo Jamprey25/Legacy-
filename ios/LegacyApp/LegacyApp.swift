@@ -99,6 +99,10 @@ private struct RootView: View {
     }
 }
 
+private enum MainTab: Hashable {
+    case wander, drop, importTab, lane
+}
+
 private struct MainTabView: View {
     let apiClient: LegacyAPIClient
     let locationEngine: LocationEngine
@@ -107,6 +111,7 @@ private struct MainTabView: View {
     @State private var backgroundLocation = BackgroundLocationCoordinator()
     @State private var wanderCoordinator: WanderCoordinator
     @State private var showBackgroundDiscoveryPrompt = false
+    @State private var selectedTab: MainTab = .wander
 
     init(apiClient: LegacyAPIClient, locationEngine: LocationEngine) {
         self.apiClient = apiClient
@@ -126,11 +131,12 @@ private struct MainTabView: View {
     }
 
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             WanderFeatureRootView(coordinator: wanderCoordinator)
             .tabItem {
                 Label("Wander", systemImage: "map")
             }
+            .tag(MainTab.wander)
 
             DropFeatureRootView(
                 coordinator: DropCoordinator(
@@ -141,6 +147,7 @@ private struct MainTabView: View {
             .tabItem {
                 Label("Drop", systemImage: "mappin.and.ellipse")
             }
+            .tag(MainTab.drop)
 
             ImportFeatureRootView(
                 coordinator: ImportCoordinator(apiClient: apiClient)
@@ -148,6 +155,7 @@ private struct MainTabView: View {
             .tabItem {
                 Label("Import", systemImage: "square.stack.3d.up")
             }
+            .tag(MainTab.importTab)
 
             MemoryLaneFeatureRootView(
                 coordinator: MemoryLaneCoordinator(
@@ -158,6 +166,7 @@ private struct MainTabView: View {
             .tabItem {
                 Label("Lane", systemImage: "photo.on.rectangle.angled")
             }
+            .tag(MainTab.lane)
         }
         .tint(LegacyColor.accent)
         .sheet(isPresented: $showBackgroundDiscoveryPrompt) {
@@ -185,6 +194,10 @@ private struct MainTabView: View {
         .onChange(of: APNsTokenStore.tokenHex) { _, _ in
             Task { await APNsRegistrationService.uploadTokenIfNeeded(apiClient: apiClient) }
         }
+        .onReceive(NotificationCenter.default.publisher(for: ProximityPushNotifications.received)) { notification in
+            let openWander = notification.userInfo?["openWander"] as? Bool ?? false
+            handleProximityPush(openWander: openWander)
+        }
         .task {
             locationEngine.requestWhenInUseAuthorization()
             NetworkMonitor.shared.start()
@@ -200,9 +213,19 @@ private struct MainTabView: View {
             }
             await backgroundLocation.startIfAuthorized()
             await APNsRegistrationService.uploadTokenIfNeeded(apiClient: apiClient)
+            let pending = ProximityPushNotifications.consumePending()
+            if pending.refresh {
+                if pending.openWander { selectedTab = .wander }
+                await wanderCoordinator.scanIfNeeded(force: true)
+            }
             if shouldOfferBackgroundDiscovery {
                 showBackgroundDiscoveryPrompt = true
             }
         }
+    }
+
+    private func handleProximityPush(openWander: Bool) {
+        if openWander { selectedTab = .wander }
+        Task { await wanderCoordinator.scanIfNeeded(force: true) }
     }
 }

@@ -29,6 +29,7 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
+		<string>remote-notification</string>
 	</array>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Legacy reads photo locations to find places you have visited and lets you drop or import memories from your library.</string>

@@ -469,6 +469,24 @@ No Joseph action needed unless he wants Google live in M0 (would need OAuth clie
 
 **Needs backend next session:** reply to `q-warmth-temporal-debounce`, `idea-fixture-contract-sync`, `question-google-signin-ready`.
 
+---
+
+## [ios → all] 2026-06-18 — APNs proximity push handling + App Store rationale
+
+**Shipped:**
+- **Proximity push handling** — `UNUserNotificationCenterDelegate` + `ProximityPushNotifications` router: foreground banner, tap → Wander tab + `scanIfNeeded(force:)`, cold-launch from push, `remote-notification` background mode.
+- **App Store reviewer rationale** — `docs/engineering/appstore-reviewer-rationale.md` (CLMonitor + significant-change + no continuous GPS).
+- **Manual QA** — `qa-blob-live-upload`, `qa-apns-proximity-push` in `manualTests[]`.
+
+**Tasks marked done:** `appstore-reviewer-rationale`.
+
+**Joseph QA:** live Blob drop on device (`qa-blob-live-upload`); proximity push on device once APNS_* env set (`qa-apns-proximity-push`).
+
+**Next session picks up:**
+1. Memory Lane owner signed GET (needs backend).
+2. Google Sign-In when backend + OAuth client ID land.
+3. Fixture sync for import/APNs routes.
+
 **Blocked on Joseph:** `BLOB_READ_WRITE_TOKEN` on Vercel for live device upload verification; manual QA items in `manualTests[]`.
 
 **Next session picks up:**

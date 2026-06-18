@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-18T14:30:00.000Z"
+    "lastUpdated": "2026-06-18T15:00:00.000Z"
   },
   "decisions": [
     {
@@ -367,6 +367,45 @@
         "Open Wander and trigger a scan (move or wait for movement gate)",
         "Confirm iOS location permission alert appears",
         "Allow — confirm scan loop continues without crash"
+      ]
+    },
+    {
+      "id": "qa-blob-live-upload",
+      "title": "Live Vercel Blob photo drop (production API)",
+      "status": "pending",
+      "addedBy": "ios",
+      "platform": "device",
+      "milestone": "M1",
+      "relatedTasks": [
+        "ios-background-upload",
+        "ios-v1-pin-drop-flow"
+      ],
+      "steps": [
+        "Use a RELEASE or live-API DEBUG build pointed at the deployed backend (not stubbed)",
+        "Sign in on a real device",
+        "Drop tab → pick or capture a photo → confirm drop",
+        "Verify no upload error; memory appears in Memory Lane with scan_status clear (may take a few seconds for webhook)",
+        "Optional: confirm blob URL in backend DB media_key"
+      ],
+      "notes": "Requires STORAGE_BACKEND=vercel-blob + BLOB_READ_WRITE_TOKEN on Vercel."
+    },
+    {
+      "id": "qa-apns-proximity-push",
+      "title": "Proximity push opens Wander and refreshes scan",
+      "status": "pending",
+      "addedBy": "ios",
+      "platform": "device",
+      "milestone": "M4",
+      "relatedTasks": [
+        "ios-apns-registration",
+        "backend-apns-push"
+      ],
+      "steps": [
+        "Grant Always location + notification permission (background discovery sheet)",
+        "Drop a memory, walk away, kill the app",
+        "Walk back in range so backend /scan returns in_range and fires APNs",
+        "Tap the notification — app opens to Wander tab with updated warmth/teasers",
+        "Requires backend APNS_* env vars on Vercel + real device (not simulator)"
       ]
     }
   ],
@@ -1176,7 +1215,7 @@
       "blockedBy": [
         "ios-region-entry-scan"
       ],
-      "notes": "AppDelegate token capture, POST /v1/devices/apns, permission sheet bundles notification ask with Always upgrade."
+      "notes": "AppDelegate token capture, POST /v1/devices/apns, permission sheet bundles notification ask with Always upgrade. Proximity push handling: tap → Wander tab + force scan; foreground banner + refresh (2026-06-18)."
     },
     {
       "id": "backend-apns-push",
@@ -1318,14 +1357,14 @@
     {
       "id": "appstore-reviewer-rationale",
       "title": "Write App Store reviewer rationale for background-location permission — explain CLMonitor + significant-change architecture",
-      "status": "todo",
+      "status": "done",
       "owner": "either",
       "phase": 1,
       "milestone": "M5",
       "blockedBy": [
         "ios-region-rotation"
       ],
-      "notes": "Write early (M3), not at submission. Background location review is a common rejection point."
+      "notes": "docs/engineering/appstore-reviewer-rationale.md — paste into App Store Connect review notes before TestFlight."
     },
     {
       "id": "testflight-beta",
