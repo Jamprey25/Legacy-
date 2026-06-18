@@ -48,16 +48,28 @@ memoriesRoutes.get("/", async (c) => {
 
   const { memories, nextCursor } = await listMemoriesByOwner({ ownerId: userId, limit, cursor });
 
-  const items = memories.map((m) => ({
-    memory_id: m.id,
-    drop_date: m.created_at.toISOString().slice(0, 10),
-    created_at: m.created_at.toISOString(),
-    media_type: m.media_type,
-    scan_status: m.scan_status,
-    thumbnail_key: m.thumbnail_key,
-    privacy_tier: m.privacy_tier,
-    drop_method: m.drop_method,
-  }));
+  // Generate signed thumbnail URLs for clear memories that have a thumbnail.
+  // Vercel Blob: thumbnail_key IS the full public URL, returned directly.
+  // S3/R2: generates a short-TTL signed GET URL.
+  const items = await Promise.all(
+    memories.map(async (m) => {
+      let thumbnailUrl: string | null = null;
+      if (m.thumbnail_key && m.scan_status === "clear") {
+        const signed = await generateSignedGetUrl(m.thumbnail_key);
+        thumbnailUrl = signed.signedGetUrl;
+      }
+      return {
+        memory_id: m.id,
+        drop_date: m.created_at.toISOString().slice(0, 10),
+        created_at: m.created_at.toISOString(),
+        media_type: m.media_type,
+        scan_status: m.scan_status,
+        thumbnail_url: thumbnailUrl,
+        privacy_tier: m.privacy_tier,
+        drop_method: m.drop_method,
+      };
+    }),
+  );
 
   return c.json({ memories: items, next_cursor: nextCursor });
 });

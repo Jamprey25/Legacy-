@@ -695,7 +695,7 @@
     {
       "id": "s3-signed-put-url",
       "title": "Backend: S3 signed PUT URL generation — generate per-asset URL, 15-min TTL, return alongside memory_id",
-      "status": "blocked",
+      "status": "done",
       "owner": "backend",
       "phase": 1,
       "milestone": "M1",

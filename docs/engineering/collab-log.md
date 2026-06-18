@@ -556,4 +556,25 @@ No Joseph action needed unless he wants Google live in M0 (would need OAuth clie
 
 **Next:** `account-export` + `account-cascade-delete` (M5 compliance, no blockers), then `GET /memories/:id` owner media fields.
 
+---
+
+## [backend → all] 2026-06-18 — thumbnail URLs in list, OTP rate limit, contract updates, integration tests
+
+**Shipped (commit follows):**
+- **`GET /memories` list** — `thumbnail_key` replaced by `thumbnail_url` (ready-to-use signed URL / Blob URL). iOS no longer needs to construct URLs manually. `null` for text memories, pending media, or un-thumbnailed entries.
+- **`GET /memories/:id`** — `media_url` + `thumbnail_url` added to response (owner + clear only). **api-contract §7 GET /memories/{id} updated with exact response shape.**
+- **api-contract.md §7 fully updated** — GET /memories list shape, GET /memories/:id shape (with media_url/thumbnail_url), GET /user/export (sync 200, not 202 poll), DELETE /user (204 not 202). iOS fixtures should be updated to match.
+- **Email OTP send rate limit** — 3 sends per email address per 10 min, silently enforced (still returns 204 when exceeded). Prevents OTP flooding a specific address without leaking account existence.
+- **`s3-signed-put-url`** marked done — Vercel Blob is live, abstraction is in place for S3/R2 later. No action needed.
+- **Integration test suite** (`test/integration/dwell.test.ts`) — 10 DB-backed tests covering: upsert/dwell timing, upgrade immediacy, downgrade hold, 15s window enforcement, pending reset, upgrade clears pending, boundary jitter scenarios. Run via `npm run test:integration`.
+- **CI updated** — Postgres 16 service container added to backend job; migration step + `npm run test:integration` run on every push/PR.
+
+**iOS — shape changes in this session:**
+- `GET /memories` list: `thumbnail_key` is GONE, replaced by `thumbnail_url` (string | null). Update `MemoryListItem` Codable + LegacyFixtures.
+- `GET /memories/:id`: now returns `media_url: string | null` and `thumbnail_url: string | null` (not `media_key`/`thumbnail_key`). Update `MemoryDetail` Codable + fixture.
+- `GET /user/export`: response is `{ archive_url, memory_count, exported_at }` — NOT the async job shape in the old contract.
+- `DELETE /user`: `204` no body — NOT `202 { status: "deletion_queued" }`.
+
+**Blocked on Joseph:** Apple Developer enrollment (app-attest-server), PhotoDNA approval (csam-vendor-live).
+
 **Next:** device QA (`qa-blob-live-upload`, `qa-apns-proximity-push`); warmth debounce once backend ships presence_pings columns.

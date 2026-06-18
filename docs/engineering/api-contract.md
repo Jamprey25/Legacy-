@@ -315,13 +315,78 @@ Embedded in `POST /v1/memories` (and the V2 compose flow). Evaluated **server-si
 ## 7. Account
 
 ### `GET /v1/memories/{id}`
-Owner-only full memory detail (coordinates included — owner only). `404` if not owner.
+Owner-only full memory detail. `404` if not owner.
+
+**Response `200`**
+```json
+{
+  "memory_id": "<uuid>",
+  "lat": 37.7749,
+  "lng": -122.4194,
+  "geohash": "9q8yyz...",
+  "source": "live",
+  "drop_method": "pin",
+  "privacy_tier": "private",
+  "scan_status": "clear",
+  "media_type": "photo",
+  "media_url": "https://blob.vercel-storage.com/...",
+  "thumbnail_url": "https://blob.vercel-storage.com/...",
+  "discoverable_after": "2026-06-19T11:00:00Z",
+  "created_at": "2026-06-18T11:00:00Z"
+}
+```
+- `media_url` and `thumbnail_url` are non-null only when `scan_status = "clear"` AND caller is owner. Otherwise `null`. For Vercel Blob these are the full public URLs (unguessable bearer capability); for S3/R2 they will be short-TTL signed GET URLs.
+- Coordinates (`lat`, `lng`, `geohash`) are included — owner data only, never returned to non-owners.
+
+### `GET /v1/memories` (list)
+Paginated owner list for Memory Lane. Oldest-first. Auth required.
+
+**Query params:** `limit` (default 50, max 100), `cursor` (opaque, from `next_cursor`).
+
+**Response `200`**
+```json
+{
+  "memories": [
+    {
+      "memory_id": "<uuid>",
+      "drop_date": "2024-09-01",
+      "created_at": "2024-09-01T14:00:00Z",
+      "media_type": "photo",
+      "scan_status": "clear",
+      "thumbnail_url": "https://blob.vercel-storage.com/...",
+      "privacy_tier": "private",
+      "drop_method": "pin"
+    }
+  ],
+  "next_cursor": "<opaque>"
+}
+```
+- `thumbnail_url` is non-null only when `scan_status = "clear"` and a thumbnail has been generated. `null` for text memories, pending media, and un-thumbnailed entries.
+- `next_cursor` is `null` when there are no more pages.
 
 ### `GET /v1/user/export`
-**Response `202`** `{ "job_id": "<uuid>", "status": "preparing" }`. Poll → eventually `{ "status": "ready", "archive_url": "...", "expires_at": "..." }`. Signed archive of own memories only.
+Synchronously packages all own memories into a JSON archive and returns a download URL. Rate-limited 3 per day.
+
+**Response `200`**
+```json
+{
+  "archive_url": "https://blob.vercel-storage.com/exports/.../export-....json",
+  "memory_count": 42,
+  "exported_at": "2026-06-18T11:00:00Z"
+}
+```
+- Archive contains own memory metadata + own coordinates (user's data). Raw storage keys are never included — media is referenced by `memory_id`.
+- For stub backend: `archive_url` is a placeholder URL; real URL requires `STORAGE_BACKEND=vercel-blob`.
+- `429 rate_limited` after 3 exports in 24 h.
 
 ### `DELETE /v1/user`
-**Response `202`** `{ "status": "deletion_queued" }`. Cascade-deletes memories, media, finds, pings, sessions.
+Hard-deletes the account and all associated data synchronously. No undo.
+
+**Response `204`** — empty body.
+
+- Cascades: memories → finds, presence_pings, seals, conditions, imports, sessions.
+- Media blobs are deleted from storage fire-and-forget after the DB rows are gone.
+- Session token is invalidated by the deletion itself (user row gone → `requireAuth` will 401).
 
 ### `POST /v1/devices/apns`
 Register or refresh the APNs device token for the authenticated install.

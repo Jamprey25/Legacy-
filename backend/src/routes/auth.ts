@@ -22,6 +22,7 @@ import { issueCode, verifyCode } from "../db/otp.js";
 import { upsertSession, revokeSession, type DeviceInfo } from "../db/sessions.js";
 import { requireAuth, type AuthVars } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
+import { incrementAndCount } from "../db/rateLimits.js";
 import { audit } from "../lib/audit.js";
 
 export const authRoutes = new Hono<{ Variables: AuthVars }>();
@@ -73,13 +74,30 @@ authRoutes.post("/social", async (c) => {
   return c.json(await sessionResponse(user, body.device), 201);
 });
 
+// Per-email OTP send window: floor(now / 600s). Matches the IP-level window.
+function otpWindowStart(): Date {
+  const windowMs = 600_000; // 10 min
+  return new Date(Math.floor(Date.now() / windowMs) * windowMs);
+}
+
 authRoutes.post("/email/start", async (c) => {
   const body = await c.req.json<{ email?: string }>();
   // Always 204 — never reveal whether the address is known (no account enumeration).
-  if (body.email && /.+@.+\..+/.test(body.email)) {
-    const code = await issueCode(body.email);
-    await sendOtpEmail(body.email, code);
+  if (!body.email || !/.+@.+\..+/.test(body.email)) return c.body(null, 204);
+
+  // Per-address send limit: 3 OTPs per 10 min. Silently skip if exceeded so we
+  // don't leak which addresses are active targets. Fail-open on DB error.
+  try {
+    const emailKey = `otp:email:${body.email.toLowerCase()}`;
+    const count = await incrementAndCount(emailKey, otpWindowStart());
+    if (count > 3) return c.body(null, 204); // silent — no 429 on this path
+  } catch {
+    // fail-open
   }
+
+  const code = await issueCode(body.email);
+  await sendOtpEmail(body.email, code);
+
   return c.body(null, 204);
 });
 

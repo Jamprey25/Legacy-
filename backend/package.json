@@ -7,8 +7,9 @@
     "dev": "tsx watch --env-file=.env.local src/dev-server.ts",
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "vitest run --exclude 'test/integration/**'",
+    "test:watch": "vitest --exclude 'test/integration/**'",
+    "test:integration": "vitest run test/integration",
     "migrate": "tsx --env-file=.env.local scripts/migrate.ts"
   },
   "dependencies": {
