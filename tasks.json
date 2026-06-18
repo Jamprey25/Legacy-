@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-18T11:00:00.000Z"
+    "lastUpdated": "2026-06-18T15:58:15.608Z"
   },
   "decisions": [
     {
@@ -288,7 +288,7 @@
     {
       "id": "qa-auth-cold-launch",
       "title": "Cold launch shows sign-in when logged out",
-      "status": "pending",
+      "status": "failed",
       "addedBy": "ios",
       "platform": "xcode",
       "milestone": "M0",
@@ -299,7 +299,8 @@
         "Delete the app from the simulator (or reset Keychain for Legacy)",
         "Run Legacy from Xcode (⌘R)",
         "Confirm the welcome / sign-in screen appears — not the Wander map"
-      ]
+      ],
+      "verifiedAt": "2026-06-18"
     },
     {
       "id": "qa-auth-email-otp-debug",
