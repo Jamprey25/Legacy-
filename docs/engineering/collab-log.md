@@ -577,4 +577,88 @@ No Joseph action needed unless he wants Google live in M0 (would need OAuth clie
 
 **Blocked on Joseph:** Apple Developer enrollment (app-attest-server), PhotoDNA approval (csam-vendor-live).
 
+---
+
+## [backend → ios] 2026-06-18 — Manual QA results + bug directive
+
+Joseph ran the full QA checklist on a real device today. Results below. Backend is holding — all failures are iOS-side. **Cursor: read this entire section and work through bugs P0 → P1 → P2 in order.**
+
+### QA Results
+
+| Test | Result | Root cause |
+|---|---|---|
+| Cold launch shows sign-in after reinstall | **FAIL** | Keychain survives app delete on real device |
+| Email OTP (stubbed) | **FAIL** | Blocked by cold-launch / Keychain issue |
+| Under-13 DOB rejection | **FAIL** | Blocked by cold-launch / Keychain issue |
+| Session persists across relaunch | PASS | ✓ |
+| Wander empty map shell | PASS (with issue) | Memory detail opens with no way to close |
+| Unlock memory | PASS (with issue) | One memory fails — likely pending scan_status |
+| Tab bar navigation | PASS | ✓ |
+| Location permission prompt | **FAIL** | Fires multiple times; Apple sign-in exits app |
+| Photo drop / upload | **FAIL** | BackgroundMediaUploader crash (background URLSession + async/await) |
+| APNs proximity push | **FAIL** | Blocked by drop failure |
+| Import photos | **FAIL** | Same upload crash as drop |
+
+---
+
+### P0 — BLOCKING (fix first, everything else depends on upload working)
+
+**`bug-upload-background-session`** — `BackgroundMediaUploader.swift` line 37 crashes at runtime:
+> `NSException: "Completion handler blocks are not supported in background sessions. Use a delegate instead."`
+
+`URLSession.upload(for:fromFile:)` async/await **cannot be called on a background URLSession**. This crashes every drop and import attempt.
+
+**Fix — fastest path:** Route the Vercel Blob handshake upload through the foreground `URLSessionMediaUploader` sibling instead of `BackgroundMediaUploader`. The Blob PUT is a single short request (~seconds); it does not need background resumability. Background upload is for the future S3 presigned-PUT path.
+
+Concrete change in `BackgroundMediaUploader.upload(data:to:contentType:)`:
+```swift
+// Replace the background session call with the foreground uploader:
+try await URLSessionMediaUploader().upload(data: data, to: url, contentType: contentType)
+```
+
+The background session (with delegate) stays in place for future S3 direct PUT; just don't use it for the Blob client-token path.
+
+---
+
+### P1 — Auth / onboarding (fix second)
+
+**`bug-keychain-reinstall-clear`** — Keychain session token survives app deletion on real device. Cold launch skips auth. Also blocks 3 other QA tests.
+
+Fix: add a first-launch sentinel in `AppDelegate` or `@main` App init:
+```swift
+if UserDefaults.standard.object(forKey: "legacyHasLaunched") == nil {
+    KeychainSession.deleteAll()   // purge all Legacy Keychain items
+    UserDefaults.standard.set(true, forKey: "legacyHasLaunched")
+}
+```
+`KeychainSession.deleteAll()` → `SecItemDelete` with `kSecClassGenericPassword` + your service name. This runs before `SessionCoordinator` reads the token, so a fresh install always routes to auth.
+
+**`bug-location-permission-repeat`** — Two sub-issues:
+1. Location permission alert fires more than once. Audit every call site of `requestAlwaysAuthorization()` and `requestWhenInUseAuthorization()`. Add a guard: only call if `CLLocationManager.authorizationStatus() == .notDetermined`.
+2. Apple sign-in (`SignInWithAppleButton` or `ASAuthorizationController`) causes the app to temporarily background, which may trigger a logout or session-check. Ensure `ASAuthorizationControllerDelegate` callbacks are received and the scene transition does not clear auth state.
+
+---
+
+### P2 — UX polish (fix after P0+P1)
+
+**`bug-memory-detail-no-dismiss`** — Memory detail sheet has no close button. User gets stuck. Add to the sheet root view:
+```swift
+.toolbar {
+    ToolbarItem(placement: .cancellationAction) {
+        Button("Close") { dismiss() }
+    }
+}
+```
+Also confirm `.interactiveDismissDisabled()` is not set, so swipe-down also works.
+
+**One memory fails to unlock** — likely `scan_status: pending` (upload never completed due to the P0 crash). After fixing P0, re-drop a memory and confirm it unlocks. If a specific old memory is still broken, check its `scan_status` in the DB — Joseph can query Neon directly.
+
+---
+
+### Summary for Cursor
+
+Work order: **P0 upload crash → P1 Keychain sentinel → P1 permission repeat → P2 dismiss button**.
+
+After each fix, update the corresponding `bug-*` thread in `tasks.json` with a `responses[]` entry (`author: "ios"`) and flip the `status` to `resolved`. Joseph will re-run QA when P0+P1 are done.
+
 **Next:** device QA (`qa-blob-live-upload`, `qa-apns-proximity-push`); warmth debounce once backend ships presence_pings columns.

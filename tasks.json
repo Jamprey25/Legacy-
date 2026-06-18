@@ -233,6 +233,50 @@
       "resolution": "Backend updates contract + collab-log on shape changes; iOS maintains LegacyFixtures in lockstep. CI snapshot diff optional later."
     },
     {
+      "id": "bug-upload-background-session",
+      "kind": "concern",
+      "title": "BackgroundMediaUploader crash — async/await not supported on background URLSession",
+      "status": "open",
+      "raisedBy": "backend",
+      "needs": "ios",
+      "detail": "Manual QA 2026-06-18: drop and import both fail. Xcode shows crash at BackgroundMediaUploader.swift line 37: `session.upload(for: request, fromFile: tempURL)` — NSException 'Completion handler blocks are not supported in background sessions. Use a delegate instead.' The async/await URLSession upload API is not available on background-configured sessions. The Vercel Blob handshake path must use either: (A) a foreground URLSession for the async PUT step — BackgroundMediaUploader already has URLSessionMediaUploader as a sibling, route the Blob client-token path through that; or (B) switch BackgroundMediaUploader to the delegate API: uploadTask(with:fromFile:).resume() + handle urlSession(_:task:didCompleteWithError:) in BackgroundUploadSessionDelegate.shared. Option A is the fastest fix. This blocks drop, import, and all downstream QA.",
+      "blocks": [],
+      "responses": []
+    },
+    {
+      "id": "bug-keychain-reinstall-clear",
+      "kind": "concern",
+      "title": "Keychain session persists after app delete — cold launch skips auth",
+      "status": "open",
+      "raisedBy": "backend",
+      "needs": "ios",
+      "detail": "Manual QA 2026-06-18: deleting the app from a real device and reinstalling does NOT clear the Keychain session token. iOS intentionally preserves Keychain items across reinstalls (entitlement-backed). The fix is a first-launch sentinel: on app start, check UserDefaults for a 'hasLaunchedBefore' flag. If absent (fresh install), delete all Legacy Keychain items, then set the flag. This ensures cold-launch-after-reinstall always shows the auth screen. SecItemDelete with kSecClassGenericPassword + service name. This also fixes qa-auth-cold-launch, qa-auth-email-otp-debug, qa-auth-dob-under13 which all fail because the session leaks.",
+      "blocks": [],
+      "responses": []
+    },
+    {
+      "id": "bug-location-permission-repeat",
+      "kind": "concern",
+      "title": "Location permission prompt fires multiple times; Apple sign-in temporarily exits app",
+      "status": "open",
+      "raisedBy": "backend",
+      "needs": "ios",
+      "detail": "Manual QA 2026-06-18: (1) Location permission alert appears more than once during onboarding. requestAlwaysAuthorization() must be called exactly once, from BackgroundDiscoveryPermissionSheet. Audit all call sites — LocationEngine, BackgroundRegionScanService, and any scene/view lifecycle hooks — and remove duplicates. Guard with CLAuthorizationStatus check before calling: only call if status == .notDetermined. (2) Sign in with Apple temporarily exits the app (ASAuthorization callback may be triggering sceneDidEnterBackground). This is likely because ASAuthorizationController presentation causes a scene transition. Ensure the ASAuthorizationControllerDelegate handles the callback on the main actor and does not treat the scene transition as a logout signal.",
+      "blocks": [],
+      "responses": []
+    },
+    {
+      "id": "bug-memory-detail-no-dismiss",
+      "kind": "concern",
+      "title": "Memory detail sheet has no dismiss / close button",
+      "status": "open",
+      "raisedBy": "backend",
+      "needs": "ios",
+      "detail": "Manual QA 2026-06-18: when a memory is surfaced (either from scan or Memory Lane tap), the detail sheet has no X / close button. User is stuck in the sheet. Add a dismiss button to the sheet toolbar or header. SwiftUI: .toolbar { ToolbarItem(placement: .cancellationAction) { Button('Close') { dismiss() } } } on the sheet root view. Also confirm the sheet can be swiped down to dismiss (presentationDetents or interactiveDismissDisabled should not be blocking).",
+      "blocks": [],
+      "responses": []
+    },
+    {
       "id": "q-owner-media-url",
       "kind": "question",
       "title": "GET /memories/:id — owner media_url for Memory Lane without re-unlock?",
@@ -285,6 +329,66 @@
     }
   ],
   "manualTests": [
+    {
+      "id": "qa-mt-cold-launch-device",
+      "title": "Cold launch shows sign-in on real device after reinstall",
+      "status": "fail",
+      "addedBy": "backend",
+      "platform": "device",
+      "milestone": "M0",
+      "relatedTasks": ["ios-keychain-session", "ios-auth-ui"],
+      "notes": "FAIL 2026-06-18: reinstalling app on device does not clear Keychain session — app skips auth and goes straight to Wander. Keychain items survive app deletion on real device (iOS behavior). Fix: on first launch after reinstall, detect missing UserDefaults sentinel and purge Keychain. See bug-keychain-reinstall-clear."
+    },
+    {
+      "id": "qa-mt-drop-upload",
+      "title": "Photo drop uploads successfully to Vercel Blob",
+      "status": "fail",
+      "addedBy": "backend",
+      "platform": "device",
+      "milestone": "M1",
+      "relatedTasks": ["ios-background-upload", "ios-v1-pin-drop-flow"],
+      "notes": "FAIL 2026-06-18: drop shows 'check location permission and connectivity — waiting to upload'. Crash in BackgroundMediaUploader line 37: URLSession.upload(for:fromFile:) async/await not supported on background URLSession. Fix: use uploadTask(with:fromFile:) delegate pattern, or route through foreground URLSessionMediaUploader for the Blob handshake path. See bug-upload-background-session."
+    },
+    {
+      "id": "qa-mt-import-upload",
+      "title": "Import clusters upload photos to Vercel Blob",
+      "status": "fail",
+      "addedBy": "backend",
+      "platform": "device",
+      "milestone": "M3",
+      "relatedTasks": ["ios-import-flow"],
+      "notes": "FAIL 2026-06-18: cluster map loads and spread-by-location works but actual photo upload fails. Same root cause as qa-mt-drop-upload (background URLSession async/await). Fix unblocks this too. See bug-upload-background-session."
+    },
+    {
+      "id": "qa-mt-location-permission-repeat",
+      "title": "Location permission prompt appears only once",
+      "status": "fail",
+      "addedBy": "backend",
+      "platform": "device",
+      "milestone": "M2",
+      "relatedTasks": ["ios-location-engine", "ios-apns-registration"],
+      "notes": "FAIL 2026-06-18: permission prompt for location fires multiple times; Apple sign-in also kicks user out of app temporarily before recovering. requestAlwaysAuthorization() may be called from multiple sites. Should be called exactly once from BackgroundDiscoveryPermissionSheet. See bug-location-permission-repeat."
+    },
+    {
+      "id": "qa-mt-memory-detail-dismiss",
+      "title": "Memory detail sheet has a dismiss button",
+      "status": "fail",
+      "addedBy": "backend",
+      "platform": "device",
+      "milestone": "M2",
+      "relatedTasks": ["ios-wander-unlock-flow", "ios-memory-lane"],
+      "notes": "FAIL 2026-06-18: memory loads at current location with no way to close the detail sheet. Need a dismiss/close button (X) in the sheet header. See bug-memory-detail-no-dismiss."
+    },
+    {
+      "id": "qa-mt-one-memory-unlock-fails",
+      "title": "All memories unlock successfully",
+      "status": "fail",
+      "addedBy": "backend",
+      "platform": "device",
+      "milestone": "M2",
+      "relatedTasks": ["ios-wander-unlock-flow"],
+      "notes": "FAIL 2026-06-18: one specific memory fails to unlock (others work). Could be scan_status still pending (upload failed), dwell not met, or a seal/condition blocking. Needs investigation — check memory_id in backend DB for scan_status and seal config."
+    }
     {
       "id": "qa-auth-cold-launch",
       "title": "Cold launch shows sign-in when logged out",
