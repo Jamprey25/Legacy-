@@ -16,14 +16,14 @@ public enum ImportPhase: Sendable, Equatable {
 public final class ImportCoordinator {
     public init(
         apiClient: LegacyAPIClient,
-        uploader: MediaUploading = URLSessionMediaUploader()
+        mediaUploader: MemoryMediaUploader? = nil
     ) {
         self.apiClient = apiClient
-        self.uploader = uploader
+        self.mediaUploader = mediaUploader ?? MemoryMediaUploader(apiClient: apiClient)
     }
 
     private let apiClient: LegacyAPIClient
-    private let uploader: MediaUploading
+    private let mediaUploader: MemoryMediaUploader
     private var geoSamples: [PhotoGeoSample] = []
     private static let iso8601: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
@@ -101,18 +101,19 @@ public final class ImportCoordinator {
             for (progressIndex, item) in sortedItems.enumerated() {
                 phase = .importing(current: progressIndex, total: sortedItems.count)
 
-                guard
-                    let upload = item.upload,
-                    let url = URL(string: upload.signedPutURL),
-                    item.clusterIndex < chosen.count
-                else { continue }
+                guard item.clusterIndex < chosen.count else { continue }
 
                 let cluster = chosen[item.clusterIndex]
                 #if os(iOS)
                 guard let assetID = cluster.sampleIDs.first else { continue }
                 let raw = try await PHAssetImageFetcher.loadJPEGData(assetID: assetID)
                 let stripped = try EXIFStripper.stripMetadata(from: raw)
-                try await uploader.upload(data: stripped, to: url, contentType: "image/jpeg")
+                try await mediaUploader.upload(
+                    memoryID: item.memoryID,
+                    data: stripped,
+                    contentType: "image/jpeg",
+                    signedPutURL: item.upload?.signedPutURL
+                )
                 uploaded += 1
                 #else
                 uploaded += 1

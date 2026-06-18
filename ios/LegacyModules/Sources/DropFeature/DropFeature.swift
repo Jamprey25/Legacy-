@@ -236,16 +236,7 @@ public struct DropFeatureRootView: View {
     }
 
     private func retryDraft(_ draft: DropDraft) async {
-        guard let data = DropDraftStore.photoData(for: draft),
-              let url = URL(string: draft.signedPutURL) else { return }
-        let uploader = URLSessionMediaUploader()
-        do {
-            try await uploader.upload(data: data, to: url, contentType: draft.contentType)
-            try DropDraftStore.delete(draft, context: modelContext)
-        } catch {
-            draft.uploadState = "failed"
-            try? modelContext.save()
-        }
+        await coordinator.retryDraft(draft, context: modelContext)
     }
     #endif
 

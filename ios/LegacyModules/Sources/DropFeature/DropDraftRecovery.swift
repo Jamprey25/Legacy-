@@ -1,24 +1,35 @@
 #if os(iOS)
+import APIClient
 import Foundation
 import SwiftData
 
 @MainActor
 public enum DropDraftRecovery {
-    public static func retryPendingDrafts(context: ModelContext) async {
+    public static func retryPendingDrafts(context: ModelContext, apiClient: LegacyAPIClient) async {
         let descriptor = FetchDescriptor<DropDraft>(
             predicate: #Predicate { $0.uploadState == "pending_upload" }
         )
         guard let drafts = try? context.fetch(descriptor), !drafts.isEmpty else { return }
 
-        let uploader = BackgroundMediaUploader()
+        let presignedUploader = BackgroundMediaUploader()
+        let mediaUploader = MemoryMediaUploader(apiClient: apiClient, presignedUploader: presignedUploader)
+
         for draft in drafts {
-            guard
-                let data = DropDraftStore.photoData(for: draft),
-                let url = URL(string: draft.signedPutURL)
-            else { continue }
+            guard let data = DropDraftStore.photoData(for: draft) else { continue }
 
             do {
-                try await uploader.upload(data: data, to: url, contentType: draft.contentType)
+                if VercelBlobUpload.isDraftRecoveryMarker(draft.signedPutURL) {
+                    _ = try await mediaUploader.upload(
+                        memoryID: draft.memoryID,
+                        data: data,
+                        contentType: draft.contentType,
+                        signedPutURL: nil
+                    )
+                } else if let url = URL(string: draft.signedPutURL) {
+                    try await presignedUploader.upload(data: data, to: url, contentType: draft.contentType)
+                } else {
+                    continue
+                }
                 try DropDraftStore.delete(draft, context: context)
             } catch {
                 draft.uploadState = "failed"

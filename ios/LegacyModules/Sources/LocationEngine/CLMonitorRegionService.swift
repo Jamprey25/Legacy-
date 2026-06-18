@@ -13,7 +13,8 @@ public actor CLMonitorRegionService {
     private let monitor: CLMonitor
     private var armedIDs: Set<String> = []
 
-    public init(name: String = "legacy.regions") async {
+    /// Monitor names must be alphanumeric (WWDC23 — no `.`, `:`, or `-`).
+    public init(name: String = "legacyRegions") async {
         monitor = await CLMonitor(name)
     }
 

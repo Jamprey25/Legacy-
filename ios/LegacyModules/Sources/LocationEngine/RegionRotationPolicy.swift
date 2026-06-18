@@ -6,13 +6,22 @@ public enum RegionSlot: Sendable, Equatable, Identifiable {
     case ownPin(memoryID: String, lat: Double, lng: Double, radiusM: Double)
     case coarseZone(geohashPrefix: String, centerLat: Double, centerLng: Double, radiusM: Double)
 
+    /// CLMonitor condition identifiers must be alphanumeric (no punctuation).
     public var id: String {
         switch self {
         case .ownPin(let memoryID, _, _, _):
-            return "own:\(memoryID)"
+            return Self.clMonitorIdentifier(prefix: "own", raw: memoryID)
         case .coarseZone(let prefix, _, _, _):
-            return "coarse:\(prefix)"
+            return Self.clMonitorIdentifier(prefix: "coarse", raw: prefix)
         }
+    }
+
+    private static func clMonitorIdentifier(prefix: String, raw: String) -> String {
+        let body = raw.unicodeScalars
+            .filter { CharacterSet.alphanumerics.contains($0) }
+            .map(String.init)
+            .joined()
+        return prefix + body
     }
 
     public var coordinate: (lat: Double, lng: Double) {

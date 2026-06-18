@@ -10,7 +10,7 @@ final class RegionRotationPolicyTests: XCTestCase {
             CachedOwnPin(memoryID: "near", lat: 0.001, lng: 0.001, dropDate: "2024-01-02", thumbnailURL: nil, cachedAt: Date()),
         ]
         let slots = RegionRotationPolicy.rotate(reference: reference, ownPins: pins, coarseZones: [])
-        XCTAssertEqual(slots.first?.id, "own:near")
+        XCTAssertEqual(slots.first?.id, "ownnear")
     }
 
     func testCoarseZonesFillRemainingBudget() {

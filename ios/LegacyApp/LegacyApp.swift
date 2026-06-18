@@ -188,7 +188,7 @@ private struct MainTabView: View {
         .task {
             locationEngine.requestWhenInUseAuthorization()
             NetworkMonitor.shared.start()
-            await DropDraftRecovery.retryPendingDrafts(context: modelContext)
+            await DropDraftRecovery.retryPendingDrafts(context: modelContext, apiClient: apiClient)
             backgroundLocation.onRegionEntered = { regionID in
                 if let result = await BackgroundRegionScanService.scanOnRegionEntry(
                     regionIdentifier: regionID,

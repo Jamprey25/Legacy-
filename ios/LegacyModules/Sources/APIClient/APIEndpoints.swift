@@ -412,6 +412,24 @@ extension LegacyAPIClient {
         try await send(request(.post, "/v1/memories", body), as: CreateMemoryResponse.self)
     }
 
+    /// Vercel Blob handshake step 1 — scoped client token for direct upload (contract §3.2).
+    public func generateBlobClientToken(memoryID: String, pathname: String) async throws -> String {
+        let payload = BlobGenerateClientTokenRequest.Payload(
+            pathname: pathname,
+            multipart: false,
+            clientPayload: "{\"memory_id\":\"\(memoryID)\"}"
+        )
+        let body = BlobGenerateClientTokenRequest(payload: payload)
+        let response: BlobGenerateClientTokenResponse = try await send(
+            request(.post, "/v1/uploads", body),
+            as: BlobGenerateClientTokenResponse.self
+        )
+        guard response.clientToken.hasPrefix("vercel_blob_client_") else {
+            throw BlobUploadError.invalidClientToken
+        }
+        return response.clientToken
+    }
+
     /// Paginated owner list for Memory Lane — oldest first, no coordinates.
     public func listMemories(cursor: String? = nil, limit: Int = 50) async throws -> ListMemoriesResponse {
         var path = "/v1/memories?limit=\(limit)"

@@ -2,8 +2,11 @@ import APIClient
 import Foundation
 import LocationEngine
 
+#if os(iOS)
+import SwiftData
+#endif
+
 public enum DropError: Error, Sendable, Equatable {
-    case missingUpload
     case stripFailed
     case emptyNote
 }
@@ -24,16 +27,16 @@ public final class DropCoordinator {
     public init(
         apiClient: LegacyAPIClient,
         locationEngine: LocationEngine,
-        uploader: MediaUploading = URLSessionMediaUploader()
+        mediaUploader: MemoryMediaUploader? = nil
     ) {
         self.apiClient = apiClient
         self.locationEngine = locationEngine
-        self.uploader = uploader
+        self.mediaUploader = mediaUploader ?? MemoryMediaUploader(apiClient: apiClient)
     }
 
     private let apiClient: LegacyAPIClient
     private let locationEngine: LocationEngine
-    private let uploader: MediaUploading
+    private let mediaUploader: MemoryMediaUploader
 
     public private(set) var selectedPhotoData: Data?
     public private(set) var pendingRecovery: PendingUploadRecovery?
@@ -113,32 +116,44 @@ public final class DropCoordinator {
             )
             let response = try await apiClient.createMemory(body)
             memoryID = response.memoryID
+            contentType = response.upload?.headers["Content-Type"] ?? "image/jpeg"
 
-            guard
-                let upload = response.upload,
-                let url = URL(string: upload.signedPutURL)
-            else {
-                throw DropError.missingUpload
+            if let upload = response.upload {
+                signedPutURL = upload.signedPutURL
+            } else {
+                signedPutURL = VercelBlobUpload.draftRecoveryMarker
             }
 
-            signedPutURL = upload.signedPutURL
-            contentType = upload.headers["Content-Type"] ?? "image/jpeg"
-
             state = .uploading
-            try await uploader.upload(data: stripped, to: url, contentType: contentType)
+            let blobURL = try await mediaUploader.upload(
+                memoryID: response.memoryID,
+                data: stripped,
+                contentType: contentType,
+                signedPutURL: response.upload?.signedPutURL,
+                uploadHeaders: response.upload?.headers ?? [:]
+            )
 
             #if DEBUG
-            let ext = contentType.contains("mp4") ? "mp4" : "jpg"
-            try? await apiClient.notifyUploadComplete(
-                memoryID: response.memoryID,
-                mediaKey: "memories/\(response.memoryID)/original.\(ext)"
-            )
+            if response.upload == nil {
+                let mediaKey = blobURL ?? VercelBlobUpload.pathname(
+                    memoryID: response.memoryID,
+                    contentType: contentType
+                )
+                try? await apiClient.notifyUploadComplete(
+                    memoryID: response.memoryID,
+                    mediaKey: mediaKey
+                )
+            } else {
+                let ext = contentType.contains("mp4") ? "mp4" : "jpg"
+                try? await apiClient.notifyUploadComplete(
+                    memoryID: response.memoryID,
+                    mediaKey: "memories/\(response.memoryID)/original.\(ext)"
+                )
+            }
             #endif
 
             cacheOwnDrop(memoryID: response.memoryID, lat: fixLat, lng: fixLng)
             state = .succeeded(memoryID: response.memoryID)
-        } catch DropError.missingUpload {
-            state = .failed("Server did not return an upload URL.")
         } catch is EXIFStripError {
             state = .failed("Could not prepare photo for upload.")
         } catch let LegacyAPIError.invalidRequest(code, message) {
@@ -231,4 +246,34 @@ public final class DropCoordinator {
             )
         )
     }
+
+    #if os(iOS)
+    /// Retries a persisted draft — presigned PUT or Vercel Blob handshake.
+    public func retryDraft(_ draft: DropDraft, context: ModelContext) async {
+        guard let data = DropDraftStore.photoData(for: draft) else { return }
+
+        do {
+            if VercelBlobUpload.isDraftRecoveryMarker(draft.signedPutURL) {
+                _ = try await mediaUploader.upload(
+                    memoryID: draft.memoryID,
+                    data: data,
+                    contentType: draft.contentType,
+                    signedPutURL: nil
+                )
+            } else if let url = URL(string: draft.signedPutURL) {
+                try await URLSessionMediaUploader().upload(
+                    data: data,
+                    to: url,
+                    contentType: draft.contentType
+                )
+            } else {
+                return
+            }
+            try DropDraftStore.delete(draft, context: context)
+        } catch {
+            draft.uploadState = "failed"
+            try? context.save()
+        }
+    }
+    #endif
 }
