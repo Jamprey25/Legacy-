@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-18T15:58:19.867Z"
+    "lastUpdated": "2026-06-18T19:00:00.000Z"
   },
   "decisions": [
     {
@@ -236,45 +236,78 @@
       "id": "bug-upload-background-session",
       "kind": "concern",
       "title": "BackgroundMediaUploader crash — async/await not supported on background URLSession",
-      "status": "open",
+      "status": "resolved",
       "raisedBy": "backend",
       "needs": "ios",
       "detail": "Manual QA 2026-06-18: drop and import both fail. Xcode shows crash at BackgroundMediaUploader.swift line 37: `session.upload(for: request, fromFile: tempURL)` — NSException 'Completion handler blocks are not supported in background sessions. Use a delegate instead.' The async/await URLSession upload API is not available on background-configured sessions. The Vercel Blob handshake path must use either: (A) a foreground URLSession for the async PUT step — BackgroundMediaUploader already has URLSessionMediaUploader as a sibling, route the Blob client-token path through that; or (B) switch BackgroundMediaUploader to the delegate API: uploadTask(with:fromFile:).resume() + handle urlSession(_:task:didCompleteWithError:) in BackgroundUploadSessionDelegate.shared. Option A is the fastest fix. This blocks drop, import, and all downstream QA.",
       "blocks": [],
-      "responses": []
+      "responses": [
+        {
+          "author": "ios",
+          "text": "Fixed (option A): BackgroundMediaUploader.upload() delegates to URLSessionMediaUploader (foreground). DropDraftRecovery uses URLSessionMediaUploader directly. Background session kept for future S3 resumable PUT only.",
+          "date": "2026-06-18"
+        },
+        {
+          "author": "ios",
+          "text": "UAT round 2 Fix 1: removed DEBUG LegacyAPIClient.stubbed() from LegacyApp — app always hits https://api.legacy.app so drop/import reach live Vercel Blob handshake.",
+          "date": "2026-06-18"
+        }
+      ],
+      "resolution": "Foreground upload for Blob/stub PUT; no async/await on background URLSession."
     },
     {
       "id": "bug-keychain-reinstall-clear",
       "kind": "concern",
       "title": "Keychain session persists after app delete — cold launch skips auth",
-      "status": "open",
+      "status": "resolved",
       "raisedBy": "backend",
       "needs": "ios",
       "detail": "Manual QA 2026-06-18: deleting the app from a real device and reinstalling does NOT clear the Keychain session token. iOS intentionally preserves Keychain items across reinstalls (entitlement-backed). The fix is a first-launch sentinel: on app start, check UserDefaults for a 'hasLaunchedBefore' flag. If absent (fresh install), delete all Legacy Keychain items, then set the flag. This ensures cold-launch-after-reinstall always shows the auth screen. SecItemDelete with kSecClassGenericPassword + service name. This also fixes qa-auth-cold-launch, qa-auth-email-otp-debug, qa-auth-dob-under13 which all fail because the session leaks.",
       "blocks": [],
-      "responses": []
+      "responses": [
+        {
+          "author": "ios",
+          "text": "KeychainSessionStore.clearIfFreshInstall() runs in LegacyApp.init before session read: if legacyHasLaunched UserDefaults flag absent → delete session token → set flag. Reinstall clears auth; normal relaunch preserves session.",
+          "date": "2026-06-18"
+        }
+      ],
+      "resolution": "First-launch sentinel purges Keychain after reinstall."
     },
     {
       "id": "bug-location-permission-repeat",
       "kind": "concern",
       "title": "Location permission prompt fires multiple times; Apple sign-in temporarily exits app",
-      "status": "open",
+      "status": "resolved",
       "raisedBy": "backend",
       "needs": "ios",
       "detail": "Manual QA 2026-06-18: (1) Location permission alert appears more than once during onboarding. requestAlwaysAuthorization() must be called exactly once, from BackgroundDiscoveryPermissionSheet. Audit all call sites — LocationEngine, BackgroundRegionScanService, and any scene/view lifecycle hooks — and remove duplicates. Guard with CLAuthorizationStatus check before calling: only call if status == .notDetermined. (2) Sign in with Apple temporarily exits the app (ASAuthorization callback may be triggering sceneDidEnterBackground). This is likely because ASAuthorizationController presentation causes a scene transition. Ensure the ASAuthorizationControllerDelegate handles the callback on the main actor and does not treat the scene transition as a logout signal.",
       "blocks": [],
-      "responses": []
+      "responses": [
+        {
+          "author": "ios",
+          "text": "Removed duplicate requestWhenInUse from MainTabView.task. LocationEngine.requestWhenInUse only when .notDetermined. BackgroundLocationCoordinator.requestAlways only when .authorizedWhenInUse (sheet path). Wander scanIfNeeded already guarded. Apple sign-in uses SignInWithAppleButton — no session clear on scene background.",
+          "date": "2026-06-18"
+        }
+      ],
+      "resolution": "Single permission prompt path with status guards."
     },
     {
       "id": "bug-memory-detail-no-dismiss",
       "kind": "concern",
       "title": "Memory detail sheet has no dismiss / close button",
-      "status": "open",
+      "status": "resolved",
       "raisedBy": "backend",
       "needs": "ios",
       "detail": "Manual QA 2026-06-18: when a memory is surfaced (either from scan or Memory Lane tap), the detail sheet has no X / close button. User is stuck in the sheet. Add a dismiss button to the sheet toolbar or header. SwiftUI: .toolbar { ToolbarItem(placement: .cancellationAction) { Button('Close') { dismiss() } } } on the sheet root view. Also confirm the sheet can be swiped down to dismiss (presentationDetents or interactiveDismissDisabled should not be blocking).",
       "blocks": [],
-      "responses": []
+      "responses": [
+        {
+          "author": "ios",
+          "text": "UnlockedMemorySheet: Close button on .cancellationAction (leading), presentationDragIndicator(.visible). Swipe-down dismiss unchanged.",
+          "date": "2026-06-18"
+        }
+      ],
+      "resolution": "Wander unlock sheet has explicit Close + drag indicator."
     },
     {
       "id": "q-owner-media-url",
@@ -388,7 +421,7 @@
       "milestone": "M2",
       "relatedTasks": ["ios-wander-unlock-flow"],
       "notes": "FAIL 2026-06-18: one specific memory fails to unlock (others work). Could be scan_status still pending (upload failed), dwell not met, or a seal/condition blocking. Needs investigation — check memory_id in backend DB for scan_status and seal config."
-    }
+    },
     {
       "id": "qa-auth-cold-launch",
       "title": "Cold launch shows sign-in when logged out",
@@ -1751,6 +1784,19 @@
         "institutional-layer-backend"
       ],
       "notes": ""
+    },
+    {
+      "id": "ios-profile-tab",
+      "title": "iOS: Profile tab — sign out, export data, delete account",
+      "status": "done",
+      "owner": "ios",
+      "phase": 1,
+      "milestone": "M5",
+      "blockedBy": [
+        "account-export",
+        "account-cascade-delete"
+      ],
+      "notes": "ProfileView in AuthFeature: GET /user/export share sheet, DELETE /user + sign out. Profile tab wired in MainTabView. AccountProfileStore persists email/user id after auth."
     },
     {
       "id": "android",
