@@ -8,7 +8,7 @@ Engineering rationale lives in `engineering-plan.md §3`. This file is the preci
 
 ## 1. Conventions
 
-- **Base URL:** `https://api.legacy.app` (prod), `https://staging-api.legacy.app` (staging). Configurable in `LegacyAPIConfiguration`.
+- **Base URL:** `https://legacy-backend-jamprey25s-projects.vercel.app` (prod, live on Vercel). Custom domain `api.legacy.app` is aspirational/not yet configured. Configurable in `LegacyAPIConfiguration`.
 - **Transport:** HTTPS only. JSON request/response bodies (`Content-Type: application/json`) except binary media uploads (direct to S3 signed URLs, not the API).
 - **Versioning:** path-prefixed `/v1/...`. All endpoints below are under `/v1`.
 - **Time:** all timestamps are RFC 3339 / ISO 8601 UTC strings (e.g. `2026-06-16T20:55:00Z`).

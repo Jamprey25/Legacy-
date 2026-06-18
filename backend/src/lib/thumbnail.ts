@@ -10,8 +10,14 @@
 // Best-effort: any failure returns null. Thumbnail generation must never block or revert
 // scan_status — the original is already clear.
 
-import sharp from "sharp";
 import { put } from "@vercel/blob";
+
+// Lazy-loaded so a missing/broken native sharp binary cannot crash app startup.
+// Only the image-processing path (post-upload webhook) ever loads it.
+async function loadSharp() {
+  const mod = await import("sharp");
+  return mod.default;
+}
 
 const THUMB_MAX_WIDTH = 400; // px — enough for a teaser card, tiny payload
 const THUMB_WEBP_QUALITY = 70;
@@ -21,6 +27,7 @@ const THUMB_WEBP_QUALITY = 70;
  * (sharp default) and honors orientation. Extracted for unit testing without network.
  */
 export async function resizeToThumbnail(input: Buffer): Promise<Buffer> {
+  const sharp = await loadSharp();
   return sharp(input)
     .rotate() // honor EXIF orientation before metadata is dropped
     .resize({ width: THUMB_MAX_WIDTH, withoutEnlargement: true })

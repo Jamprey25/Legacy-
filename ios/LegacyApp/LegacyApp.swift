@@ -10,9 +10,6 @@ import DesignSystem
 import APIClient
 import LocationEngine
 import SwiftData
-#if DEBUG
-import LegacyAPIStubs
-#endif
 
 @MainActor
 @Observable
@@ -25,6 +22,7 @@ final class AppModel {
 
     func signOut() {
         try? KeychainSessionStore.delete()
+        AccountProfileStore.clear()
         isAuthenticated = false
     }
 }
@@ -45,18 +43,28 @@ struct LegacyApp: App {
         UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
     }
 
+    /// Set `LegacyGoogleClientID` in Info.plist when Joseph adds Google OAuth credentials.
+    private static var googleClientID: String? {
+        guard let raw = Bundle.main.object(forInfoDictionaryKey: "LegacyGoogleClientID") as? String else {
+            return nil
+        }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.hasPrefix("$(") else { return nil }
+        return trimmed
+    }
+
     init() {
-        #if DEBUG
-        apiClient = LegacyAPIClient.stubbed()
-        #else
+        if UserDefaults.standard.object(forKey: "legacyHasLaunched") == nil {
+            AccountProfileStore.clear()
+        }
+        KeychainSessionStore.clearIfFreshInstall()
         apiClient = LegacyAPIClient(
             configuration: LegacyAPIConfiguration(
-                baseURL: URL(string: "https://api.legacy.app")!,
+                baseURL: URL(string: "https://legacy-backend-jamprey25s-projects.vercel.app")!,
                 appVersion: Self.appVersion,
                 deviceID: Self.deviceID
             )
         )
-        #endif
     }
 
     var body: some Scene {
@@ -65,7 +73,8 @@ struct LegacyApp: App {
                 appModel: appModel,
                 apiClient: apiClient,
                 locationEngine: locationEngine,
-                deviceID: Self.deviceID
+                deviceID: Self.deviceID,
+                googleClientID: Self.googleClientID
             )
             .onAppear { appModel.refreshSession() }
         }
@@ -78,32 +87,35 @@ private struct RootView: View {
     let apiClient: LegacyAPIClient
     let locationEngine: LocationEngine
     let deviceID: String
+    let googleClientID: String?
 
+    @ViewBuilder
     var body: some View {
-        Group {
-            if appModel.isAuthenticated {
-                MainTabView(
+        if appModel.isAuthenticated {
+            MainTabView(
+                appModel: appModel,
+                apiClient: apiClient,
+                locationEngine: locationEngine
+            )
+        } else {
+            AuthFeatureRootView(
+                coordinator: AuthCoordinator(
                     apiClient: apiClient,
-                    locationEngine: locationEngine
+                    deviceID: deviceID,
+                    googleClientID: googleClientID,
+                    onAuthenticated: { appModel.refreshSession() }
                 )
-            } else {
-                AuthFeatureRootView(
-                    coordinator: AuthCoordinator(
-                        apiClient: apiClient,
-                        deviceID: deviceID,
-                        onAuthenticated: { appModel.refreshSession() }
-                    )
-                )
-            }
+            )
         }
     }
 }
 
 private enum MainTab: Hashable {
-    case wander, drop, importTab, lane
+    case wander, drop, importTab, lane, profile
 }
 
 private struct MainTabView: View {
+    @Bindable var appModel: AppModel
     let apiClient: LegacyAPIClient
     let locationEngine: LocationEngine
 
@@ -113,7 +125,8 @@ private struct MainTabView: View {
     @State private var showBackgroundDiscoveryPrompt = false
     @State private var selectedTab: MainTab = .wander
 
-    init(apiClient: LegacyAPIClient, locationEngine: LocationEngine) {
+    init(appModel: AppModel, apiClient: LegacyAPIClient, locationEngine: LocationEngine) {
+        self.appModel = appModel
         self.apiClient = apiClient
         self.locationEngine = locationEngine
         _wanderCoordinator = State(initialValue: WanderCoordinator(
@@ -132,41 +145,11 @@ private struct MainTabView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            WanderFeatureRootView(coordinator: wanderCoordinator)
-            .tabItem {
-                Label("Wander", systemImage: "map")
-            }
-            .tag(MainTab.wander)
-
-            DropFeatureRootView(
-                coordinator: DropCoordinator(
-                    apiClient: apiClient,
-                    locationEngine: locationEngine
-                )
-            )
-            .tabItem {
-                Label("Drop", systemImage: "mappin.and.ellipse")
-            }
-            .tag(MainTab.drop)
-
-            ImportFeatureRootView(
-                coordinator: ImportCoordinator(apiClient: apiClient)
-            )
-            .tabItem {
-                Label("Import", systemImage: "square.stack.3d.up")
-            }
-            .tag(MainTab.importTab)
-
-            MemoryLaneFeatureRootView(
-                coordinator: MemoryLaneCoordinator(
-                    apiClient: apiClient,
-                    locationEngine: locationEngine
-                )
-            )
-            .tabItem {
-                Label("Lane", systemImage: "photo.on.rectangle.angled")
-            }
-            .tag(MainTab.lane)
+            wanderTab
+            dropTab
+            importTab
+            laneTab
+            profileTab
         }
         .tint(LegacyColor.accent)
         .sheet(isPresented: $showBackgroundDiscoveryPrompt) {
@@ -199,7 +182,6 @@ private struct MainTabView: View {
             handleProximityPush(openWander: openWander)
         }
         .task {
-            locationEngine.requestWhenInUseAuthorization()
             NetworkMonitor.shared.start()
             await DropDraftRecovery.retryPendingDrafts(context: modelContext, apiClient: apiClient)
             backgroundLocation.onRegionEntered = { regionID in
@@ -227,5 +209,55 @@ private struct MainTabView: View {
     private func handleProximityPush(openWander: Bool) {
         if openWander { selectedTab = .wander }
         Task { await wanderCoordinator.scanIfNeeded(force: true) }
+    }
+
+    @ViewBuilder
+    private var wanderTab: some View {
+        WanderFeatureRootView(coordinator: wanderCoordinator)
+            .tabItem { Label("Wander", systemImage: "map") }
+            .tag(MainTab.wander)
+    }
+
+    @ViewBuilder
+    private var dropTab: some View {
+        DropFeatureRootView(
+            coordinator: DropCoordinator(
+                apiClient: apiClient,
+                locationEngine: locationEngine
+            )
+        )
+        .tabItem { Label("Drop", systemImage: "mappin.and.ellipse") }
+        .tag(MainTab.drop)
+    }
+
+    @ViewBuilder
+    private var importTab: some View {
+        ImportFeatureRootView(
+            coordinator: ImportCoordinator(apiClient: apiClient)
+        )
+        .tabItem { Label("Import", systemImage: "square.stack.3d.up") }
+        .tag(MainTab.importTab)
+    }
+
+    @ViewBuilder
+    private var laneTab: some View {
+        MemoryLaneFeatureRootView(
+            coordinator: MemoryLaneCoordinator(
+                apiClient: apiClient,
+                locationEngine: locationEngine
+            )
+        )
+        .tabItem { Label("Lane", systemImage: "photo.on.rectangle.angled") }
+        .tag(MainTab.lane)
+    }
+
+    @ViewBuilder
+    private var profileTab: some View {
+        ProfileView(
+            apiClient: apiClient,
+            onSignOut: { appModel.signOut() }
+        )
+        .tabItem { Label("Profile", systemImage: "person.circle") }
+        .tag(MainTab.profile)
     }
 }

@@ -12,14 +12,21 @@
 // Best-effort: returns null on failure so the caller falls back to the original.
 // SEC-MED-4.
 
-import sharp from "sharp";
 import { put, del } from "@vercel/blob";
+
+// Lazy-loaded so a missing/broken native sharp binary cannot crash app startup.
+// Only the upload webhook path ever loads it.
+async function loadSharp() {
+  const mod = await import("sharp");
+  return mod.default;
+}
 
 /**
  * Pure strip step: image bytes → re-encoded bytes with all metadata removed.
  * Extracted for unit testing without network I/O.
  */
 export async function stripImageMetadata(input: Buffer): Promise<Buffer> {
+  const sharp = await loadSharp();
   // keepMetadata(false) is sharp's default; explicit here for documentation.
   // rotate() auto-corrects orientation so the visual result is unchanged.
   const meta = await sharp(input).metadata();
