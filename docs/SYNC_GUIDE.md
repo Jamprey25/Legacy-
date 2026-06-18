@@ -1,5 +1,7 @@
 # Documentation Sync Guide
 
+> **Not agent sync.** For Claude ↔ Cursor coordination, use [`docs/engineering/AGENT_WORKFLOW.md`](./engineering/AGENT_WORKFLOW.md).
+
 Quick reference for keeping `/docs/engineering/` and `/docs/product/` in sync with the live product at https://legacy-preview-rho.vercel.app/
 
 ---

@@ -52,5 +52,26 @@ export interface Decision {
 export interface TasksFile {
   meta: { project: string; lastUpdated: string };
   decisions?: Decision[];
+  /** Manual Xcode/device checks Joseph marks pass/fail in the dashboard. */
+  manualTests?: ManualTest[];
   tasks: Task[];
+}
+
+export type ManualTestStatus = "pending" | "passed" | "failed";
+export type ManualTestPlatform = "xcode" | "device" | "simulator";
+
+export interface ManualTest {
+  id: string;
+  title: string;
+  status: ManualTestStatus;
+  /** Who added this check (ios = Cursor, backend = Claude). */
+  addedBy: Owner | "joseph";
+  platform: ManualTestPlatform;
+  milestone?: string;
+  /** Task ids this validates (e.g. ios-auth-ui). */
+  relatedTasks?: string[];
+  /** Step-by-step instructions for Joseph in Xcode/simulator. */
+  steps: string[];
+  notes?: string;
+  verifiedAt?: string;
 }

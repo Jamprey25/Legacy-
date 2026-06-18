@@ -18,12 +18,13 @@ This monorepo is split across two builders:
 | **Backend API** | Claude Code | TypeScript/Node (Hono or Fastify) + PostgreSQL on Vercel |
 | **Task dashboard** | Shared | Next.js on Vercel, reads `tasks.json` |
 
-Coordination happens through two files at the repo root:
+Coordination happens through shared repo docs (not chat memory):
 
 - **`tasks.json`** — shared task list (status, owner, blockers). The [live dashboard](https://dashboard-two-orpin-63.vercel.app) auto-refreshes every 30s.
-- **`docs/engineering/collab-log.md`** — cross-AI decisions, open questions, brainstorm.
+- **`docs/engineering/collab-log.md`** — cross-AI decisions, open questions, handoffs.
+- **`docs/engineering/AGENT_WORKFLOW.md`** — **session start/end rituals**, edit boundaries, Joseph relay template. Both agents read this first.
 
-**Process:** Decisions that need Joseph go in the collab log or `tasks.json` `decisions[]` *before* anyone asks him in chat. See the **Working agreement** section in `collab-log.md`.
+**Process:** Decisions that need Joseph go in the collab log or `tasks.json` `decisions[]` *before* anyone asks him in chat. See **Working agreement** in `collab-log.md` and **Agent workflow** above.
 
 Authoritative API shapes: **`docs/engineering/api-contract.md`**
 
@@ -90,6 +91,8 @@ After saving, open **Deployments** → **Redeploy** the latest `main` commit.
 
 **Decisions:** When Claude/Cursor escalate something to you, it appears at the top of the dashboard with clickable **options**. Your choice is written to `tasks.json` (set `DECISIONS_SECRET` + `GITHUB_TOKEN` on Vercel; locally it updates `../tasks.json` without a token).
 
+**Discussions:** Agents raise **questions, concerns, and ideas** in the same `decisions[]` list. They must reply to each other's open threads (`needs: "ios"` or `"backend"`) — see [`AGENT_WORKFLOW.md`](docs/engineering/AGENT_WORKFLOW.md).
+
 ---
 
 ## Repository layout
@@ -132,8 +135,9 @@ Full rationale: `docs/engineering/engineering-plan.md`, `docs/engineering/archit
 | [Engineering plan](docs/engineering/engineering-plan.md) | Architecture, phases, privacy model |
 | [API contract](docs/engineering/api-contract.md) | Exact request/response wire format |
 | [Technical internal](docs/engineering/TECHNICAL_INTERNAL.md) | iOS module design, state, flows |
+| [Agent workflow](docs/engineering/AGENT_WORKFLOW.md) | Claude + Cursor sync rituals, roles, handoffs |
 | [Collab log](docs/engineering/collab-log.md) | Cross-AI decisions, brainstorm, **working agreement** |
-| [Sync guide](docs/SYNC_GUIDE.md) | When/how to update docs |
+| [Sync guide](docs/SYNC_GUIDE.md) | Product website ↔ internal docs (not agent sync) |
 
 ---
 

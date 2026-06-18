@@ -151,6 +151,28 @@
           "author": "ios",
           "text": "Do not add a scalar. A responsive 0-1 distance proxy reintroduces the DEC-15 attack: walk 3 steps, read the value, repeat from two or three positions and you have trilaterated the pin without passing a proximity check. The vector/scalar distinction does not save us — trilateration only needs distances from known points, not bearings. Keep 3 coarse bands. Smooth UX comes from client-side easing between band transitions (already in WarmthCueOverlay, ~0.6s cosmetic interpolation). The user sees a smooth bloom; the device only ever knew coarse/approaching/in_bubble. Also want the bands debounced server-side so rapid in/out jitter near a boundary cannot be sampled as a fine signal.",
           "date": "2026-06-16"
+        },
+        {
+          "author": "ios",
+          "text": "Follow-up on temporal debounce (raised in my first reply): proximity.ts quantizes to bands per scan but does not hold/hysteresis across requests yet. Promoted to q-warmth-temporal-debounce — needs backend.",
+          "date": "2026-06-18"
+        }
+      ]
+    },
+    {
+      "id": "q-warmth-temporal-debounce",
+      "kind": "question",
+      "title": "Warmth bands — temporal debounce/hysteresis across scans?",
+      "status": "open",
+      "raisedBy": "ios",
+      "needs": "backend",
+      "detail": "Per-scan band quantization exists (proximity.ts) but rapid boundary crossing can still flip coarse↔approaching↔in_bubble every /scan. iOS asked for server-side debounce so an attacker cannot sample boundary jitter as a finer signal. Proposal: require band stable for N consecutive scans or T seconds before emitting a downgrade (upgrades may stay immediate). What N/T fits Phase 1?",
+      "blocks": [],
+      "responses": [
+        {
+          "author": "ios",
+          "text": "Client-side WarmthCueOverlay already eases visually (~0.6s) — that is cosmetic only. Need backend policy so the wire value cannot oscillate faster than dwell-scale timing. Suggest starting with 2 scans ≥15s apart before downgrading a band; upgrades immediate. Open to backend counter-proposal.",
+          "date": "2026-06-18"
         }
       ]
     },
@@ -158,7 +180,7 @@
       "id": "concern-blob-public-url",
       "kind": "concern",
       "title": "Vercel Blob media served as public unguessable URL (not short-TTL)",
-      "status": "open",
+      "status": "resolved",
       "raisedBy": "backend",
       "needs": "joseph",
       "detail": "Vercel Blob has no S3-style presigned/expiring GET. Phase-1 implementation uploads media access:public with addRandomSuffix, so the blob URL is an unguessable bearer capability stored as media_key and returned on unlock. Trade-off vs the contract intent of a short-TTL signed GET: a leaked URL stays valid indefinitely; there is no server-enforced view window. Acceptable for Phase-1 private-tier memories (URL is unguessable, memories are owner/recipient-scoped), but it weakens the privacy posture for public-tier. MUST revisit before public memories / Phase 3 — options then: migrate to S3 presigned GET, or proxy private blobs through the function with a short-lived token. Documented in api-contract §3.2 and DEC-23 revisit trigger.",
@@ -167,6 +189,46 @@
         {
           "author": "joseph",
           "text": "I think for pahse 3 we migrate so aws s3",
+          "date": "2026-06-18"
+        },
+        {
+          "author": "ios",
+          "text": "Acknowledged for Phase 1. Blob client-upload handshake shipped (POST /v1/uploads → PUT vercel.com/api/blob). BLOB_READ_WRITE_TOKEN now set on Vercel. Client mitigations while URLs are bearer-capabilities: (1) never persist unlocked media URLs — AsyncImage / in-memory only; FoundPinsCache stores own pin coords only; (2) no os_log of media_key or signed URLs; (3) no URL caching in UserDefaults. Phase 3 per Joseph: migrate to AWS S3 presigned GET for unlock — iOS will consume whatever unlock returns, no client changes beyond decoding.",
+          "date": "2026-06-18"
+        }
+      ],
+      "resolution": "Phase 1: accept Vercel Blob unguessable public URLs for private-tier. Phase 3: migrate media GET to AWS S3 presigned URLs (Joseph 2026-06-18). Revisit trigger remains DEC-23 / public-tier."
+    },
+    {
+      "id": "idea-fixture-contract-sync",
+      "kind": "idea",
+      "title": "Keep APIClient fixtures in lockstep with contract examples",
+      "status": "open",
+      "raisedBy": "ios",
+      "needs": "backend",
+      "detail": "LegacyAPIStubs + LegacyAPIClient.stubbed() drive offline previews and tests from JSON fixtures (APIClientTests, WanderFeatureTests). Proposal: when backend changes a response shape, update the matching fixture and api-contract.md example in the same PR. Optional: CI diff live preview responses against fixtures. Prevents silent Codable drift.",
+      "blocks": [],
+      "responses": [
+        {
+          "author": "ios",
+          "text": "Fixtures live in ios/LegacyModules/Sources/LegacyAPIStubs/LegacyFixtures.swift — one struct per major endpoint. Happy to add fixtures for /memories/import and APNs routes when backend confirms final shapes.",
+          "date": "2026-06-18"
+        }
+      ]
+    },
+    {
+      "id": "question-google-signin-ready",
+      "kind": "question",
+      "title": "Google Sign-In — backend ready when Joseph adds OAuth client ID?",
+      "status": "open",
+      "raisedBy": "ios",
+      "needs": "backend",
+      "detail": "AuthFeature shows Google button as UI-only ('Coming soon') until auth-google-oauth is live AND Joseph adds Google OAuth client ID to Xcode. Apple + email OTP are wired. Confirm backend POST /v1/auth/social accepts google id_token today and anything else iOS must send (nonce, etc.).",
+      "blocks": ["ios-auth-ui"],
+      "responses": [
+        {
+          "author": "ios",
+          "text": "Will enable GoogleSignIn or ASWebAuthenticationSession once backend confirms token exchange path matches Apple flow (same AuthResponse shape). No SDK bundled yet deliberately.",
           "date": "2026-06-18"
         }
       ]

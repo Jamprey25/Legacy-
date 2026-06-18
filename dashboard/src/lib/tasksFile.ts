@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
-import type { Decision, TasksFile, ThreadResponse } from "../app/types";
+import type { Decision, ManualTest, ManualTestStatus, TasksFile, ThreadResponse } from "../app/types";
 
 const GITHUB_REPO = process.env.GITHUB_REPO ?? "Jamprey25/Legacy-";
 const GITHUB_BRANCH = process.env.GITHUB_BRANCH ?? "main";
@@ -129,4 +129,27 @@ export function resolveDecision(
   const next = { ...data, decisions: [...decisions] };
   next.decisions![index] = decision;
   return { data: next, decision };
+}
+
+export function updateManualTest(
+  data: TasksFile,
+  testId: string,
+  status: ManualTestStatus
+): { data: TasksFile; test: ManualTest } {
+  const tests = data.manualTests ?? [];
+  const index = tests.findIndex((t) => t.id === testId);
+  if (index === -1) throw new Error(`Manual test not found: ${testId}`);
+
+  const verifiedAt =
+    status === "pending" ? undefined : new Date().toISOString().slice(0, 10);
+
+  const test: ManualTest = {
+    ...tests[index],
+    status,
+    verifiedAt,
+  };
+
+  const next = { ...data, manualTests: [...tests] };
+  next.manualTests![index] = test;
+  return { data: next, test };
 }

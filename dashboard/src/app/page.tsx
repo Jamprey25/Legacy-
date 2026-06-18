@@ -4,6 +4,7 @@ import type { TasksFile, Task, Owner } from "./types";
 import TaskCard from "./components/TaskCard";
 import MilestoneGroup from "./components/MilestoneGroup";
 import DecisionsPanel from "./components/DecisionsPanel";
+import ManualTestPanel from "./components/ManualTestPanel";
 
 const GITHUB_RAW =
   "https://raw.githubusercontent.com/Jamprey25/Legacy-/main/tasks.json";
@@ -110,6 +111,7 @@ export default function Dashboard() {
 
   const { tasks, meta } = data;
   const decisions = data.decisions ?? [];
+  const manualTests = data.manualTests ?? [];
   const openDecisions = decisions.filter((d) => d.status === "open");
   const total = tasks.length;
   const done = tasks.filter((t) => t.status === "done").length;
@@ -253,6 +255,11 @@ export default function Dashboard() {
             onResolved={fetchTasks}
             prominent={openDecisions.length > 0}
           />
+        )}
+
+        {/* ── Manual QA checklist (Xcode) ── */}
+        {manualTests.length > 0 && (
+          <ManualTestPanel tests={manualTests} onUpdate={fetchTasks} />
         )}
 
         {/* ── Phase swimlane ── */}
