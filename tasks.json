@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-18T19:00:00.000Z"
+    "lastUpdated": "2026-06-19T18:39:35.004Z"
   },
   "decisions": [
     {
@@ -369,7 +369,10 @@
       "addedBy": "backend",
       "platform": "device",
       "milestone": "M0",
-      "relatedTasks": ["ios-keychain-session", "ios-auth-ui"],
+      "relatedTasks": [
+        "ios-keychain-session",
+        "ios-auth-ui"
+      ],
       "notes": "FAIL 2026-06-18: reinstalling app on device does not clear Keychain session — app skips auth and goes straight to Wander. Keychain items survive app deletion on real device (iOS behavior). Fix: on first launch after reinstall, detect missing UserDefaults sentinel and purge Keychain. See bug-keychain-reinstall-clear."
     },
     {
@@ -379,7 +382,10 @@
       "addedBy": "backend",
       "platform": "device",
       "milestone": "M1",
-      "relatedTasks": ["ios-background-upload", "ios-v1-pin-drop-flow"],
+      "relatedTasks": [
+        "ios-background-upload",
+        "ios-v1-pin-drop-flow"
+      ],
       "notes": "FAIL 2026-06-18: drop shows 'check location permission and connectivity — waiting to upload'. Crash in BackgroundMediaUploader line 37: URLSession.upload(for:fromFile:) async/await not supported on background URLSession. Fix: use uploadTask(with:fromFile:) delegate pattern, or route through foreground URLSessionMediaUploader for the Blob handshake path. See bug-upload-background-session."
     },
     {
@@ -389,7 +395,9 @@
       "addedBy": "backend",
       "platform": "device",
       "milestone": "M3",
-      "relatedTasks": ["ios-import-flow"],
+      "relatedTasks": [
+        "ios-import-flow"
+      ],
       "notes": "FAIL 2026-06-18: cluster map loads and spread-by-location works but actual photo upload fails. Same root cause as qa-mt-drop-upload (background URLSession async/await). Fix unblocks this too. See bug-upload-background-session."
     },
     {
@@ -399,7 +407,10 @@
       "addedBy": "backend",
       "platform": "device",
       "milestone": "M2",
-      "relatedTasks": ["ios-location-engine", "ios-apns-registration"],
+      "relatedTasks": [
+        "ios-location-engine",
+        "ios-apns-registration"
+      ],
       "notes": "FAIL 2026-06-18: permission prompt for location fires multiple times; Apple sign-in also kicks user out of app temporarily before recovering. requestAlwaysAuthorization() may be called from multiple sites. Should be called exactly once from BackgroundDiscoveryPermissionSheet. See bug-location-permission-repeat."
     },
     {
@@ -409,7 +420,10 @@
       "addedBy": "backend",
       "platform": "device",
       "milestone": "M2",
-      "relatedTasks": ["ios-wander-unlock-flow", "ios-memory-lane"],
+      "relatedTasks": [
+        "ios-wander-unlock-flow",
+        "ios-memory-lane"
+      ],
       "notes": "FAIL 2026-06-18: memory loads at current location with no way to close the detail sheet. Need a dismiss/close button (X) in the sheet header. See bug-memory-detail-no-dismiss."
     },
     {
@@ -419,7 +433,9 @@
       "addedBy": "backend",
       "platform": "device",
       "milestone": "M2",
-      "relatedTasks": ["ios-wander-unlock-flow"],
+      "relatedTasks": [
+        "ios-wander-unlock-flow"
+      ],
       "notes": "FAIL 2026-06-18: one specific memory fails to unlock (others work). Could be scan_status still pending (upload failed), dwell not met, or a seal/condition blocking. Needs investigation — check memory_id in backend DB for scan_status and seal config."
     },
     {
@@ -460,7 +476,7 @@
     {
       "id": "qa-auth-dob-under13",
       "title": "Under-13 DOB shows age-restricted screen",
-      "status": "pending",
+      "status": "passed",
       "addedBy": "ios",
       "platform": "simulator",
       "milestone": "M0",
@@ -471,7 +487,8 @@
         "Sign out or fresh install",
         "Start sign-in and pick a DOB that makes the user under 13",
         "Confirm age-restricted / rejection UI — must not reach Wander"
-      ]
+      ],
+      "verifiedAt": "2026-06-19"
     },
     {
       "id": "qa-session-persists",
