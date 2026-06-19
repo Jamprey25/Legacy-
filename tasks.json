@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-19T18:39:35.004Z"
+    "lastUpdated": "2026-06-19T18:39:46.203Z"
   },
   "decisions": [
     {
@@ -543,7 +543,7 @@
     {
       "id": "qa-tab-shell",
       "title": "Tab bar navigation between Wander and Memory Lane",
-      "status": "pending",
+      "status": "passed",
       "addedBy": "ios",
       "platform": "simulator",
       "milestone": "M0",
@@ -554,7 +554,8 @@
         "After sign-in, switch between main tabs (Wander, Memory Lane, etc.)",
         "Confirm no crash, state preserved when switching back",
         "Sign-out (if exposed in UI) returns to auth flow"
-      ]
+      ],
+      "verifiedAt": "2026-06-19"
     },
     {
       "id": "qa-location-permission",
