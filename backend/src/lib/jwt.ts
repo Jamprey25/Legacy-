@@ -80,6 +80,9 @@ function secret(): Uint8Array {
 
 function requireEnv(key: string): string {
   const v = process.env[key];
-  if (!v) throw new Error(`${key} is not set`);
+  if (!v) {
+    console.error(`[config] missing env: ${key}`);
+    throw new ApiError("internal_error", "Something went wrong.");
+  }
   return v;
 }

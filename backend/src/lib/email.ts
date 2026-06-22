@@ -11,7 +11,7 @@ export async function sendOtpEmail(email: string, code: string): Promise<void> {
     return;
   }
 
-  await fetch("https://api.resend.com/emails", {
+  const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -21,4 +21,8 @@ export async function sendOtpEmail(email: string, code: string): Promise<void> {
       text: `Your Legacy verification code is ${code}. It expires in 10 minutes.`,
     }),
   });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    console.error(`[otp] Resend failed ${res.status}: ${detail.slice(0, 200)}`);
+  }
 }

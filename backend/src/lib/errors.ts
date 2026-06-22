@@ -22,7 +22,8 @@ export type ErrorCode =
   | "rate_limited"
   | "invalid_code"
   | "dob_required"
-  | "internal_error";
+  | "internal_error"
+  | "attestation_invalid";
 
 const STATUS_BY_CODE: Record<ErrorCode, number> = {
   invalid_request: 400,
@@ -44,6 +45,7 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   invalid_code: 401,
   dob_required: 400,
   internal_error: 500,
+  attestation_invalid: 403,
 };
 
 export class ApiError extends Error {

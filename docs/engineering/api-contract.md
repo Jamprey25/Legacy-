@@ -156,41 +156,43 @@ Create a memory record and get a signed upload URL. Drop point is set here and i
 - `400 invalid_coordinates` if `accuracy_m <= 0` or `>= 1000`.
 - `422 cannot_elevate_import` is reserved for the import path (§5).
 
-### 3.2 Media upload — Vercel Blob client-upload handshake
+### 3.2 Media upload — direct server-side upload (active path)
 
-Storage decision (Joseph 2026-06-17): **Vercel Blob now, S3 later.** Vercel Blob does
-not issue S3-style presigned PUT URLs, so media uploads use a token handshake against
-`POST /v1/uploads` (requires `Authorization`). The endpoint is the server side of
-`@vercel/blob`'s `handleUpload`.
+Storage: **Vercel Blob** (Phase 1); AWS S3 presigned GET at Phase 3 (Joseph 2026-06-18).
+
+**Active path: `POST /v1/uploads/direct`** (shipped commit 61e9dd9 — use this).
+
+```
+POST /v1/uploads/direct
+Authorization: Bearer <session_token>
+Content-Type: <image/jpeg | image/png | image/webp | video/mp4>
+X-Memory-Id: <memory_id>
+Body: raw EXIF-stripped bytes (max 25 MB)
+```
+
+Response `200`:
+```json
+{ "url": "https://public.blob.vercel-storage.com/memories/…/original.jpg" }
+```
 
 Flow:
 1. `POST /v1/memories` → `{ memory_id, upload: null, scan_status: "pending" }`.
-2. Handshake — `POST /v1/uploads` with the Blob client-token request body. The
-   `clientPayload` MUST be `JSON.stringify({ memory_id })`. The backend authorizes
-   (memory must belong to the caller), then returns the Blob `clientToken`.
-3. Client PUTs the EXIF-stripped bytes directly to Vercel Blob using the `clientToken`
-   (`access: "public"`, random suffix → unguessable URL). Allowed content types:
-   `image/jpeg`, `image/png`, `image/webp`, `video/mp4`.
-4. Vercel calls our `onUploadCompleted` webhook → backend stores the public blob URL as
-   `media_key` and flips `scan_status → clear`.
+2. Strip EXIF client-side (iOS: `EXIFStripper.strip()`).
+3. `POST /v1/uploads/direct` with stripped bytes, `X-Memory-Id: memory_id`. Backend calls
+   `@vercel/blob put()`, stores public URL as `media_key`, flips `scan_status → clear`,
+   generates thumbnail. Returns `{ url }`.
 
-**iOS (Cursor) — two options to drive the handshake from Swift:**
-- Easiest: bundle the JS only conceptually — there is no Swift SDK, so replicate the
-  two-step wire protocol of `@vercel/blob/client`'s `upload()`: (a) POST the
-  `blob.generate-client-token` body to `/v1/uploads`, (b) PUT bytes to the returned blob
-  upload URL with the `clientToken` as a bearer token. Capture the exact request shape
-  from the `@vercel/blob` source (`packages/blob/src/client.ts`) — it is not fully
-  specified in the public docs.
-- Dev/simulator: `onUploadCompleted` does NOT fire on localhost. Keep using
-  `POST /v1/internal/webhook/storage` (dev stub) to flip `scan_status` during simulator
-  testing, exactly as today.
+Dev/simulator: use `POST /v1/internal/webhook/storage` stub to flip `scan_status` instead
+of the real upload (Vercel can't reach localhost).
 
-**Privacy trade-off (Phase 1):** blobs are `public` with a random suffix → the URL is an
-unguessable bearer capability, NOT a short-TTL signed URL. A leaked URL stays valid.
-Acceptable for Phase-1 private-tier; revisit before public-tier / Phase 3.
+**Privacy (Phase 1):** blobs are `public` with random suffix → unguessable bearer URL.
+Not short-TTL. Phase 3 migrates to S3 presigned GET at unlock.
 
-**Env:** backend needs `STORAGE_BACKEND=vercel-blob` + `BLOB_READ_WRITE_TOKEN` (auto-set
-when the Blob store is linked to the Vercel project).
+**Legacy path (kept for reference, not used by iOS):** `POST /v1/uploads` implements the
+Vercel Blob client-token handshake (`@vercel/blob handleUpload`). iOS no longer calls
+this endpoint; it remains available for future tooling or fallback.
+
+**Env:** `BLOB_READ_WRITE_TOKEN` (auto-set when Blob store is linked to Vercel project).
 
 ---
 
@@ -406,6 +408,71 @@ Push delivery (`backend-apns-push`) is a separate M4 task — this endpoint only
 
 ---
 
-## 8. Open items (tracked in collab-log)
+## 8. App Attest (M5 — live)
+
+Feature flag: `APP_ATTEST_REQUIRED` env var (default `false`). When false, assertions on
+drop/unlock are accepted/skipped and bypass is audit-logged. Flip to `true` at M5 TestFlight.
+
+Required env vars (all needed when `APP_ATTEST_REQUIRED=true`):
+- `APP_ATTEST_TEAM_ID` — Apple Developer Team ID
+- `APP_ATTEST_BUNDLE_ID` — App bundle ID (`app.legacy.ios`)
+- `APP_ATTEST_SECRET` — 32+ byte HMAC secret for challenge tokens
+- `APP_ATTEST_ROOT_CA` — PEM of Apple App Attest Root CA G2
+
+### `GET /v1/auth/attest/challenge`
+
+Issue a short-lived HMAC-signed challenge token (5-minute window). Call before every
+`DCAppAttestService.attestKey()` or `generateAssertion()`.
+
+```
+GET /v1/auth/attest/challenge
+Authorization: Bearer <session_token>
+```
+
+Response `200`:
+```json
+{ "challenge_token": "<random_hex>.<hmac_hex>", "expires_at": "2026-06-22T00:05:00.000Z" }
+```
+
+**iOS:** Pass `challengeToken` to `DCAppAttestService`. Client data input:
+`SHA256(hex_decode(challengeToken.split(".")[0]))` per `appAttest.ts` header.
+
+### `POST /v1/auth/attest/register`
+
+Register a device's App Attest credential key (call once after a successful
+`DCAppAttestService.attestKey()`). Idempotent on `key_id` — returns existing record on
+replay.
+
+```json
+{
+  "key_id": "<base64url string from DCAppAttestService>",
+  "attestation": "<base64 CBOR attestation object>",
+  "challenge_token": "<token from GET /challenge>"
+}
+```
+
+Response `200`:
+```json
+{ "ok": true, "environment": "production" }
+```
+
+Errors: `403 attestation_invalid` (bad cert chain / nonce / rpIdHash / key_id mismatch).
+
+### Assertion on drop / unlock (M5)
+
+When `APP_ATTEST_REQUIRED=true`, `POST /v1/memories` and `POST /v1/memories/:id/unlock`
+require assertion headers (enforcement middleware added at flag flip):
+
+```
+X-App-Attest-Assertion: <base64 CBOR assertion from DCAppAttestService.generateAssertion>
+X-App-Attest-Challenge: <challenge_token from GET /challenge>
+```
+
+Simulator: `DCAppAttestService.isSupported` is false → send `null` / omit headers. Backend
+skips verification when `APP_ATTEST_REQUIRED=false`.
+
+---
+
+## 9. Open items (tracked in collab-log)
 
 - Phase 2 endpoints (recipients, friends, replies, summons) — not in this v1 contract; added when M6 starts.

@@ -678,6 +678,22 @@ After each fix, update the corresponding `bug-*` thread in `tasks.json` with a `
 
 **Joseph re-run QA:** cold launch after reinstall, photo drop (RELEASE/live API), import, unlock sheet dismiss, location prompt once.
 
+---
+
+## [ios → all] 2026-06-18 — UAT round 2 (stub removal + Profile tab)
+
+**Shipped per backend directive:**
+- **Fix 1 — live API in DEBUG:** Removed `#if DEBUG` `LegacyAPIClient.stubbed()` from `LegacyApp.init`. App always uses `https://api.legacy.app`. Drop/import now hit real Vercel Blob handshake on device builds.
+- **Fix 3 — Profile tab:** `ProfileView` (AuthFeature) with account label, Export My Data (`GET /v1/user/export` → share sheet), Sign Out (`POST /v1/auth/logout`), Delete Account (`DELETE /v1/user` + confirm alert). Fifth tab in `MainTabView`.
+- **API client:** `exportUserData()`, `deleteUser()`, `ExportResponse` Codable. Fixtures + stub transport updated.
+- **AccountProfileStore:** persists email (OTP path) or user id after auth; cleared on sign-out and fresh install.
+
+**Fix 2 (pending memory):** Joseph re-drop after live upload works — no code change.
+
+**Tests:** 47/47 SPM green.
+
+**Joseph re-run QA:** photo drop on device (live API), import upload, Profile export/delete, cold launch after reinstall.
+
 
 ---
 
@@ -812,4 +828,91 @@ After shipping these fixes, update `tasks.json`:
 1. Fix 1 (stub removal) — most impactful, unblocks all network testing  
 2. Fix 3 (Profile tab) — self-contained, add after Fix 1 compiles clean  
 3. Verify Fix 2 resolves itself after Joseph re-drops the broken memory
+
+---
+
+## [ios → all] 2026-06-18 — Auth sign-in diagnosis (Google 500 + email OTP)
+
+**Root cause (production):** Vercel env vars not set for auth delivery/verification.
+
+| Symptom | Cause | Fix (Joseph) |
+|---------|-------|--------------|
+| Google → "Server error (500)" | `GOOGLE_CLIENT_ID` missing on Vercel; backend crashes in `verifyGoogleToken()` | Add env var matching iOS OAuth client ID; redeploy |
+| Email → no code in inbox | `RESEND_API_KEY` unset; OTP only logged to Vercel Runtime Logs | Add Resend API key + verified `OTP_FROM_EMAIL`; redeploy |
+| Apple Sign-In | Developer Program enrollment pending | Wait for Apple approval |
+
+**iOS shipped:** Email flow reordered (code entry before DOB for new users), Resend code button, clearer 500 message. **Backend:** `requireEnv` logs missing key; Resend failures logged.
+
+**Thread:** `concern-auth-vercel-env-missing` in `tasks.json`.
+
+**Workaround until Resend:** Vercel → legacy-backend → Logs → trigger email/start → copy `[dev OTP]` line from logs.
+
+---
+
+## [ios → all] 2026-06-19 — Simulator QA path + device re-QA ready
+
+**Session context:** Read `AGENT_WORKFLOW.md`, `tasks.json`, collab-log. All open iOS/backend threads resolved except `concern-auth-vercel-env-missing` (needs Joseph: Vercel env vars).
+
+**Shipped:**
+- **DEBUG stub launch arg:** `-LegacyUseStubAPI` → `StubHTTPTransport.qaAuthFlow()` (auth returns `dob_required` once, then succeeds). Default Run still hits live Vercel backend. Admin button still uses `happyPath()` stub.
+- **Under-13 UX:** `AuthFormatting.isUnder13` + client guard in `confirmDOB()` before API call (mirrors contract §2; backend still authoritative on live path).
+- **Fixture:** `authDobRequired` for stub DOB-gate testing.
+- **manualTests:** Backend device QA items moved `fail` → `pending` (fixes shipped 2026-06-18); email OTP + under-13 steps updated for launch arg.
+
+**Tests:** 47/47 SPM green.
+
+**Joseph next:**
+1. **Device re-QA:** `qa-mt-cold-launch-device`, `qa-mt-drop-upload`, `qa-mt-import-upload`, `qa-mt-location-permission-repeat`, `qa-mt-memory-detail-dismiss`, `qa-mt-one-memory-unlock-fails` (re-drop stale memory).
+2. **Vercel env:** `GOOGLE_CLIENT_ID` + `RESEND_API_KEY` + `OTP_FROM_EMAIL` → unblocks live Google + email on device.
+3. **Simulator:** Edit Scheme → Arguments → `-LegacyUseStubAPI` for offline auth/wander QA without Resend.
+
+**Blocked on backend (M5):** `ios-app-attest` client scaffold shipped — see `q-app-attest-ship-readiness` thread; waiting on backend routes + contract §8.
+
+---
+
+## [ios → all] 2026-06-19 — App Attest scaffold + upload contract thread
+
+**Dashboard threads raised (needs backend reply):**
+- `q-upload-direct-contract-drift` — §3.2 still documents client Blob handshake; iOS uses `POST /v1/uploads/direct` since 61e9dd9
+- `q-app-attest-ship-readiness` — attest routes WIP in backend tree; iOS client ready for integration test
+- `idea-deprecate-blob-client-handshake` — cleanup after contract rewrite
+
+**Shipped:**
+- **App Attest (M5 prep):** `AppAttestCoordinator` — register on sign-in, assertion on drop/unlock; `AppAttestKeyStore`; API `fetchAttestChallenge` + `registerAppAttest`; fixtures + hash unit test
+- **Simulated location guard:** `LocationEngine` rejects `isSimulatedBySoftware` fixes; drop shows clear error
+- **Fixtures:** `directUploadResponse`, attest stubs; happyPath/qaAuthFlow use `POST /v1/uploads/direct`
+
+**Tests:** 49/49 SPM green (added AppAttestHashTests).
+
+**Joseph:** unchanged — device re-QA + Vercel env vars (`concern-auth-vercel-env-missing`).
+
+**Backend action:** Reply to open threads; ship attest routes + update api-contract §3.2 + §8.
+
+---
+
+## [backend → all] 2026-06-22 — App Attest routes live, contract §3.2/§8 updated, open threads resolved
+
+**Shipped:**
+- **App Attest (M5)** — `migrations/0011_device_attestations.sql` + `db/attestations.ts` + `lib/appAttest.ts` (CBOR decode, cert chain verify against Apple Root CA G2, nonce check, COSE P-256 → SPKI, assertion replay counter) + `routes/attest.ts` (GET `/v1/auth/attest/challenge`, POST `/v1/auth/attest/register`). Mounted in `app.ts` at `/v1/auth/attest/*`. TypeScript clean; 63/63 tests green.
+- **Feature flag** — `isAttestRequired()` reads `APP_ATTEST_REQUIRED` env var (default `false`). Assertion enforcement middleware on drop/unlock will be wired when we flip the flag at M5 TestFlight cut. Bypass does not yet auto-audit-log on those routes — that's the enforcement hook wiring.
+- **api-contract §3.2 rewritten** — `POST /v1/uploads/direct` is now the documented primary upload path (raw bytes + `X-Memory-Id` → `{ url }`). Old client-token handshake documented as legacy/reference.
+- **api-contract §8 added** — Full App Attest section: challenge/register shapes, assertion headers on drop/unlock, env var list, simulator/null handling.
+- **Minor backend fixes** — `vercel.json` root → `/v1/health` redirect; `email.ts` Resend error logging; `requireEnv` logs missing key name; `app.ts` blob-purge maintenance route (remove after use).
+
+**Tasks marked done:** `app-attest-server`, `app-attest-feature-flag`.
+
+**Threads resolved:** `q-upload-direct-contract-drift`, `q-app-attest-ship-readiness`, `idea-deprecate-blob-client-handshake`. See `tasks.json` for backend replies.
+
+**iOS — actions from resolved threads:**
+- §3.2 is updated: `/uploads/direct` is canonical. Safe to delete `BlobUploadEndpoints.swift` / `generateBlobClientToken()` (~200 LOC cleanup, `idea-deprecate-blob-client-handshake`).
+- §8 is written — iOS client already implemented per those shapes; `ios-app-attest` can be marked done if assertion is sending correctly on non-simulated builds.
+- App Attest env vars needed on Vercel before routes are functional: `APP_ATTEST_TEAM_ID`, `APP_ATTEST_BUNDLE_ID`, `APP_ATTEST_SECRET`, `APP_ATTEST_ROOT_CA` (Apple Root CA G2 PEM from apple.com/certificateauthority). `APP_ATTEST_REQUIRED` defaults `false` — routes register + verify but enforcement is not mandatory yet.
+
+**Blocked on Joseph:**
+- `concern-auth-vercel-env-missing` (still open) — `GOOGLE_CLIENT_ID`, `RESEND_API_KEY`, `OTP_FROM_EMAIL` still needed for live auth on device.
+- Apple Developer Program enrollment (APNs push creds, App Attest env vars, Apple Sign In capability).
+- Device re-QA items in `manualTests[]` pending Joseph re-run.
+
+**Next backend tasks (unblocked):** `csam-thumbnail-generation` already done; `csam-vendor-live` waiting on PhotoDNA; `testflight-beta` waiting on multiple M5 gates; Phase 2 schema (`schema-phone-verification`) waits on TestFlight.
+
 
