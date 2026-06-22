@@ -90,7 +90,7 @@ authRoutes.post("/email/start", async (c) => {
   try {
     const emailKey = `otp:email:${body.email.toLowerCase()}`;
     const count = await incrementAndCount(emailKey, otpWindowStart());
-    if (count > 3) return c.body(null, 204); // silent — no 429 on this path
+    if (count > 5) return c.body(null, 204); // silent — no 429 on this path
   } catch {
     // fail-open
   }

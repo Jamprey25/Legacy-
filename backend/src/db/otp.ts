@@ -5,7 +5,7 @@ import { createHash, randomInt } from "node:crypto";
 import { sql } from "./client.js";
 import { ApiError } from "../lib/errors.js";
 
-const TTL_MINUTES = 10;
+const TTL_MINUTES = 30;
 const MAX_ATTEMPTS = 5;
 
 function hashCode(code: string): string {

@@ -18,7 +18,7 @@ export async function sendOtpEmail(email: string, code: string): Promise<void> {
       from,
       to: email,
       subject: "Your Legacy code",
-      text: `Your Legacy verification code is ${code}. It expires in 10 minutes.`,
+      text: `Your Legacy verification code is ${code}. It expires in 30 minutes.`,
     }),
   });
   if (!res.ok) {

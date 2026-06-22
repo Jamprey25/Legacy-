@@ -200,7 +200,7 @@ public final class AuthCoordinator {
             )
             try await finishAuth(response)
         } catch LegacyAPIError.unauthorized {
-            errorMessage = "That code is invalid or expired. Request a new one."
+            errorMessage = "That code is incorrect or has expired. Tap 'Resend code' to get a new one."
         } catch let LegacyAPIError.invalidRequest(code, _) where code == "dob_required" {
             route = .dobGate(pending: .email)
         } catch let LegacyAPIError.forbidden(code, _) where code == "age_restricted" {

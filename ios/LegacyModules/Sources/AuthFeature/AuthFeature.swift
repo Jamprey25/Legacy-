@@ -206,7 +206,7 @@ private struct EmailOTPView: View {
                 .font(LegacyFont.title2)
                 .foregroundStyle(LegacyColor.textPrimary)
 
-            Text("We sent a 6-digit code to \(coordinator.email)")
+            Text("We sent a 6-digit code to \(coordinator.email). It's valid for 30 minutes.")
                 .font(LegacyFont.callout)
                 .foregroundStyle(LegacyColor.textSecondary)
                 .multilineTextAlignment(.center)
