@@ -387,7 +387,11 @@ private struct MainTabView: View {
 
     @ViewBuilder
     private var laneTab: some View {
-        MemoryLaneFeatureRootView(coordinator: memoryLaneCoordinator)
+        MemoryLaneFeatureRootView(
+            coordinator: memoryLaneCoordinator,
+            onStartDropping: { selectedTab = .drop },
+            onStartImporting: { selectedTab = .importTab }
+        )
         .tabItem { Label("Lane", systemImage: "photo.on.rectangle.angled") }
         .tag(MainTab.lane)
     }

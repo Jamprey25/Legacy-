@@ -168,11 +168,19 @@ public final class MemoryLaneCoordinator {
 }
 
 public struct MemoryLaneFeatureRootView: View {
-    public init(coordinator: MemoryLaneCoordinator) {
+    public init(
+        coordinator: MemoryLaneCoordinator,
+        onStartDropping: (() -> Void)? = nil,
+        onStartImporting: (() -> Void)? = nil
+    ) {
         self.coordinator = coordinator
+        self.onStartDropping = onStartDropping
+        self.onStartImporting = onStartImporting
     }
 
     @Bindable private var coordinator: MemoryLaneCoordinator
+    private let onStartDropping: (() -> Void)?
+    private let onStartImporting: (() -> Void)?
 
     private let columns = [
         GridItem(.flexible(), spacing: LegacySpacing.md),
@@ -186,11 +194,7 @@ public struct MemoryLaneFeatureRootView: View {
                     ProgressView()
                         .tint(LegacyColor.accent)
                 } else if coordinator.items.isEmpty {
-                    ContentUnavailableView(
-                        "Memory Lane",
-                        systemImage: "photo.on.rectangle.angled",
-                        description: Text(emptyDescription)
-                    )
+                    emptyState
                 } else {
                     ScrollView {
                         #if os(iOS)
@@ -255,13 +259,48 @@ public struct MemoryLaneFeatureRootView: View {
         }
     }
 
+    @ViewBuilder
+    private var emptyState: some View {
+        if coordinator.mediaTypeFilter != .all {
+            // Filtered to empty — guide the user back rather than to creation flows.
+            ContentUnavailableView {
+                Label("No matches", systemImage: "line.3.horizontal.decrease.circle")
+            } description: {
+                Text(emptyDescription)
+            } actions: {
+                Button("Clear filter") {
+                    Task { await coordinator.setMediaTypeFilter(.all) }
+                }
+                .buttonStyle(.legacyPrimary)
+            }
+        } else {
+            ContentUnavailableView {
+                Label("No memories yet", systemImage: "photo.on.rectangle.angled")
+            } description: {
+                Text(emptyDescription)
+            } actions: {
+                #if os(iOS)
+                VStack(spacing: LegacySpacing.sm) {
+                    if let onStartDropping {
+                        Button("Drop your first memory", action: onStartDropping)
+                            .buttonStyle(.legacyPrimary)
+                    }
+                    if let onStartImporting {
+                        Button("Import from Photos", action: onStartImporting)
+                            .buttonStyle(.legacySecondary)
+                    }
+                }
+                .padding(.horizontal, LegacySpacing.xxl)
+                #endif
+            }
+        }
+    }
+
     private var emptyDescription: String {
         if coordinator.mediaTypeFilter != .all {
             return "No \(coordinator.mediaTypeFilter.label.lowercased()) match this filter."
         }
-        return coordinator.sort == .newest
-            ? "Memories you drop will appear here, newest first."
-            : "Memories you drop will appear here, oldest first."
+        return "Drop a photo or note at a place that matters — it'll appear here and unlock when you return."
     }
 }
 
