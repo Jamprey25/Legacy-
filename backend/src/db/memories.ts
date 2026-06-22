@@ -224,3 +224,33 @@ export async function findNearbyMemories(
   `;
   return rows as unknown as NearbyMemory[];
 }
+
+export interface CoarseZoneCount {
+  geohash_prefix: string; // precision-7 cell (~150m) — no coordinates ever returned
+  count: number;
+}
+
+/**
+ * Count others' eligible memories by precision-7 geohash prefix within the coarse zone.
+ * Returns cell prefixes + counts only — never coordinates or identity (DEC-15).
+ * Phase 1: privacy_tier = 'private', so this will return 0 rows until Phase 2 social.
+ * Kept now so iOS can wire the rendering; will light up naturally when social ships.
+ */
+export async function countNearbyZones(
+  coarseHash: string,
+  neighbourHashes: string[],
+  requestingUserId: string,
+): Promise<CoarseZoneCount[]> {
+  const zoneHashes = [coarseHash, ...neighbourHashes];
+  const rows = await sql`
+    SELECT left(geohash, 7) AS geohash_prefix,
+           count(*)::int    AS count
+    FROM memories
+    WHERE owner_id != ${requestingUserId}
+      AND scan_status = 'clear'
+      AND discoverable_after <= now()
+      AND left(geohash, 5) = ANY(${zoneHashes})
+    GROUP BY left(geohash, 7)
+  `;
+  return rows as unknown as CoarseZoneCount[];
+}

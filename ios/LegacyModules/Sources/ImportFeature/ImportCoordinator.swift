@@ -1,6 +1,7 @@
 import APIClient
 import DropFeature
 import Foundation
+import LocationEngine
 
 public enum ImportPhase: Sendable, Equatable {
     case idle
@@ -35,6 +36,13 @@ public final class ImportCoordinator {
     public private(set) var clusters: [PhotoCluster] = []
     public private(set) var geoSampleCount = 0
     public var selectedClusterIDs: Set<String> = []
+
+    public private(set) var pendingCelebrationPins: [CachedOwnPin] = []
+
+    public func consumeCelebrationPins() -> [CachedOwnPin] {
+        defer { pendingCelebrationPins = [] }
+        return pendingCelebrationPins
+    }
 
     public var selectedClusters: [PhotoCluster] {
         clusters.filter { selectedClusterIDs.contains($0.id) }
@@ -80,6 +88,7 @@ public final class ImportCoordinator {
         guard !chosen.isEmpty, !isImporting else { return }
 
         phase = .importing(current: 0, total: chosen.count)
+        pendingCelebrationPins = []
 
         do {
             let request = ImportMemoriesRequest(
@@ -114,6 +123,16 @@ public final class ImportCoordinator {
                     contentType: "image/jpeg",
                     signedPutURL: item.upload?.signedPutURL
                 )
+                let pin = CachedOwnPin(
+                    memoryID: item.memoryID,
+                    lat: cluster.centroidLat,
+                    lng: cluster.centroidLng,
+                    dropDate: Self.capturedAtISO(for: cluster, samples: geoSamples).prefix(10).description,
+                    thumbnailURL: nil,
+                    cachedAt: Date()
+                )
+                OwnMemoryPinCache.save(pin)
+                pendingCelebrationPins.append(pin)
                 uploaded += 1
                 #else
                 uploaded += 1

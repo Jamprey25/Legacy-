@@ -6,7 +6,7 @@ import { ApiError } from "../lib/errors.js";
 import { encode as geohashEncode, neighbours } from "../lib/geohash.js";
 import { ownMemoryProximity, othersMemoryProximity } from "../lib/proximity.js";
 import { generateSignedGetUrl } from "../lib/storage.js";
-import { findNearbyMemories } from "../db/memories.js";
+import { findNearbyMemories, countNearbyZones } from "../db/memories.js";
 import { validateLocationInput } from "../lib/locationInput.js";
 import { audit } from "../lib/audit.js";
 import { upsertPresencePing, debouncedWarmth, type WarmthBand } from "../db/presencePings.js";
@@ -41,9 +41,12 @@ discoveryRoutes.post("/scan", async (c) => {
   // Coarse zone = precision-5 prefix (~4.9km cell). Query this cell + 8 neighbours.
   const coarseHash = geohashEncode(lat, lng, 5);
   const neighbourHashes = neighbours(coarseHash);
-  const nearby = await findNearbyMemories(coarseHash, neighbourHashes, userId);
+  const [nearby, zones] = await Promise.all([
+    findNearbyMemories(coarseHash, neighbourHashes, userId),
+    countNearbyZones(coarseHash, neighbourHashes, userId),
+  ]);
 
-  if (nearby.length === 0) {
+  if (nearby.length === 0 && zones.length === 0) {
     return new Response(null, { status: 204 });
   }
 
@@ -74,6 +77,12 @@ discoveryRoutes.post("/scan", async (c) => {
         thumbnailUrl = signed.signedGetUrl;
       }
 
+      // Pin reveal: expose coordinates only when user is within 100m reveal radius.
+      // For own memories: always revealed (they placed it). For others: only at reveal radius.
+      // This is the only place lat/lng ever leave the server for a non-owner (DEC-15 gate).
+      const PIN_REVEAL_RADIUS_M = 100;
+      const pinRevealed = isOwn || prox.distanceM <= PIN_REVEAL_RADIUS_M;
+
       return {
         memory_id: mem.id,
         thumbnail_url: thumbnailUrl,
@@ -83,6 +92,9 @@ discoveryRoutes.post("/scan", async (c) => {
         in_range: prox.inBubble,
         warmth: emittedWarmth,
         scan_status: mem.scan_status,
+        pin_revealed: pinRevealed,
+        // Coordinates only when revealed — omitted entirely otherwise (never null).
+        ...(pinRevealed ? { lat: mem.lat, lng: mem.lng } : {}),
       };
     }),
   );
@@ -92,7 +104,7 @@ discoveryRoutes.post("/scan", async (c) => {
   // Audit: count only — never coordinates (DEC-17 / privacy gate).
   audit(c, "scan", { teaser_count: filteredTeasers.length });
 
-  if (filteredTeasers.length === 0) {
+  if (filteredTeasers.length === 0 && zones.length === 0) {
     return new Response(null, { status: 204 });
   }
 
@@ -111,5 +123,10 @@ discoveryRoutes.post("/scan", async (c) => {
     }).catch(() => {});
   }
 
-  return c.json({ teasers: filteredTeasers });
+  return c.json({
+    teasers: filteredTeasers,
+    // Precision-7 cell prefixes (~150m) with counts of others' eligible memories.
+    // Never contains coordinates or identity — only geohash prefix + count (DEC-15).
+    zones: zones.map((z) => ({ geohash_prefix: z.geohash_prefix, count: z.count })),
+  });
 });

@@ -7,10 +7,12 @@ import Foundation
 public enum BackgroundRegionScanService {
     public struct Result: Sendable {
         public let teasers: [Teaser]
+        public let zones: [CoarseZone]
         public let hasInRangeMemory: Bool
 
-        public init(teasers: [Teaser], hasInRangeMemory: Bool) {
+        public init(teasers: [Teaser], zones: [CoarseZone] = [], hasInRangeMemory: Bool) {
             self.teasers = teasers
+            self.zones = zones
             self.hasInRangeMemory = hasInRangeMemory
         }
     }
@@ -29,10 +31,10 @@ public enum BackgroundRegionScanService {
             if let response = try await apiClient.scan(body) {
                 let inRange = response.teasers.contains { $0.inRange }
                 locationEngine.recordScan(at: CLLocation(latitude: fix.lat, longitude: fix.lng))
-                return Result(teasers: response.teasers, hasInRangeMemory: inRange)
+                return Result(teasers: response.teasers, zones: response.zones, hasInRangeMemory: inRange)
             }
 
-            return Result(teasers: [], hasInRangeMemory: false)
+            return Result(teasers: [], zones: [], hasInRangeMemory: false)
         } catch {
             return nil
         }

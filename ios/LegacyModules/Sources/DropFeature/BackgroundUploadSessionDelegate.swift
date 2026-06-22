@@ -1,7 +1,7 @@
 #if os(iOS)
 import Foundation
 
-/// Receives background URLSession completion callbacks for resumable uploads.
+/// Receives background URLSession lifecycle callbacks (reserved for future S3 resumable PUT).
 public final class BackgroundUploadSessionDelegate: NSObject, URLSessionDelegate, @unchecked Sendable {
     public static let shared = BackgroundUploadSessionDelegate()
 

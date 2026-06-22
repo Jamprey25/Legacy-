@@ -1,5 +1,6 @@
 import DesignSystem
 import SwiftUI
+import AuthenticationServices
 
 #if os(iOS)
 
@@ -60,10 +61,42 @@ private struct AuthWelcomeView: View {
             }
 
             VStack(spacing: LegacySpacing.md) {
+                SignInWithAppleButton(.signIn) { request in
+                    request.requestedScopes = [.fullName, .email]
+                } onCompletion: { result in
+                    coordinator.handleAppleAuthorization(result)
+                }
+                .signInWithAppleButtonStyle(.white)
+                .frame(height: 50)
+                .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.md, style: .continuous))
+
+                if coordinator.isGoogleSignInAvailable {
+                    Button("Continue with Google") {
+                        Task { await coordinator.beginGoogleSignIn() }
+                    }
+                    .buttonStyle(.legacySecondary)
+                } else {
+                    VStack(spacing: LegacySpacing.xs) {
+                        Button("Continue with Google") {}
+                            .buttonStyle(.legacySecondary)
+                            .disabled(true)
+                        Text("Coming soon")
+                            .font(LegacyFont.caption)
+                            .foregroundStyle(LegacyColor.textSecondary)
+                    }
+                }
+
                 Button("Continue with Email") {
                     coordinator.beginEmailSignIn()
                 }
                 .buttonStyle(.legacyPrimary)
+
+                #if DEBUG
+                Button("Admin") {
+                    coordinator.signInAsAdmin()
+                }
+                .buttonStyle(.legacySecondary)
+                #endif
             }
             .padding(.horizontal, LegacySpacing.xl)
 
@@ -186,6 +219,13 @@ private struct EmailOTPView: View {
             .buttonStyle(.legacyPrimary)
             .padding(.horizontal, LegacySpacing.xl)
             .disabled(coordinator.isLoading || coordinator.otpCode.count < 6)
+
+            Button("Resend code") {
+                Task { await coordinator.resendEmailCode() }
+            }
+            .font(LegacyFont.callout)
+            .foregroundStyle(LegacyColor.textSecondary)
+            .disabled(coordinator.isLoading)
 
             Button("Back") { coordinator.backToWelcome() }
                 .font(LegacyFont.callout)

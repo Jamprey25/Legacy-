@@ -10,11 +10,36 @@ import DesignSystem
 import APIClient
 import LocationEngine
 import SwiftData
+import LegacyAPIStubs
 
 @MainActor
 @Observable
 final class AppModel {
     var isAuthenticated = false
+    private(set) var apiClient: LegacyAPIClient
+
+    init(appVersion: String, deviceID: String) {
+        apiClient = Self.makeAPIClient(appVersion: appVersion, deviceID: deviceID)
+    }
+
+    static func makeAPIClient(appVersion: String, deviceID: String) -> LegacyAPIClient {
+        #if DEBUG
+        if AccountProfileStore.isDevAdmin || Self.usesStubAPI {
+            let transport: StubHTTPTransport = AccountProfileStore.isDevAdmin ? .happyPath() : .qaAuthFlow()
+            return LegacyAPIClient.stubbed(
+                transport: transport,
+                token: (try? KeychainSessionStore.read()) ?? "stub-token"
+            )
+        }
+        #endif
+        return LegacyAPIClient(
+            configuration: LegacyAPIConfiguration(
+                baseURL: URL(string: "https://legacy-backend-jamprey25s-projects.vercel.app")!,
+                appVersion: appVersion,
+                deviceID: deviceID
+            )
+        )
+    }
 
     func refreshSession() {
         isAuthenticated = (try? KeychainSessionStore.read()) != nil
@@ -23,17 +48,50 @@ final class AppModel {
     func signOut() {
         try? KeychainSessionStore.delete()
         AccountProfileStore.clear()
+        #if os(iOS)
+        AppAttestKeyStore.clear()
+        #endif
+        #if DEBUG
+        apiClient = Self.makeAPIClient(
+            appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0",
+            deviceID: UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+        )
+        #endif
         isAuthenticated = false
     }
+
+    #if DEBUG
+    /// Xcode: Edit Scheme → Run → Arguments → add `-LegacyUseStubAPI` for offline QA (email OTP, drop, wander).
+    private static var usesStubAPI: Bool {
+        ProcessInfo.processInfo.arguments.contains("-LegacyUseStubAPI")
+    }
+
+    func signInAsDevAdmin() {
+        try? KeychainSessionStore.save(token: "stub-token")
+        AccountProfileStore.saveDevAdmin()
+        apiClient = LegacyAPIClient.stubbed(token: "stub-token")
+        isAuthenticated = true
+    }
+
+    func makeMediaUploader() -> MemoryMediaUploader {
+        if AccountProfileStore.isDevAdmin {
+            return .devBypass(apiClient: apiClient)
+        }
+        return MemoryMediaUploader(apiClient: apiClient)
+    }
+    #else
+    func makeMediaUploader() -> MemoryMediaUploader {
+        MemoryMediaUploader(apiClient: apiClient)
+    }
+    #endif
 }
 
 @main
 struct LegacyApp: App {
     @UIApplicationDelegateAdaptor(LegacyAppDelegate.self) private var appDelegate
 
-    private let apiClient: LegacyAPIClient
     private let locationEngine = LocationEngine()
-    @State private var appModel = AppModel()
+    @State private var appModel: AppModel
 
     private static var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
@@ -56,27 +114,31 @@ struct LegacyApp: App {
     init() {
         if UserDefaults.standard.object(forKey: "legacyHasLaunched") == nil {
             AccountProfileStore.clear()
+            #if os(iOS)
+            AppAttestKeyStore.clear()
+            #endif
         }
         KeychainSessionStore.clearIfFreshInstall()
-        apiClient = LegacyAPIClient(
-            configuration: LegacyAPIConfiguration(
-                baseURL: URL(string: "https://legacy-backend-jamprey25s-projects.vercel.app")!,
-                appVersion: Self.appVersion,
-                deviceID: Self.deviceID
-            )
-        )
+        _appModel = State(initialValue: AppModel(appVersion: Self.appVersion, deviceID: Self.deviceID))
     }
 
     var body: some Scene {
         WindowGroup {
             RootView(
                 appModel: appModel,
-                apiClient: apiClient,
                 locationEngine: locationEngine,
                 deviceID: Self.deviceID,
                 googleClientID: Self.googleClientID
             )
-            .onAppear { appModel.refreshSession() }
+            .onAppear {
+                appModel.refreshSession()
+                #if os(iOS)
+                AppAttestCoordinator.shared.configure(apiClient: appModel.apiClient)
+                if appModel.isAuthenticated {
+                    Task { await AppAttestCoordinator.shared.ensureRegistered() }
+                }
+                #endif
+            }
         }
         .modelContainer(for: DropDraft.self)
     }
@@ -84,7 +146,6 @@ struct LegacyApp: App {
 
 private struct RootView: View {
     @Bindable var appModel: AppModel
-    let apiClient: LegacyAPIClient
     let locationEngine: LocationEngine
     let deviceID: String
     let googleClientID: String?
@@ -94,18 +155,35 @@ private struct RootView: View {
         if appModel.isAuthenticated {
             MainTabView(
                 appModel: appModel,
-                apiClient: apiClient,
                 locationEngine: locationEngine
             )
         } else {
+            #if DEBUG
             AuthFeatureRootView(
                 coordinator: AuthCoordinator(
-                    apiClient: apiClient,
+                    apiClient: appModel.apiClient,
                     deviceID: deviceID,
                     googleClientID: googleClientID,
-                    onAuthenticated: { appModel.refreshSession() }
+                    onAuthenticated: {
+                        appModel.refreshSession()
+                        Task { await AppAttestCoordinator.shared.ensureRegistered() }
+                    },
+                    onDevAdminSignIn: { appModel.signInAsDevAdmin() }
                 )
             )
+            #else
+            AuthFeatureRootView(
+                coordinator: AuthCoordinator(
+                    apiClient: appModel.apiClient,
+                    deviceID: deviceID,
+                    googleClientID: googleClientID,
+                    onAuthenticated: {
+                        appModel.refreshSession()
+                        Task { await AppAttestCoordinator.shared.ensureRegistered() }
+                    }
+                )
+            )
+            #endif
         }
     }
 }
@@ -116,23 +194,33 @@ private enum MainTab: Hashable {
 
 private struct MainTabView: View {
     @Bindable var appModel: AppModel
-    let apiClient: LegacyAPIClient
     let locationEngine: LocationEngine
 
     @Environment(\.modelContext) private var modelContext
     @State private var backgroundLocation = BackgroundLocationCoordinator()
     @State private var wanderCoordinator: WanderCoordinator
+    @State private var dropCoordinator: DropCoordinator
+    @State private var importCoordinator: ImportCoordinator
+    @State private var pinCelebration = PinDropCelebrationCoordinator()
     @State private var showBackgroundDiscoveryPrompt = false
     @State private var selectedTab: MainTab = .wander
 
-    init(appModel: AppModel, apiClient: LegacyAPIClient, locationEngine: LocationEngine) {
+    init(appModel: AppModel, locationEngine: LocationEngine) {
         self.appModel = appModel
-        self.apiClient = apiClient
         self.locationEngine = locationEngine
         _wanderCoordinator = State(initialValue: WanderCoordinator(
-            apiClient: apiClient,
+            apiClient: appModel.apiClient,
             locationEngine: locationEngine,
             networkMonitor: NetworkMonitor.shared
+        ))
+        _dropCoordinator = State(initialValue: DropCoordinator(
+            apiClient: appModel.apiClient,
+            locationEngine: locationEngine,
+            mediaUploader: appModel.makeMediaUploader()
+        ))
+        _importCoordinator = State(initialValue: ImportCoordinator(
+            apiClient: appModel.apiClient,
+            mediaUploader: appModel.makeMediaUploader()
         ))
     }
 
@@ -158,7 +246,7 @@ private struct MainTabView: View {
                     backgroundLocation.requestAlwaysAuthorization()
                     Task {
                         _ = await APNsRegistrationService.requestAuthorizationAndRegister()
-                        await APNsRegistrationService.uploadTokenIfNeeded(apiClient: apiClient)
+                        await APNsRegistrationService.uploadTokenIfNeeded(apiClient: appModel.apiClient)
                     }
                     showBackgroundDiscoveryPrompt = false
                 },
@@ -175,26 +263,40 @@ private struct MainTabView: View {
             }
         }
         .onChange(of: APNsTokenStore.tokenHex) { _, _ in
-            Task { await APNsRegistrationService.uploadTokenIfNeeded(apiClient: apiClient) }
+            Task { await APNsRegistrationService.uploadTokenIfNeeded(apiClient: appModel.apiClient) }
         }
         .onReceive(NotificationCenter.default.publisher(for: ProximityPushNotifications.received)) { notification in
             let openWander = notification.userInfo?["openWander"] as? Bool ?? false
             handleProximityPush(openWander: openWander)
         }
+        .onChange(of: dropCoordinator.state) { _, newState in
+            if case .succeeded = newState, let pin = dropCoordinator.consumeCelebrationPin() {
+                celebratePins([pin])
+            }
+        }
+        .onChange(of: importCoordinator.phase) { _, phase in
+            if case .completed = phase {
+                let pins = importCoordinator.consumeCelebrationPins()
+                if !pins.isEmpty { celebratePins(pins) }
+            }
+        }
         .task {
             NetworkMonitor.shared.start()
-            await DropDraftRecovery.retryPendingDrafts(context: modelContext, apiClient: apiClient)
+            await DropDraftRecovery.retryPendingDrafts(
+                context: modelContext,
+                mediaUploader: appModel.makeMediaUploader()
+            )
             backgroundLocation.onRegionEntered = { regionID in
                 if let result = await BackgroundRegionScanService.scanOnRegionEntry(
                     regionIdentifier: regionID,
-                    apiClient: apiClient,
+                    apiClient: appModel.apiClient,
                     locationEngine: locationEngine
                 ) {
                     wanderCoordinator.ingestBackgroundScan(result)
                 }
             }
             await backgroundLocation.startIfAuthorized()
-            await APNsRegistrationService.uploadTokenIfNeeded(apiClient: apiClient)
+            await APNsRegistrationService.uploadTokenIfNeeded(apiClient: appModel.apiClient)
             let pending = ProximityPushNotifications.consumePending()
             if pending.refresh {
                 if pending.openWander { selectedTab = .wander }
@@ -206,6 +308,14 @@ private struct MainTabView: View {
         }
     }
 
+    private func celebratePins(_ pins: [CachedOwnPin]) {
+        selectedTab = .wander
+        Task {
+            await pinCelebration.celebrate(pins: pins, wander: wanderCoordinator)
+            await wanderCoordinator.scanIfNeeded(force: true)
+        }
+    }
+
     private func handleProximityPush(openWander: Bool) {
         if openWander { selectedTab = .wander }
         Task { await wanderCoordinator.scanIfNeeded(force: true) }
@@ -213,28 +323,24 @@ private struct MainTabView: View {
 
     @ViewBuilder
     private var wanderTab: some View {
-        WanderFeatureRootView(coordinator: wanderCoordinator)
+        WanderFeatureRootView(
+            coordinator: wanderCoordinator,
+            pinCelebration: pinCelebration
+        )
             .tabItem { Label("Wander", systemImage: "map") }
             .tag(MainTab.wander)
     }
 
     @ViewBuilder
     private var dropTab: some View {
-        DropFeatureRootView(
-            coordinator: DropCoordinator(
-                apiClient: apiClient,
-                locationEngine: locationEngine
-            )
-        )
+        DropFeatureRootView(coordinator: dropCoordinator)
         .tabItem { Label("Drop", systemImage: "mappin.and.ellipse") }
         .tag(MainTab.drop)
     }
 
     @ViewBuilder
     private var importTab: some View {
-        ImportFeatureRootView(
-            coordinator: ImportCoordinator(apiClient: apiClient)
-        )
+        ImportFeatureRootView(coordinator: importCoordinator)
         .tabItem { Label("Import", systemImage: "square.stack.3d.up") }
         .tag(MainTab.importTab)
     }
@@ -243,7 +349,7 @@ private struct MainTabView: View {
     private var laneTab: some View {
         MemoryLaneFeatureRootView(
             coordinator: MemoryLaneCoordinator(
-                apiClient: apiClient,
+                apiClient: appModel.apiClient,
                 locationEngine: locationEngine
             )
         )
@@ -254,7 +360,7 @@ private struct MainTabView: View {
     @ViewBuilder
     private var profileTab: some View {
         ProfileView(
-            apiClient: apiClient,
+            apiClient: appModel.apiClient,
             onSignOut: { appModel.signOut() }
         )
         .tabItem { Label("Profile", systemImage: "person.circle") }

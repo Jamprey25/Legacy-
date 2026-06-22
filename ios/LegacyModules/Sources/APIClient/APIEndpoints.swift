@@ -236,7 +236,7 @@ public struct MemoryLaneItem: Decodable, Sendable, Equatable, Identifiable, Hash
     public let createdAt: String
     public let mediaType: String
     public let scanStatus: String
-    public let thumbnailKey: String?
+    public let thumbnailURL: String?
     public let privacyTier: String
     public let dropMethod: String
 
@@ -246,7 +246,7 @@ public struct MemoryLaneItem: Decodable, Sendable, Equatable, Identifiable, Hash
         case createdAt = "created_at"
         case mediaType = "media_type"
         case scanStatus = "scan_status"
-        case thumbnailKey = "thumbnail_key"
+        case thumbnailURL = "thumbnail_url"
         case privacyTier = "privacy_tier"
         case dropMethod = "drop_method"
     }
@@ -273,8 +273,8 @@ public struct MemoryDetail: Decodable, Sendable, Equatable {
     public let privacyTier: String
     public let scanStatus: String
     public let mediaType: String
-    public let mediaKey: String?
-    public let thumbnailKey: String?
+    public let mediaURL: String?
+    public let thumbnailURL: String?
     public let discoverableAfter: String
     public let createdAt: String
 
@@ -285,8 +285,8 @@ public struct MemoryDetail: Decodable, Sendable, Equatable {
         case privacyTier = "privacy_tier"
         case scanStatus = "scan_status"
         case mediaType = "media_type"
-        case mediaKey = "media_key"
-        case thumbnailKey = "thumbnail_key"
+        case mediaURL = "media_url"
+        case thumbnailURL = "thumbnail_url"
         case discoverableAfter = "discoverable_after"
         case createdAt = "created_at"
     }
@@ -324,6 +324,10 @@ public struct Teaser: Decodable, Sendable, Equatable {
     /// Non-directional warmth — the only proximity signal (DEC-15). No bearing field exists.
     public let warmth: String
     public let scanStatus: String
+    /// True when user is within reveal radius (~100m). Coordinates only present when true (others' memories).
+    public let pinRevealed: Bool
+    public let lat: Double?
+    public let lng: Double?
 
     enum CodingKeys: String, CodingKey {
         case memoryID = "memory_id"
@@ -334,6 +338,8 @@ public struct Teaser: Decodable, Sendable, Equatable {
         case inRange = "in_range"
         case warmth
         case scanStatus = "scan_status"
+        case pinRevealed = "pin_revealed"
+        case lat, lng
     }
 
     public init(
@@ -344,7 +350,10 @@ public struct Teaser: Decodable, Sendable, Equatable {
         isOwn: Bool,
         inRange: Bool,
         warmth: String,
-        scanStatus: String
+        scanStatus: String,
+        pinRevealed: Bool = false,
+        lat: Double? = nil,
+        lng: Double? = nil
     ) {
         self.memoryID = memoryID
         self.thumbnailURL = thumbnailURL
@@ -354,11 +363,58 @@ public struct Teaser: Decodable, Sendable, Equatable {
         self.inRange = inRange
         self.warmth = warmth
         self.scanStatus = scanStatus
+        self.pinRevealed = pinRevealed
+        self.lat = lat
+        self.lng = lng
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        memoryID = try container.decode(String.self, forKey: .memoryID)
+        thumbnailURL = try container.decodeIfPresent(String.self, forKey: .thumbnailURL)
+        dropDate = try container.decode(String.self, forKey: .dropDate)
+        ownerDisplay = try container.decode(String.self, forKey: .ownerDisplay)
+        isOwn = try container.decode(Bool.self, forKey: .isOwn)
+        inRange = try container.decode(Bool.self, forKey: .inRange)
+        warmth = try container.decode(String.self, forKey: .warmth)
+        scanStatus = try container.decode(String.self, forKey: .scanStatus)
+        pinRevealed = try container.decodeIfPresent(Bool.self, forKey: .pinRevealed) ?? false
+        lat = try container.decodeIfPresent(Double.self, forKey: .lat)
+        lng = try container.decodeIfPresent(Double.self, forKey: .lng)
+    }
+}
+
+/// A precision-7 geohash cell (~150m) containing one or more others' memories.
+/// No coordinates — only the cell prefix and count (DEC-15).
+public struct CoarseZone: Decodable, Sendable, Equatable {
+    public let geohashPrefix: String
+    public let count: Int
+
+    public init(geohashPrefix: String, count: Int) {
+        self.geohashPrefix = geohashPrefix
+        self.count = count
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case geohashPrefix = "geohash_prefix"
+        case count
     }
 }
 
 public struct ScanResponse: Decodable, Sendable, Equatable {
     public let teasers: [Teaser]
+    /// Coarse zone cells for others' memories — render as glow overlays, never as pins.
+    public let zones: [CoarseZone]
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        teasers = try container.decode([Teaser].self, forKey: .teasers)
+        zones = try container.decodeIfPresent([CoarseZone].self, forKey: .zones) ?? []
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case teasers, zones
+    }
 }
 
 public struct UnlockedMedia: Decodable, Sendable, Equatable {
@@ -391,6 +447,49 @@ public struct UnlockResponse: Decodable, Sendable, Equatable {
     }
 }
 
+// MARK: - Account (§7)
+
+public struct ExportResponse: Decodable, Sendable, Equatable {
+    public let archiveURL: String
+    public let memoryCount: Int
+    public let exportedAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case archiveURL = "archive_url"
+        case memoryCount = "memory_count"
+        case exportedAt = "exported_at"
+    }
+}
+
+// MARK: - App Attest (§8 / M5)
+
+public struct AttestChallengeResponse: Decodable, Sendable {
+    public let challengeToken: String
+    public let expiresAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case challengeToken = "challenge_token"
+        case expiresAt = "expires_at"
+    }
+}
+
+struct AttestRegisterRequest: Encodable, Sendable {
+    let keyId: String
+    let attestation: String
+    let challengeToken: String
+
+    enum CodingKeys: String, CodingKey {
+        case keyId = "key_id"
+        case attestation
+        case challengeToken = "challenge_token"
+    }
+}
+
+struct AttestRegisterResponse: Decodable, Sendable {
+    let ok: Bool
+    let environment: String?
+}
+
 // MARK: - Endpoint methods
 
 extension LegacyAPIClient {
@@ -406,6 +505,28 @@ extension LegacyAPIClient {
 
     public func authEmailVerify(_ body: EmailVerifyRequest) async throws -> AuthResponse {
         try await send(request(.post, "/v1/auth/email/verify", body, requiresAuth: false), as: AuthResponse.self)
+    }
+
+    public func fetchAttestChallenge() async throws -> AttestChallengeResponse {
+        try await send(
+            LegacyRequest(method: .get, path: "/v1/auth/attest/challenge"),
+            as: AttestChallengeResponse.self
+        )
+    }
+
+    public func registerAppAttest(keyID: String, attestationBase64: String, challengeToken: String) async throws {
+        _ = try await send(
+            request(
+                .post,
+                "/v1/auth/attest/register",
+                AttestRegisterRequest(
+                    keyId: keyID,
+                    attestation: attestationBase64,
+                    challengeToken: challengeToken
+                )
+            ),
+            as: AttestRegisterResponse.self
+        )
     }
 
     public func createMemory(_ body: CreateMemoryRequest) async throws -> CreateMemoryResponse {
@@ -461,6 +582,16 @@ extension LegacyAPIClient {
 
     public func logout() async throws {
         try await sendNoContent(LegacyRequest(method: .post, path: "/v1/auth/logout", body: Data("{}".utf8)))
+    }
+
+    /// Packages all own memories into a downloadable archive (contract §7).
+    public func exportUserData() async throws -> ExportResponse {
+        try await send(LegacyRequest(method: .get, path: "/v1/user/export"), as: ExportResponse.self)
+    }
+
+    /// Permanently deletes the account and all associated data (contract §7).
+    public func deleteUser() async throws {
+        try await sendNoContent(LegacyRequest(method: .delete, path: "/v1/user"))
     }
 
     /// Register or refresh the APNs device token for this install (contract §7 / M4).

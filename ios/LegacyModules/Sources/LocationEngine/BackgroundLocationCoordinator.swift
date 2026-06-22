@@ -37,7 +37,10 @@ public final class BackgroundLocationCoordinator: NSObject {
     }
 
     public func requestAlwaysAuthorization() {
+        #if os(iOS)
+        guard manager.authorizationStatus == .authorizedWhenInUse else { return }
         manager.requestAlwaysAuthorization()
+        #endif
     }
 
     /// Start significant-change monitoring (near-zero steady-state power).

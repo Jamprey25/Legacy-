@@ -32,6 +32,7 @@ public final class MemoryLaneCoordinator {
     public private(set) var detail: MemoryDetail?
     public private(set) var isLoadingDetail = false
     public private(set) var isUnlocking = false
+    public private(set) var ownerMediaURL: URL?
     public private(set) var unlockedMediaURL: URL?
     public private(set) var unlockMessage: String?
 
@@ -71,12 +72,18 @@ public final class MemoryLaneCoordinator {
     public func loadDetail(for item: MemoryLaneItem) async {
         isLoadingDetail = true
         detail = nil
+        ownerMediaURL = nil
         unlockedMediaURL = nil
         unlockMessage = nil
         defer { isLoadingDetail = false }
 
         do {
-            detail = try await apiClient.getMemory(id: item.memoryID)
+            let loaded = try await apiClient.getMemory(id: item.memoryID)
+            detail = loaded
+            if loaded.scanStatus == "clear", let urlString = loaded.mediaURL ?? loaded.thumbnailURL,
+               let url = URL(string: urlString) {
+                ownerMediaURL = url
+            }
         } catch {
             errorMessage = "Could not load memory details."
         }
@@ -91,7 +98,13 @@ public final class MemoryLaneCoordinator {
 
         do {
             let fix = try await locationEngine.acquireFix()
-            let body = LocationRequest(lat: fix.lat, lng: fix.lng, accuracyM: fix.accuracyM)
+            let attestation = await AppAttestBridge.currentAssertionBase64()
+            let body = LocationRequest(
+                lat: fix.lat,
+                lng: fix.lng,
+                accuracyM: fix.accuracyM,
+                attestation: attestation
+            )
             let response = try await apiClient.unlock(memoryID: memoryID, body)
             if let urlString = response.media.first?.url, let url = URL(string: urlString) {
                 unlockedMediaURL = url
@@ -187,10 +200,30 @@ private struct MemoryLaneCard: View {
                 RoundedRectangle(cornerRadius: LegacyRadius.sm)
                     .fill(LegacyColor.surface)
                     .aspectRatio(1, contentMode: .fit)
-                Image(systemName: item.mediaType == "text" ? "text.quote" : "photo")
-                    .font(.title2)
-                    .foregroundStyle(LegacyColor.textSecondary)
+
+                if item.scanStatus == "clear",
+                   let urlString = item.thumbnailURL,
+                   let url = URL(string: urlString) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image.resizable().scaledToFill()
+                        case .failure:
+                            Image(systemName: "photo")
+                                .font(.title2)
+                                .foregroundStyle(LegacyColor.textSecondary)
+                        default:
+                            ProgressView().tint(LegacyColor.accent)
+                        }
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.sm))
+                } else {
+                    Image(systemName: item.mediaType == "text" ? "text.quote" : "photo")
+                        .font(.title2)
+                        .foregroundStyle(LegacyColor.textSecondary)
+                }
             }
+            .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.sm))
 
             Text(item.dropDate)
                 .font(LegacyFont.caption)
@@ -238,11 +271,13 @@ struct MemoryLaneDetailView: View {
                     }
 
                     if detail.scanStatus == "clear" {
-                        Button("Open at location") {
-                            Task { await coordinator.openAtLocation(memoryID: detail.memoryID) }
+                        if coordinator.ownerMediaURL == nil && coordinator.unlockedMediaURL == nil {
+                            Button("Open at location") {
+                                Task { await coordinator.openAtLocation(memoryID: detail.memoryID) }
+                            }
+                            .buttonStyle(.legacyPrimary)
+                            .disabled(coordinator.isUnlocking)
                         }
-                        .buttonStyle(.legacyPrimary)
-                        .disabled(coordinator.isUnlocking)
                     }
 
                     if coordinator.isUnlocking {
@@ -250,7 +285,7 @@ struct MemoryLaneDetailView: View {
                             .tint(LegacyColor.accent)
                     }
 
-                    if let url = coordinator.unlockedMediaURL {
+                    if let url = coordinator.unlockedMediaURL ?? coordinator.ownerMediaURL {
                         AsyncImage(url: url) { phase in
                             switch phase {
                             case .success(let image):

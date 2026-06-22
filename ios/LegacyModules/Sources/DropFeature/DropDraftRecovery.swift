@@ -5,14 +5,13 @@ import SwiftData
 
 @MainActor
 public enum DropDraftRecovery {
-    public static func retryPendingDrafts(context: ModelContext, apiClient: LegacyAPIClient) async {
+    public static func retryPendingDrafts(context: ModelContext, mediaUploader: MemoryMediaUploader) async {
         let descriptor = FetchDescriptor<DropDraft>(
             predicate: #Predicate { $0.uploadState == "pending_upload" }
         )
         guard let drafts = try? context.fetch(descriptor), !drafts.isEmpty else { return }
 
-        let presignedUploader = BackgroundMediaUploader()
-        let mediaUploader = MemoryMediaUploader(apiClient: apiClient, presignedUploader: presignedUploader)
+        let presignedUploader = URLSessionMediaUploader()
 
         for draft in drafts {
             guard let data = DropDraftStore.photoData(for: draft) else { continue }

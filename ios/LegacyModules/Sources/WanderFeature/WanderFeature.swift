@@ -40,7 +40,7 @@ public final class WanderCoordinator {
     private let haptics: WarmthHapticFeedback
     private var previousWarmthLevel: WarmthLevel = .none
 
-    /// Teasers from the latest scan — no coordinates (contract §4).
+    /// Teasers from the latest scan — no coordinates unless `pin_revealed` (contract §4).
     public private(set) var teasers: [Teaser] = []
     public private(set) var isScanning = false
     public private(set) var isUnlocking = false
@@ -50,6 +50,28 @@ public final class WanderCoordinator {
 
     /// Own-memory pins unlocked in range — safe to render offline (never stores others' coords).
     public private(set) var cachedOwnPins: [CachedOwnPin]
+
+    /// Precision-7 coarse zones from the latest scan — glow overlays only (no exact pins).
+    public private(set) var zoneGlows: [ZoneGlowOverlay] = []
+
+    /// Others' memories revealed within ~100m — coordinates come from scan only, never persisted.
+    public private(set) var revealedOthersPins: [RevealedMemoryPin] = []
+
+    /// When set, Wander map only shows these own-pin IDs (pin-drop animation).
+    public private(set) var mapPinFilter: Set<String>?
+
+    public func reloadOwnPins() {
+        cachedOwnPins = OwnMemoryPinCache.load()
+    }
+
+    public func setMapPinFilter(_ ids: Set<String>?) {
+        mapPinFilter = ids
+    }
+
+    public var mapOwnPins: [CachedOwnPin] {
+        guard let filter = mapPinFilter else { return cachedOwnPins }
+        return cachedOwnPins.filter { filter.contains($0.memoryID) }
+    }
 
     /// Ambient warmth intensity 0…1. No directional component.
     public var warmthIntensity: Double = 0
@@ -98,10 +120,11 @@ public final class WanderCoordinator {
             let body = LocationRequest(lat: fix.lat, lng: fix.lng, accuracyM: fix.accuracyM)
 
             if let response = try await apiClient.scan(body) {
-                teasers = response.teasers
-                WanderScanCache.save(teasers: response.teasers)
+                applyScanResult(response)
             } else {
                 teasers = []
+                zoneGlows = []
+                revealedOthersPins = []
                 WanderScanCache.clear()
             }
 
@@ -143,7 +166,13 @@ public final class WanderCoordinator {
 
         do {
             let fix = try await locationEngine.acquireFix()
-            let body = LocationRequest(lat: fix.lat, lng: fix.lng, accuracyM: fix.accuracyM)
+            let attestation = await AppAttestBridge.currentAssertionBase64()
+            let body = LocationRequest(
+                lat: fix.lat,
+                lng: fix.lng,
+                accuracyM: fix.accuracyM,
+                attestation: attestation
+            )
             let response = try await apiClient.unlock(memoryID: teaser.memoryID, body)
 
             if let urlString = response.media.first?.url, let url = URL(string: urlString) {
@@ -215,6 +244,8 @@ public final class WanderCoordinator {
     /// Apply teasers from a background region-entry scan or proximity push refresh.
     public func ingestBackgroundScan(_ result: BackgroundRegionScanService.Result) {
         teasers = result.teasers
+        zoneGlows = ZoneGlowOverlay.build(from: result.zones)
+        revealedOthersPins = PinRevealPolicy.revealedOthers(from: result.teasers)
         if result.teasers.isEmpty {
             WanderScanCache.clear()
         } else {
@@ -225,14 +256,39 @@ public final class WanderCoordinator {
             statusMessage = "You're near a memory — open it when you're ready."
         }
     }
+
+    private func applyScanResult(_ response: ScanResponse) {
+        teasers = response.teasers
+        zoneGlows = ZoneGlowOverlay.build(from: response.zones)
+        revealedOthersPins = PinRevealPolicy.revealedOthers(from: response.teasers)
+        WanderScanCache.save(teasers: response.teasers)
+        cacheCoarseZones(response.zones)
+    }
+
+    private func cacheCoarseZones(_ zones: [CoarseZone]) {
+        let records = zones.compactMap { zone -> CoarseZoneRecord? in
+            guard let decoded = GeohashCell.decode(prefix: zone.geohashPrefix) else { return nil }
+            return CoarseZoneRecord(
+                geohashPrefix: zone.geohashPrefix,
+                centerLat: decoded.lat,
+                centerLng: decoded.lng
+            )
+        }
+        CoarseZoneCache.merge(prefixes: records)
+    }
 }
 
 public struct WanderFeatureRootView: View {
-    public init(coordinator: WanderCoordinator) {
+    public init(
+        coordinator: WanderCoordinator,
+        pinCelebration: PinDropCelebrationCoordinator? = nil
+    ) {
         self.coordinator = coordinator
+        self.pinCelebration = pinCelebration
     }
 
     @Bindable private var coordinator: WanderCoordinator
+    private var pinCelebration: PinDropCelebrationCoordinator?
 
     public var body: some View {
         ZStack {
@@ -240,7 +296,9 @@ public struct WanderFeatureRootView: View {
             if let coordinate = coordinator.userCoordinate {
                 WanderUserMap(
                     coordinate: coordinate,
-                    ownPins: coordinator.cachedOwnPins
+                    ownPins: coordinator.mapOwnPins,
+                    revealedOthersPins: coordinator.revealedOthersPins,
+                    zoneGlows: coordinator.zoneGlows
                 )
                 .ignoresSafeArea()
             }
@@ -291,12 +349,18 @@ public struct WanderFeatureRootView: View {
                 }
             }
             .overlay(alignment: .bottom) {
-                if coordinator.showsOfflineNearUX {
+                if let celebration = pinCelebration,
+                   let message = celebration.overlayMessage,
+                   let progress = celebration.overlayProgress {
+                    PinDropCelebrationOverlay(message: message, progress: progress)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                } else if coordinator.showsOfflineNearUX {
                     OfflineNearBanner()
                         .padding(.horizontal, LegacySpacing.lg)
                         .padding(.bottom, LegacySpacing.lg)
                 }
             }
+            .animation(.easeInOut(duration: 0.35), value: pinCelebration?.isActive ?? false)
 
             WarmthCueOverlay(intensity: coordinator.warmthIntensity)
                 .ignoresSafeArea()
@@ -407,8 +471,8 @@ private struct TeaserCard: View {
                     .foregroundStyle(LegacyColor.textSecondary)
                 HStack {
                     Label(
-                        teaser.inRange ? "In range" : warmthLabel,
-                        systemImage: teaser.inRange ? "location.fill" : "sparkles"
+                        statusLabel,
+                        systemImage: statusIcon
                     )
                     .font(LegacyFont.caption)
                     .foregroundStyle(teaser.inRange ? LegacyColor.accent : LegacyColor.textSecondary)
@@ -437,6 +501,18 @@ private struct TeaserCard: View {
         case .coarse: return "In the area"
         case .none: return "Nearby"
         }
+    }
+
+    private var statusLabel: String {
+        if teaser.inRange { return "In range" }
+        if teaser.pinRevealed { return "On the map" }
+        return warmthLabel
+    }
+
+    private var statusIcon: String {
+        if teaser.inRange { return "location.fill" }
+        if teaser.pinRevealed { return "mappin.and.ellipse" }
+        return "sparkles"
     }
 
     @ViewBuilder
@@ -523,10 +599,11 @@ private struct UnlockedMemorySheet: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
                 }
             }
+            .presentationDragIndicator(.visible)
         }
     }
 }
@@ -535,12 +612,23 @@ private struct UnlockedMemorySheet: View {
 private struct WanderUserMap: View {
     let coordinate: CLLocationCoordinate2D
     let ownPins: [CachedOwnPin]
+    let revealedOthersPins: [RevealedMemoryPin]
+    let zoneGlows: [ZoneGlowOverlay]
 
     @State private var position: MapCameraPosition
+    @State private var visibleOwnPinIDs: Set<String> = []
+    @State private var visibleRevealedPinIDs: Set<String> = []
 
-    init(coordinate: CLLocationCoordinate2D, ownPins: [CachedOwnPin]) {
+    init(
+        coordinate: CLLocationCoordinate2D,
+        ownPins: [CachedOwnPin],
+        revealedOthersPins: [RevealedMemoryPin],
+        zoneGlows: [ZoneGlowOverlay]
+    ) {
         self.coordinate = coordinate
         self.ownPins = ownPins
+        self.revealedOthersPins = revealedOthersPins
+        self.zoneGlows = zoneGlows
         let region = MKCoordinateRegion(
             center: coordinate,
             span: MKCoordinateSpan(latitudeDelta: 0.012, longitudeDelta: 0.012)
@@ -551,19 +639,136 @@ private struct WanderUserMap: View {
     var body: some View {
         Map(position: $position) {
             UserAnnotation()
+
+            ForEach(zoneGlows) { zone in
+                MapCircle(
+                    center: CLLocationCoordinate2D(latitude: zone.centerLat, longitude: zone.centerLng),
+                    radius: zone.radiusMeters
+                )
+                .foregroundStyle(LegacyColor.accent.opacity(zone.opacity))
+            }
+
             ForEach(ownPins) { pin in
-                Marker("Your memory", coordinate: CLLocationCoordinate2D(latitude: pin.lat, longitude: pin.lng))
-                    .tint(LegacyColor.accent)
+                Annotation("Your memory", coordinate: CLLocationCoordinate2D(latitude: pin.lat, longitude: pin.lng)) {
+                    PinDropMarker(isVisible: visibleOwnPinIDs.contains(pin.memoryID), style: .own)
+                }
+            }
+
+            ForEach(revealedOthersPins) { pin in
+                Annotation("Memory nearby", coordinate: CLLocationCoordinate2D(latitude: pin.lat, longitude: pin.lng)) {
+                    PinDropMarker(isVisible: visibleRevealedPinIDs.contains(pin.memoryID), style: .revealed)
+                }
             }
         }
         .mapStyle(.standard(elevation: .realistic))
         .allowsHitTesting(false)
-        .onChange(of: coordinate.latitude) { _, _ in
-            position = .region(MKCoordinateRegion(
-                center: coordinate,
-                span: MKCoordinateSpan(latitudeDelta: 0.012, longitudeDelta: 0.012)
-            ))
+        .onAppear {
+            syncVisiblePins(animated: false)
+            fitCamera()
         }
+        .onChange(of: coordinate.latitude) { _, _ in fitCamera() }
+        .onChange(of: ownPins.map(\.memoryID)) { oldIDs, newIDs in
+            guard oldIDs != newIDs else { return }
+            let incoming = ownPins.filter { !visibleOwnPinIDs.contains($0.memoryID) }.map(\.memoryID)
+            if incoming.isEmpty {
+                visibleOwnPinIDs = Set(newIDs)
+            } else {
+                for (index, pinID) in incoming.enumerated() {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.08) {
+                        withAnimation(.spring(response: 0.45, dampingFraction: 0.62)) {
+                            _ = visibleOwnPinIDs.insert(pinID)
+                        }
+                    }
+                }
+            }
+            fitCamera()
+        }
+        .onChange(of: revealedOthersPins.map(\.memoryID)) { oldIDs, newIDs in
+            guard oldIDs != newIDs else { return }
+            let incoming = revealedOthersPins.filter { !visibleRevealedPinIDs.contains($0.memoryID) }.map(\.memoryID)
+            if incoming.isEmpty {
+                visibleRevealedPinIDs = Set(newIDs)
+            } else {
+                for (index, pinID) in incoming.enumerated() {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.08) {
+                        withAnimation(.spring(response: 0.45, dampingFraction: 0.62)) {
+                            _ = visibleRevealedPinIDs.insert(pinID)
+                        }
+                    }
+                }
+            }
+            visibleRevealedPinIDs = visibleRevealedPinIDs.intersection(Set(newIDs))
+            fitCamera()
+        }
+    }
+
+    private func syncVisiblePins(animated: Bool) {
+        if animated {
+            visibleOwnPinIDs = []
+            visibleRevealedPinIDs = []
+            for (index, pinID) in ownPins.map(\.memoryID).enumerated() {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.08) {
+                    withAnimation(.spring(response: 0.45, dampingFraction: 0.62)) {
+                        _ = visibleOwnPinIDs.insert(pinID)
+                    }
+                }
+            }
+            for (index, pinID) in revealedOthersPins.map(\.memoryID).enumerated() {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.08) {
+                    withAnimation(.spring(response: 0.45, dampingFraction: 0.62)) {
+                        _ = visibleRevealedPinIDs.insert(pinID)
+                    }
+                }
+            }
+        } else {
+            visibleOwnPinIDs = Set(ownPins.map(\.memoryID))
+            visibleRevealedPinIDs = Set(revealedOthersPins.map(\.memoryID))
+        }
+    }
+
+    private func fitCamera() {
+        var points = [coordinate]
+        points.append(contentsOf: ownPins.map {
+            CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng)
+        })
+        points.append(contentsOf: revealedOthersPins.map {
+            CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng)
+        })
+        let lats = points.map(\.latitude)
+        let lngs = points.map(\.longitude)
+        guard let minLat = lats.min(), let maxLat = lats.max(),
+              let minLng = lngs.min(), let maxLng = lngs.max() else { return }
+        let center = CLLocationCoordinate2D(
+            latitude: (minLat + maxLat) / 2,
+            longitude: (minLng + maxLng) / 2
+        )
+        let span = MKCoordinateSpan(
+            latitudeDelta: max(0.012, (maxLat - minLat) * 1.5 + 0.008),
+            longitudeDelta: max(0.012, (maxLng - minLng) * 1.5 + 0.008)
+        )
+        withAnimation(.easeInOut(duration: 0.45)) {
+            position = .region(MKCoordinateRegion(center: center, span: span))
+        }
+    }
+}
+
+private struct PinDropMarker: View {
+    enum Style {
+        case own
+        case revealed
+    }
+
+    let isVisible: Bool
+    var style: Style = .own
+
+    var body: some View {
+        Image(systemName: style == .own ? "mappin.circle.fill" : "mappin.and.ellipse")
+            .font(.system(size: style == .own ? 28 : 24, weight: .semibold))
+            .foregroundStyle(style == .own ? LegacyColor.accent : LegacyColor.accent.opacity(0.85))
+            .shadow(color: .black.opacity(0.35), radius: 3, y: 2)
+            .scaleEffect(isVisible ? 1.0 : 0.01)
+            .offset(y: isVisible ? 0 : -24)
+            .opacity(isVisible ? 1 : 0)
     }
 }
 #endif

@@ -1,0 +1,37 @@
+---
+description: Legacy multi-agent sync — Cursor (iOS) session rituals and edit boundaries
+alwaysApply: true
+---
+
+# Legacy agent sync (Cursor / iOS)
+
+You own **`ios/**`**. Claude Code owns **`backend/**`**. Full protocol: `docs/engineering/AGENT_WORKFLOW.md`.
+
+## Session start (mandatory)
+
+1. `git status` + read `tasks.json` (open `decisions[]`, **`question`/`concern`/`idea` threads**, `owner: "ios"` tasks)
+2. **Reply** to threads where `needs: "ios"` or backend raised something you have not answered
+3. Read **last 2 entries** in `docs/engineering/collab-log.md` + **Backend → iOS** section
+4. If API work: read `docs/engineering/api-contract.md`
+
+Chat is **not** authoritative — only repo docs.
+
+## Cross-agent feedback (required)
+
+- **Raise** concerns/questions/ideas in `tasks.json` → `decisions[]` (set `needs: "backend"` when appropriate)
+- **Reply** via `responses[]` with `"author": "ios"` before session end
+- Encouraged: flag privacy/UX risks as `kind: "concern"` even when non-blocking
+
+## Edit boundaries
+
+- Primary: `ios/**`
+- Do not edit `backend/**` without a collab-log + dashboard thread
+- Update `tasks.json` when marking tasks done or posting thread replies
+
+## Session end
+
+Append `[ios → all] YYYY-MM-DD — …` to `collab-log.md`. All open threads needing iOS must have your reply.
+
+## Truth hierarchy
+
+`tasks.json` > `collab-log.md` > `api-contract.md` > chat > Ruflo

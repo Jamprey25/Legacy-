@@ -6,6 +6,7 @@ public enum LocationEngineError: Error, Sendable {
     case fixUnavailable
     case accuracyRejected
     case superseded
+    case simulatedLocation
 }
 
 /// A point fix reduced to exactly what the API contract accepts: `lat`, `lng`, `accuracy_m`.
@@ -92,6 +93,7 @@ public final class LocationEngine: NSObject, LocationEngineProtocol {
 
     public func requestWhenInUseAuthorization() {
         #if os(iOS)
+        guard manager.authorizationStatus == .notDetermined else { return }
         manager.requestWhenInUseAuthorization()
         #endif
     }
@@ -148,6 +150,15 @@ extension LocationEngine: CLLocationManagerDelegate {
         guard let location = locations.last else { return }
 
         Task { @MainActor in
+            #if os(iOS)
+            if #available(iOS 15.0, *),
+               location.sourceInformation?.isSimulatedBySoftware == true {
+                fixContinuation?.resume(throwing: LocationEngineError.simulatedLocation)
+                fixContinuation = nil
+                return
+            }
+            #endif
+
             let fix = LocationFix(location)
             latestFix = fix
             fixContinuation?.resume(returning: fix)

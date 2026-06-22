@@ -246,13 +246,15 @@ public struct DropFeatureRootView: View {
         case .idle:
             EmptyView()
         case .stripping, .creating, .uploading:
-            ProgressView("Dropping memory…")
-                .tint(LegacyColor.accent)
+            DropProgressOverlay()
+                .padding(.horizontal, LegacySpacing.lg)
+                .padding(.bottom, LegacySpacing.sm)
         case .succeeded:
-            Text("Memory dropped.")
+            Label("Memory dropped", systemImage: "mappin.and.ellipse")
                 .font(LegacyFont.callout)
                 .foregroundStyle(LegacyColor.accent)
                 .padding(.bottom, LegacySpacing.sm)
+                .transition(.scale(scale: 0.8).combined(with: .opacity))
         case .failed(let message):
             Text(message)
                 .font(LegacyFont.callout)
@@ -260,6 +262,62 @@ public struct DropFeatureRootView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, LegacySpacing.lg)
                 .padding(.bottom, LegacySpacing.sm)
+        }
+    }
+}
+
+private struct DropProgressOverlay: View {
+    private static let messages = [
+        "Creating your legacy…",
+        "Pinning the moment…",
+        "Loading your memories…",
+        "Marking this place…",
+        "Sealing the memory…",
+    ]
+
+    @State private var messageIndex = 0
+    @State private var progress: Double = 0
+    @State private var textOpacity: Double = 1
+
+    var body: some View {
+        VStack(spacing: LegacySpacing.sm) {
+            ProgressView(value: progress)
+                .tint(LegacyColor.accent)
+                .animation(.easeInOut(duration: 0.4), value: progress)
+
+            Text(Self.messages[messageIndex])
+                .font(LegacyFont.caption)
+                .foregroundStyle(LegacyColor.textSecondary)
+                .opacity(textOpacity)
+                .animation(.easeInOut(duration: 0.3), value: textOpacity)
+        }
+        .onAppear {
+            advanceProgress()
+            rotateMessage()
+        }
+    }
+
+    private func advanceProgress() {
+        let steps: [(Double, Double)] = [(0.25, 0.6), (0.5, 0.8), (0.75, 1.2), (0.88, 0.8)]
+        var delay = 0.0
+        for (target, duration) in steps {
+            let d = delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + d) {
+                withAnimation(.easeInOut(duration: duration)) { progress = target }
+            }
+            delay += duration
+        }
+    }
+
+    private func rotateMessage() {
+        guard messageIndex < Self.messages.count - 1 else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+            withAnimation { textOpacity = 0 }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                messageIndex = (messageIndex + 1) % Self.messages.count
+                withAnimation { textOpacity = 1 }
+                rotateMessage()
+            }
         }
     }
 }

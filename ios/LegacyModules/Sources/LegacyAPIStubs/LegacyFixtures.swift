@@ -44,7 +44,31 @@ public enum LegacyFixtures {
           "warmth": "in_bubble",
           "scan_status": "clear"
         }
+      ],
+      "zones": [
+        { "geohash_prefix": "9q8yyk8", "count": 2 }
       ]
+    }
+    """.utf8)
+
+    public static let scanWithRevealedOther = Data("""
+    {
+      "teasers": [
+        {
+          "memory_id": "66666666-6666-6666-6666-666666666666",
+          "thumbnail_url": null,
+          "drop_date": "2024-08-15",
+          "owner_display": "unknown",
+          "is_own": false,
+          "in_range": false,
+          "warmth": "approaching",
+          "scan_status": "clear",
+          "pin_revealed": true,
+          "lat": 37.7755,
+          "lng": -122.4188
+        }
+      ],
+      "zones": []
     }
     """.utf8)
 
@@ -71,7 +95,7 @@ public enum LegacyFixtures {
           "created_at": "2024-09-01T18:30:00Z",
           "media_type": "photo",
           "scan_status": "clear",
-          "thumbnail_key": null,
+          "thumbnail_url": null,
           "privacy_tier": "private",
           "drop_method": "pin"
         },
@@ -81,7 +105,7 @@ public enum LegacyFixtures {
           "created_at": "2023-06-15T12:00:00Z",
           "media_type": "photo",
           "scan_status": "pending",
-          "thumbnail_key": null,
+          "thumbnail_url": null,
           "privacy_tier": "private",
           "drop_method": "pin"
         }
@@ -101,12 +125,14 @@ public enum LegacyFixtures {
       "privacy_tier": "private",
       "scan_status": "clear",
       "media_type": "photo",
-      "media_key": "memories/22222222/full.jpg",
-      "thumbnail_key": null,
+      "media_url": "https://blob.vercel-storage.com/memories/22222222/full.jpg",
+      "thumbnail_url": null,
       "discoverable_after": "2026-06-17T20:55:00Z",
       "created_at": "2024-09-01T18:30:00Z"
     }
     """.utf8)
+
+    public static let memoryDetailWithMedia = memoryDetail
 
     public static let importMemories = Data("""
     {
@@ -124,6 +150,66 @@ public enum LegacyFixtures {
     }
     """.utf8)
 
+    public static let createMemoryBlob = Data("""
+    {
+      "memory_id": "22222222-2222-2222-2222-222222222222",
+      "upload": null,
+      "discoverable_after": "2026-06-17T20:55:00Z",
+      "scan_status": "pending"
+    }
+    """.utf8)
+
+    public static let blobClientToken = Data("""
+    {
+      "type": "blob.generate-client-token",
+      "clientToken": "vercel_blob_client_store1234_payload"
+    }
+    """.utf8)
+
+    public static let importMemoriesBlob = Data("""
+    {
+      "import_id": "44444444-4444-4444-4444-444444444444",
+      "memories": [
+        { "cluster_index": 0, "memory_id": "55555555-5555-5555-5555-555555555555", "upload": null }
+      ]
+    }
+    """.utf8)
+
+    public static let exportUserData = Data("""
+    {
+      "archive_url": "https://blob.vercel-storage.com/exports/stub/export.json",
+      "memory_count": 2,
+      "exported_at": "2026-06-18T11:00:00Z"
+    }
+    """.utf8)
+
+    public static let directUploadResponse = Data("""
+    {
+      "url": "https://blob.vercel-storage.com/memories/stub/original.jpg"
+    }
+    """.utf8)
+
+    public static let attestChallenge = Data("""
+    {
+      "challenge_token": "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899.deadbeef",
+      "expires_at": "2026-06-19T15:00:00Z"
+    }
+    """.utf8)
+
+    public static let attestRegister = Data("""
+    {
+      "ok": true,
+      "environment": "development"
+    }
+    """.utf8)
+
+    /// 400 — first sign-in without DOB (contract §2).
+    public static let authDobRequired = Data("""
+    {
+      "error": { "code": "dob_required", "message": "Date of birth required on first sign-in.", "request_id": "req_stub" }
+    }
+    """.utf8)
+
     /// 423 Locked — dwell not yet satisfied (contract §4).
     public static let lockedDwell = Data("""
     {
@@ -136,11 +222,17 @@ public enum LegacyFixtures {
     public static func validateAll(decoder: JSONDecoder = JSONDecoder()) throws {
         _ = try decoder.decode(AuthResponse.self, from: authSocial)
         _ = try decoder.decode(CreateMemoryResponse.self, from: createMemory)
+        _ = try decoder.decode(CreateMemoryResponse.self, from: createMemoryBlob)
         _ = try decoder.decode(ScanResponse.self, from: scanWithTeasers)
+        _ = try decoder.decode(ScanResponse.self, from: scanWithRevealedOther)
         _ = try decoder.decode(UnlockResponse.self, from: unlock)
         _ = try decoder.decode(ListMemoriesResponse.self, from: memoryList)
         _ = try decoder.decode(MemoryDetail.self, from: memoryDetail)
+        _ = try decoder.decode(MemoryDetail.self, from: memoryDetailWithMedia)
         _ = try decoder.decode(ImportMemoriesResponse.self, from: importMemories)
+        _ = try decoder.decode(ImportMemoriesResponse.self, from: importMemoriesBlob)
+        _ = try decoder.decode(ExportResponse.self, from: exportUserData)
+        _ = try decoder.decode(AttestChallengeResponse.self, from: attestChallenge)
     }
 }
 
@@ -152,12 +244,36 @@ extension StubHTTPTransport {
         transport.enqueue("/v1/auth/social", .json(201, LegacyFixtures.authSocial))
         transport.enqueue("/v1/auth/email/start", .noContent)
         transport.enqueue("/v1/auth/email/verify", .json(201, LegacyFixtures.authSocial))
-        transport.enqueue("POST /v1/memories", .json(201, LegacyFixtures.createMemory))
+        transport.enqueue("POST /v1/memories", .json(201, LegacyFixtures.createMemoryBlob))
+        transport.enqueue("POST /v1/uploads/direct", .json(200, LegacyFixtures.directUploadResponse))
         transport.enqueue("GET /v1/memories", .ok(LegacyFixtures.memoryList))
         transport.enqueue("GET /memories/22222222-2222-2222-2222-222222222222", .ok(LegacyFixtures.memoryDetail))
         transport.enqueue("POST /v1/memories/import", .json(201, LegacyFixtures.importMemories))
         transport.enqueue("/v1/discovery/scan", .ok(LegacyFixtures.scanWithTeasers))
         transport.enqueue("POST /v1/devices/apns", .noContent)
+        transport.enqueue("GET /v1/user/export", .ok(LegacyFixtures.exportUserData))
+        transport.enqueue("DELETE /v1/user", .noContent)
+        transport.enqueue("/unlock", .json(423, LegacyFixtures.lockedDwell), .ok(LegacyFixtures.unlock))
+        return transport
+    }
+
+    /// Auth paths return `dob_required` once, then succeed — exercises DOB gate in simulator QA.
+    public static func qaAuthFlow() -> StubHTTPTransport {
+        let transport = StubHTTPTransport()
+        transport.enqueue("/v1/auth/social", .json(400, LegacyFixtures.authDobRequired), .json(201, LegacyFixtures.authSocial))
+        transport.enqueue("/v1/auth/email/start", .noContent)
+        transport.enqueue("/v1/auth/email/verify", .json(400, LegacyFixtures.authDobRequired), .json(201, LegacyFixtures.authSocial))
+        transport.enqueue("/v1/auth/attest/challenge", .json(200, LegacyFixtures.attestChallenge))
+        transport.enqueue("/v1/auth/attest/register", .json(200, LegacyFixtures.attestRegister))
+        transport.enqueue("POST /v1/memories", .json(201, LegacyFixtures.createMemoryBlob))
+        transport.enqueue("POST /v1/uploads/direct", .json(200, LegacyFixtures.directUploadResponse))
+        transport.enqueue("GET /v1/memories", .ok(LegacyFixtures.memoryList))
+        transport.enqueue("GET /memories/22222222-2222-2222-2222-222222222222", .ok(LegacyFixtures.memoryDetail))
+        transport.enqueue("POST /v1/memories/import", .json(201, LegacyFixtures.importMemories))
+        transport.enqueue("/v1/discovery/scan", .ok(LegacyFixtures.scanWithTeasers))
+        transport.enqueue("POST /v1/devices/apns", .noContent)
+        transport.enqueue("GET /v1/user/export", .ok(LegacyFixtures.exportUserData))
+        transport.enqueue("DELETE /v1/user", .noContent)
         transport.enqueue("/unlock", .json(423, LegacyFixtures.lockedDwell), .ok(LegacyFixtures.unlock))
         return transport
     }

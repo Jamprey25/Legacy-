@@ -71,4 +71,12 @@ public enum KeychainSessionStore {
             throw KeychainError.unexpectedStatus(status)
         }
     }
+
+    /// Keychain survives app delete on device; UserDefaults does not. Purge stale sessions on first launch after reinstall.
+    public static func clearIfFreshInstall() {
+        let flag = "legacyHasLaunched"
+        guard UserDefaults.standard.object(forKey: flag) == nil else { return }
+        try? delete()
+        UserDefaults.standard.set(true, forKey: flag)
+    }
 }

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2DC0AB1A2FE4554B004E7FFE /* Media.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2DC0AB192FE4554B004E7FFE /* Media.xcassets */; };
 		B10000000000000000000001 /* LegacyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000001 /* LegacyApp.swift */; };
 		B10000000000000000000002 /* WanderFeature in Frameworks */ = {isa = PBXBuildFile; productRef = P10000000000000000000001 /* WanderFeature */; };
 		B10000000000000000000003 /* DesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = P10000000000000000000002 /* DesignSystem */; };
@@ -24,6 +25,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		2DC0AB192FE4554B004E7FFE /* Media.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Media.xcassets; sourceTree = "<group>"; };
 		F10000000000000000000001 /* LegacyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyApp.swift; sourceTree = "<group>"; };
 		F10000000000000000000002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		F10000000000000000000003 /* Legacy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Legacy.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -70,6 +72,7 @@
 				F10000000000000000000006 /* APNsRegistrationService.swift */,
 				F10000000000000000000007 /* ProximityPushNotifications.swift */,
 				F10000000000000000000002 /* Info.plist */,
+				2DC0AB192FE4554B004E7FFE /* Media.xcassets */,
 			);
 			path = LegacyApp;
 			sourceTree = "<group>";
@@ -154,6 +157,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2DC0AB1A2FE4554B004E7FFE /* Media.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -40,6 +40,12 @@ public final class DropCoordinator {
 
     public private(set) var selectedPhotoData: Data?
     public private(set) var pendingRecovery: PendingUploadRecovery?
+    public private(set) var pendingCelebrationPin: CachedOwnPin?
+
+    public func consumeCelebrationPin() -> CachedOwnPin? {
+        defer { pendingCelebrationPin = nil }
+        return pendingCelebrationPin
+    }
 
     public private(set) var state: DropState = .idle
     public var isDropping: Bool {
@@ -108,11 +114,13 @@ public final class DropCoordinator {
             fixLng = fix.lng
 
             state = .creating
+            let attestation = await AppAttestBridge.currentAssertionBase64()
             let body = makeCreateRequest(
                 fix: fix,
                 mediaType: "photo",
                 dropMethod: dropMethod,
-                compose: compose
+                compose: compose,
+                attestation: attestation
             )
             let response = try await apiClient.createMemory(body)
             memoryID = response.memoryID
@@ -152,15 +160,37 @@ public final class DropCoordinator {
             }
             #endif
 
+            let dropDay = Self.dropDateString()
             cacheOwnDrop(memoryID: response.memoryID, lat: fixLat, lng: fixLng)
+            pendingCelebrationPin = CachedOwnPin(
+                memoryID: response.memoryID,
+                lat: fixLat,
+                lng: fixLng,
+                dropDate: dropDay,
+                thumbnailURL: nil,
+                cachedAt: Date()
+            )
             state = .succeeded(memoryID: response.memoryID)
+        } catch LocationEngineError.simulatedLocation {
+            state = .failed("Simulated location is not allowed for drops.")
         } catch is EXIFStripError {
             state = .failed("Could not prepare photo for upload.")
+        } catch let LegacyAPIError.unauthorized {
+            state = .failed("Session expired. Sign out and sign in again.")
         } catch let LegacyAPIError.invalidRequest(code, message) {
             state = .failed(message.isEmpty ? code : message)
             stageRecovery(memoryID: memoryID, photoData: strippedData, signedPutURL: signedPutURL, contentType: contentType)
+        } catch let LegacyAPIError.server(status) {
+            state = .failed("Server error (\(status)) creating memory.")
+            stageRecovery(memoryID: memoryID, photoData: strippedData, signedPutURL: signedPutURL, contentType: contentType)
+        } catch let error as MediaUploadError {
+            state = .failed(dropUploadMessage(for: error))
+            stageRecovery(memoryID: memoryID, photoData: strippedData, signedPutURL: signedPutURL, contentType: contentType)
+        } catch let error as BlobUploadError {
+            state = .failed(blobUploadMessage(for: error))
+            stageRecovery(memoryID: memoryID, photoData: strippedData, signedPutURL: signedPutURL, contentType: contentType)
         } catch {
-            state = .failed("Drop failed. Check location permission and connectivity.")
+            state = .failed("Drop failed: \((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)")
             stageRecovery(memoryID: memoryID, photoData: strippedData, signedPutURL: signedPutURL, contentType: contentType)
         }
     }
@@ -178,15 +208,26 @@ public final class DropCoordinator {
 
         do {
             let fix = try await locationEngine.acquireFix()
+            let attestation = await AppAttestBridge.currentAssertionBase64()
             let body = makeCreateRequest(
                 fix: fix,
                 mediaType: "text",
                 dropMethod: "note_bottle",
                 compose: compose,
-                caption: trimmed
+                caption: trimmed,
+                attestation: attestation
             )
             let response = try await apiClient.createMemory(body)
+            let dropDay = Self.dropDateString()
             cacheOwnDrop(memoryID: response.memoryID, lat: fix.lat, lng: fix.lng)
+            pendingCelebrationPin = CachedOwnPin(
+                memoryID: response.memoryID,
+                lat: fix.lat,
+                lng: fix.lng,
+                dropDate: dropDay,
+                thumbnailURL: nil,
+                cachedAt: Date()
+            )
             state = .succeeded(memoryID: response.memoryID)
         } catch let LegacyAPIError.invalidRequest(code, message) {
             state = .failed(message.isEmpty ? code : message)
@@ -200,7 +241,8 @@ public final class DropCoordinator {
         mediaType: String,
         dropMethod: String,
         compose: DropComposeDraft,
-        caption: String? = nil
+        caption: String? = nil,
+        attestation: String? = nil
     ) -> CreateMemoryRequest {
         let teaser = compose.teaserText.trimmingCharacters(in: .whitespacesAndNewlines)
         return CreateMemoryRequest(
@@ -213,7 +255,8 @@ public final class DropCoordinator {
             teaserText: teaser.isEmpty ? nil : teaser,
             caption: caption,
             seal: DropComposeMapping.sealPayload(from: compose.seal),
-            condition: compose.condition.map(DropComposeMapping.conditionPayload(from:))
+            condition: compose.condition.map(DropComposeMapping.conditionPayload(from:)),
+            attestation: attestation
         )
     }
 
@@ -233,18 +276,22 @@ public final class DropCoordinator {
     }
 
     private func cacheOwnDrop(memoryID: String, lat: Double, lng: Double) {
-        let day = ISO8601DateFormatter()
-        day.formatOptions = [.withFullDate]
         OwnMemoryPinCache.save(
             CachedOwnPin(
                 memoryID: memoryID,
                 lat: lat,
                 lng: lng,
-                dropDate: day.string(from: Date()),
+                dropDate: Self.dropDateString(),
                 thumbnailURL: nil,
                 cachedAt: Date()
             )
         )
+    }
+
+    private static func dropDateString() -> String {
+        let day = ISO8601DateFormatter()
+        day.formatOptions = [.withFullDate]
+        return day.string(from: Date())
     }
 
     #if os(iOS)
@@ -276,4 +323,26 @@ public final class DropCoordinator {
         }
     }
     #endif
+
+    private func dropUploadMessage(for error: MediaUploadError) -> String {
+        switch error {
+        case let .transport(message):
+            return "Upload failed: \(message)"
+        case let .invalidResponse(statusCode):
+            return "Upload failed (HTTP \(statusCode))."
+        }
+    }
+
+    private func blobUploadMessage(for error: BlobUploadError) -> String {
+        switch error {
+        case .invalidClientToken:
+            return "Upload token invalid. Sign out and try again."
+        case let .tokenRequestFailed(statusCode):
+            return "Could not start upload (HTTP \(statusCode)). Check you're signed in."
+        case let .uploadFailed(statusCode):
+            return "Blob upload failed (HTTP \(statusCode))."
+        case let .transport(message):
+            return "Upload failed: \(message)"
+        }
+    }
 }

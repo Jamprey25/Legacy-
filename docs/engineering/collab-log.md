@@ -915,4 +915,79 @@ After shipping these fixes, update `tasks.json`:
 
 **Next backend tasks (unblocked):** `csam-thumbnail-generation` already done; `csam-vendor-live` waiting on PhotoDNA; `testflight-beta` waiting on multiple M5 gates; Phase 2 schema (`schema-phone-verification`) waits on TestFlight.
 
+---
 
+## [backend → all] 2026-06-22 (session 2) — Pin drop & memory discovery feature design
+
+### New Feature: Pin Drop Animation + Memory Discovery on Map
+
+Joseph requested two features to make the app feel less aimless:
+
+**Feature A — Pin drop animation (APPROVED, iOS-only):**
+- Progress bar with rotating text ("Loading your memories…" / "Creating your legacy…")
+- Pins cascade one-by-one (~80ms stagger) after import/drop completes
+- No backend changes — POST /v1/memories and /v1/memories/import already return coords
+- Task: `ios-pin-drop-animation`
+
+**Feature B — Memory discovery on map (design phase):**
+- **Own pins:** show freely on Wander map from `OwnMemoryPinCache` — task `ios-own-memory-map-pins`
+- **Others' memories:** coarse-zone glow (geohash prefix regions), NOT exact pins (DEC-15 privacy)
+- **Pin reveal radius:** pins materialize at ~75-100m (Joseph wants more than 20m unlock distance so it doesn't feel like a chore). Unlock stays at ~20m. Two-beat: spot → walk → unlock.
+- Backend work: `backend-scan-zones` adds `zones[]` to /scan response (`{ geohash_prefix, count }`, no coordinates)
+
+### Discovery gradient
+`fuzzy zone glow (far) → warmth bloom (close) → pin reveals at 75-100m → unlock at 20m`
+
+### Decisions open (needs Joseph)
+- `dec-pin-reveal-radius` — 75m vs 100m vs tunable per environment
+- `dec-coarse-zone-precision` — precision-7 (~150m) vs precision-6 (~1.2km) vs precision-5 (~4.9km)
+
+### Backend → iOS
+- **Cursor: start `ios-pin-drop-animation` now** — no blockers, no backend dependency
+- **Cursor: start `ios-own-memory-map-pins` now** — already have coords in OwnMemoryPinCache
+- `ios-coarse-zone-glow` and `ios-pin-reveal-at-distance` blocked on Joseph's precision/radius decisions
+
+### Backend work queued
+- `backend-scan-zones` blocked on `dec-coarse-zone-precision` — will add `zones[]` to /scan response when precision decided
+
+---
+
+## [ios → all] 2026-06-22 — Pin drop celebration + own pins on Wander map
+
+**Tasks marked done:** `ios-pin-drop-animation`, `ios-own-memory-map-pins`
+
+**Shipped (iOS-only, no backend dependency):**
+- `PinDropCelebrationCoordinator` — rotating loading copy ("Loading your memories…" / "Creating your legacy…" / "Placing your pins…"), progress bar, ~80ms stagger reveal
+- After successful **Drop** or **Import**, `MainTabView` auto-switches to Wander and runs celebration; then force scan
+- **Own memory pins** render on Wander map from `OwnMemoryPinCache` with spring drop animation + camera fit to user + pins
+- `DropCoordinator.pendingCelebrationPin` / `ImportCoordinator.pendingCelebrationPins` bridge completion → celebration
+
+**Verification:** 49/49 SPM tests pass; `xcodebuild -scheme Legacy` succeeds (iPhone 16 sim).
+
+**Manual QA:** `qa-pin-drop-celebration` added to `manualTests[]`.
+
+**Joseph decided (2026-06-22, dashboard):** `dec-pin-reveal-radius` → **100m reveal**; `dec-coarse-zone-precision` → **precision-7 (~150m)**. Dashboard shows all decisions resolved.
+
+**Next up (Feature B — discovery gradient):**
+- **Backend:** `backend-scan-zones` — unblocked; add `zones[]` to `/scan` at precision-7
+- **iOS:** `ios-coarse-zone-glow` — after backend ships zones
+- **iOS:** `ios-pin-reveal-at-distance` — 100m constant once zone glow lands
+
+---
+
+## [ios → all] 2026-06-22 (session 3) — Zone glow + 100m pin reveal (Feature B)
+
+**Tasks marked done:** `ios-coarse-zone-glow`, `ios-pin-reveal-at-distance`
+
+**Shipped:**
+- **Coarse zone glow** — `ZoneGlowOverlay` decodes precision-7 `zones[]` geohash prefixes via `GeohashCell`; renders `MapCircle` heat blobs on Wander map (opacity scales with count)
+- **100m pin reveal** — `PinRevealPolicy.revealRadiusMeters = 100`; others' pins render when scan teaser has `pin_revealed` + `lat`/`lng` (session-only, never persisted); spring drop animation; TeaserCard shows "On the map"
+- **Scan wiring** — `WanderCoordinator.applyScanResult` updates zones + revealed pins; `CoarseZoneCache.merge` for background region rotation
+- **Fixtures** — `scanWithRevealedOther`, zones in `scanWithTeasers`
+
+**Verification:** 54/54 SPM tests; Xcode build succeeds.
+
+**Backend → iOS (needs reply on `q-pin-reveal-scan-coords`):**
+- iOS ready for optional teaser fields: `pin_revealed: true`, `lat`, `lng` when `!is_own && distance <= 100m`
+- `zones[]` already in backend `discovery.ts` — iOS glow will light up on next deploy
+- Please update `api-contract.md` §4 when `pin_revealed` ships
