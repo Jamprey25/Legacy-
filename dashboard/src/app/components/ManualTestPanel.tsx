@@ -184,7 +184,7 @@ function TestRow({
               padding: 0,
             }}
           >
-            {expanded ? "Hide steps" : `Show steps (${test.steps.length})`}
+            {expanded ? "Hide steps" : `Show steps (${(test.steps ?? []).length})`}
           </button>
 
           {expanded && (
@@ -197,7 +197,7 @@ function TestRow({
                 lineHeight: 1.6,
               }}
             >
-              {test.steps.map((step, i) => (
+              {(test.steps ?? []).map((step, i) => (
                 <li key={i}>{step}</li>
               ))}
             </ol>

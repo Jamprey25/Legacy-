@@ -456,6 +456,98 @@
           "date": "2026-06-22"
         }
       ]
+    },
+    {
+      "id": "dec-pin-reveal-radius",
+      "kind": "decision",
+      "title": "Pin reveal radius vs unlock radius — how far away should pins appear?",
+      "status": "decided",
+      "chosenOptionId": "100m-reveal",
+      "decidedAt": "2026-06-22",
+      "resolution": "100m reveal radius. Pin materializes on map at 100m, unlock still requires ~20m. Joseph: 'I don't want it to feel chore like.' QA walks may refine this constant.",
+      "raisedBy": "backend",
+      "needs": "joseph",
+      "detail": "Joseph wants memory pins to appear on the map before the user is at unlock distance (~20m), so discovery doesn't feel like a chore. Proposal: split into two radii. Pin REVEALS at ~75-100m (you see it drop onto the map), unlock stays at ~20m. This gives a two-beat moment: spot it → walk to it → unlock. Privacy: only owner's nearby pins and already-scanned teasers within reveal radius. Others' memories stay as coarse-zone glow until reveal radius. The reveal radius is a tunable constant — QA walks will determine the sweet spot.",
+      "options": [
+        {
+          "id": "75m-reveal",
+          "label": "75m reveal radius",
+          "description": "Pin appears at 75m, unlock at 20m. Tight enough to feel directional, wide enough to not be a chore.",
+          "recommended": true
+        },
+        {
+          "id": "100m-reveal",
+          "label": "100m reveal radius",
+          "description": "Pin appears at 100m, unlock at 20m. More generous — better for parks/open spaces, might feel too easy in dense urban."
+        },
+        {
+          "id": "tunable-per-context",
+          "label": "Tunable per environment",
+          "description": "75m urban, 100m parks/suburbs. Requires reverse-geocode or density heuristic. More complex."
+        }
+      ]
+    },
+    {
+      "id": "dec-coarse-zone-precision",
+      "kind": "decision",
+      "title": "Coarse-zone glow precision — how big should the 'something is nearby' blob be?",
+      "status": "decided",
+      "chosenOptionId": "precision-7",
+      "decidedAt": "2026-06-22",
+      "resolution": "Precision-7 (~150m cells). Directional enough to guide walking, coarse enough for privacy. Glow hands off cleanly to pin reveal at 100m.",
+      "raisedBy": "backend",
+      "needs": "joseph",
+      "detail": "For Feature B (discovery on map), others' memories appear as a soft glow/heat-blob, not pins. The glow size is controlled by geohash precision. This is a privacy knob: tighter precision = better UX but weaker privacy guarantee. The glow transitions to warmth cues as user approaches, then pin reveals at the reveal radius (see dec-pin-reveal-radius).",
+      "options": [
+        {
+          "id": "precision-7",
+          "label": "Precision-7 (~150m cells)",
+          "description": "Feels very directional. 'Something is in this block.' Weakest privacy but best UX.",
+          "recommended": true
+        },
+        {
+          "id": "precision-6",
+          "label": "Precision-6 (~1.2km cells)",
+          "description": "Neighborhood-scale. 'Something is in this area.' Good balance."
+        },
+        {
+          "id": "precision-5",
+          "label": "Precision-5 (~4.9km cells)",
+          "description": "District-scale. Very private but might feel too vague to act on."
+        }
+      ]
+    },
+    {
+      "id": "idea-pin-drop-animation",
+      "kind": "idea",
+      "title": "Pin drop animation with progress bar on import/drop",
+      "status": "resolved",
+      "raisedBy": "joseph",
+      "needs": "ios",
+      "detail": "When importing camera roll or dropping a photo: show a progress bar with text like 'Loading your memories…' / 'Creating your legacy…', then pins cascade onto the map one-by-one with a drop animation (~80ms stagger). Pure iOS work — no backend changes. Uses OwnMemoryPinCache for import centroids. Joseph approved 2026-06-22.",
+      "responses": [
+        {
+          "author": "backend",
+          "date": "2026-06-22",
+          "text": "No backend changes needed. POST /v1/memories and POST /v1/memories/import already return the coordinates. iOS can animate on completion callback. Directive written for Cursor."
+        },
+        {
+          "author": "ios",
+          "date": "2026-06-22",
+          "text": "Shipped: PinDropCelebrationCoordinator + overlay on Wander; auto-switch to Wander tab after drop/import; 80ms stagger pin reveal on map; OwnMemoryPinCache persisted. Build + 49 SPM tests green."
+        }
+      ]
+    },
+    {
+      "id": "q-pin-reveal-scan-coords",
+      "kind": "question",
+      "title": "Scan teaser — add pin_revealed + lat/lng at 100m for others' memories?",
+      "status": "open",
+      "raisedBy": "ios",
+      "needs": "backend",
+      "detail": "iOS wired map reveal at PinRevealPolicy.revealRadiusMeters (100). Wander renders others' pins when teaser has pin_revealed:true plus lat/lng. Coordinates must NOT persist on device (session-only from latest scan). Proposed contract addition to api-contract §4 scan teaser: optional pin_revealed (bool), lat, lng — only when !is_own && distance <= 100m. Unlock bubble stays ~20m. zones[] glow overlay is ready on iOS.",
+      "blocks": [],
+      "responses": []
     }
   ],
   "manualTests": [
@@ -467,6 +559,10 @@
       "platform": "device",
       "milestone": "M0",
       "relatedTasks": ["ios-keychain-session", "ios-auth-ui"],
+      "steps": [
+        "Delete Legacy from the device, reinstall from Xcode",
+        "Cold launch — confirm sign-in screen appears (not Wander)"
+      ],
       "notes": "iOS fix shipped (KeychainSessionStore.clearIfFreshInstall). Joseph re-run after reinstall on device."
     },
     {
@@ -477,6 +573,10 @@
       "platform": "device",
       "milestone": "M1",
       "relatedTasks": ["ios-background-upload", "ios-v1-pin-drop-flow"],
+      "steps": [
+        "Live API build on device (not stub)",
+        "Drop tab → photo → confirm upload completes without error"
+      ],
       "notes": "iOS fix shipped (foreground URLSession for Blob PUT). Joseph re-run on device with live API."
     },
     {
@@ -487,6 +587,10 @@
       "platform": "device",
       "milestone": "M3",
       "relatedTasks": ["ios-import-flow"],
+      "steps": [
+        "Import tab → run import on device with live API",
+        "Confirm cluster uploads complete"
+      ],
       "notes": "Same upload fix as qa-mt-drop-upload. Joseph re-run on device."
     },
     {
@@ -497,6 +601,10 @@
       "platform": "device",
       "milestone": "M2",
       "relatedTasks": ["ios-location-engine", "ios-apns-registration"],
+      "steps": [
+        "Fresh install → grant location when prompted once",
+        "Navigate app — confirm permission alert does not repeat"
+      ],
       "notes": "iOS fix shipped (status guards + single prompt path). Joseph re-run on device."
     },
     {
@@ -507,6 +615,10 @@
       "platform": "device",
       "milestone": "M2",
       "relatedTasks": ["ios-wander-unlock-flow", "ios-memory-lane"],
+      "steps": [
+        "Unlock or open a memory detail sheet",
+        "Confirm Close button dismisses the sheet"
+      ],
       "notes": "iOS fix shipped (UnlockedMemorySheet Close button). Joseph re-run on device."
     },
     {
@@ -517,6 +629,10 @@
       "platform": "device",
       "milestone": "M2",
       "relatedTasks": ["ios-wander-unlock-flow"],
+      "steps": [
+        "After qa-mt-drop-upload passes, re-drop if needed",
+        "Confirm all nearby memories unlock successfully"
+      ],
       "notes": "Likely scan_status pending from pre-fix upload crash. Re-drop after qa-mt-drop-upload passes; no further iOS code expected."
     },
     {
@@ -717,98 +833,6 @@
         "Tap the notification — app opens to Wander tab with updated warmth/teasers",
         "Requires backend APNS_* env vars on Vercel + real device (not simulator)"
       ]
-    },
-    {
-      "id": "dec-pin-reveal-radius",
-      "kind": "decision",
-      "title": "Pin reveal radius vs unlock radius — how far away should pins appear?",
-      "status": "decided",
-      "chosenOptionId": "100m-reveal",
-      "decidedAt": "2026-06-22",
-      "resolution": "100m reveal radius. Pin materializes on map at 100m, unlock still requires ~20m. Joseph: 'I don't want it to feel chore like.' QA walks may refine this constant.",
-      "raisedBy": "backend",
-      "needs": "joseph",
-      "detail": "Joseph wants memory pins to appear on the map before the user is at unlock distance (~20m), so discovery doesn't feel like a chore. Proposal: split into two radii. Pin REVEALS at ~75-100m (you see it drop onto the map), unlock stays at ~20m. This gives a two-beat moment: spot it → walk to it → unlock. Privacy: only owner's nearby pins and already-scanned teasers within reveal radius. Others' memories stay as coarse-zone glow until reveal radius. The reveal radius is a tunable constant — QA walks will determine the sweet spot.",
-      "options": [
-        {
-          "id": "75m-reveal",
-          "label": "75m reveal radius",
-          "description": "Pin appears at 75m, unlock at 20m. Tight enough to feel directional, wide enough to not be a chore.",
-          "recommended": true
-        },
-        {
-          "id": "100m-reveal",
-          "label": "100m reveal radius",
-          "description": "Pin appears at 100m, unlock at 20m. More generous — better for parks/open spaces, might feel too easy in dense urban."
-        },
-        {
-          "id": "tunable-per-context",
-          "label": "Tunable per environment",
-          "description": "75m urban, 100m parks/suburbs. Requires reverse-geocode or density heuristic. More complex."
-        }
-      ]
-    },
-    {
-      "id": "dec-coarse-zone-precision",
-      "kind": "decision",
-      "title": "Coarse-zone glow precision — how big should the 'something is nearby' blob be?",
-      "status": "decided",
-      "chosenOptionId": "precision-7",
-      "decidedAt": "2026-06-22",
-      "resolution": "Precision-7 (~150m cells). Directional enough to guide walking, coarse enough for privacy. Glow hands off cleanly to pin reveal at 100m.",
-      "raisedBy": "backend",
-      "needs": "joseph",
-      "detail": "For Feature B (discovery on map), others' memories appear as a soft glow/heat-blob, not pins. The glow size is controlled by geohash precision. This is a privacy knob: tighter precision = better UX but weaker privacy guarantee. The glow transitions to warmth cues as user approaches, then pin reveals at the reveal radius (see dec-pin-reveal-radius).",
-      "options": [
-        {
-          "id": "precision-7",
-          "label": "Precision-7 (~150m cells)",
-          "description": "Feels very directional. 'Something is in this block.' Weakest privacy but best UX.",
-          "recommended": true
-        },
-        {
-          "id": "precision-6",
-          "label": "Precision-6 (~1.2km cells)",
-          "description": "Neighborhood-scale. 'Something is in this area.' Good balance."
-        },
-        {
-          "id": "precision-5",
-          "label": "Precision-5 (~4.9km cells)",
-          "description": "District-scale. Very private but might feel too vague to act on."
-        }
-      ]
-    },
-    {
-      "id": "idea-pin-drop-animation",
-      "kind": "idea",
-      "title": "Pin drop animation with progress bar on import/drop",
-      "status": "resolved",
-      "raisedBy": "joseph",
-      "needs": "ios",
-      "detail": "When importing camera roll or dropping a photo: show a progress bar with text like 'Loading your memories…' / 'Creating your legacy…', then pins cascade onto the map one-by-one with a drop animation (~80ms stagger). Pure iOS work — no backend changes. Uses OwnMemoryPinCache for import centroids. Joseph approved 2026-06-22.",
-      "responses": [
-        {
-          "author": "backend",
-          "date": "2026-06-22",
-          "text": "No backend changes needed. POST /v1/memories and POST /v1/memories/import already return the coordinates. iOS can animate on completion callback. Directive written for Cursor."
-        },
-        {
-          "author": "ios",
-          "date": "2026-06-22",
-          "text": "Shipped: PinDropCelebrationCoordinator + overlay on Wander; auto-switch to Wander tab after drop/import; 80ms stagger pin reveal on map; OwnMemoryPinCache persisted. Build + 49 SPM tests green."
-        }
-      ]
-    },
-    {
-      "id": "q-pin-reveal-scan-coords",
-      "kind": "question",
-      "title": "Scan teaser — add pin_revealed + lat/lng at 100m for others' memories?",
-      "status": "open",
-      "raisedBy": "ios",
-      "needs": "backend",
-      "detail": "iOS wired map reveal at PinRevealPolicy.revealRadiusMeters (100). Wander renders others' pins when teaser has pin_revealed:true plus lat/lng. Coordinates must NOT persist on device (session-only from latest scan). Proposed contract addition to api-contract §4 scan teaser: optional pin_revealed (bool), lat, lng — only when !is_own && distance <= 100m. Unlock bubble stays ~20m. zones[] glow overlay is ready on iOS.",
-      "blocks": [],
-      "responses": []
     }
   ],
   "tasks": [
