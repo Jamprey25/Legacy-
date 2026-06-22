@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-22T17:02:56.666Z"
+    "lastUpdated": "2026-06-22T17:12:41.320Z"
   },
   "decisions": [
     {
@@ -803,7 +803,7 @@
     {
       "id": "qa-blob-live-upload",
       "title": "Live Vercel Blob photo drop (production API)",
-      "status": "pending",
+      "status": "passed",
       "addedBy": "ios",
       "platform": "device",
       "milestone": "M1",
@@ -818,7 +818,8 @@
         "Verify no upload error; memory appears in Memory Lane with scan_status clear (may take a few seconds for webhook)",
         "Optional: confirm blob URL in backend DB media_key"
       ],
-      "notes": "Requires STORAGE_BACKEND=vercel-blob + BLOB_READ_WRITE_TOKEN on Vercel."
+      "notes": "Requires STORAGE_BACKEND=vercel-blob + BLOB_READ_WRITE_TOKEN on Vercel.",
+      "verifiedAt": "2026-06-22"
     },
     {
       "id": "qa-pin-drop-celebration",
