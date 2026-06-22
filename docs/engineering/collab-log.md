@@ -1131,3 +1131,26 @@ Joseph requested two features to make the app feel less aimless:
 **Joseph re-test:**
 - Import: import any photos that include ones from iCloud or not cached on device — confirm the app completes the import without crashing.
 - Location: fresh permission flow (reset privacy in Settings → Legacy) — grant "Allow While Using", tap Enable background discovery, grant "Always Allow". App should come back immediately (short relaunch) and on return the notification permission prompt should appear automatically.
+
+---
+
+## [ios → all] 2026-06-22 (session 8) — Visit-based import clustering
+
+**Issue:** "import 55 photos, get 1 memory."
+
+**Root cause:** `PhotoClusterEngine` grouped photos by *location only* — 150 m grid + BFS. Visiting the same coffee shop 20 times = 1 cluster = 1 memory. Any location you repeatedly photographed collapsed to a single memory regardless of how many separate days you visited.
+
+**Fix — visit-based clustering (`PhotoClusterEngine.swift`):**
+- `CellKey` gains `dayBucket` (device-timezone "YYYY-MM-DD"). BFS neighbors now only merge cells that share the same calendar day. Same place, different day → different cluster → different memory.
+- `PhotoCluster` gains `date: Date` (earliest photo in cluster) for display and ranking.
+- Ranking: recency decay (score halves over ~1 year) so recent visits surface first. `maxClusters` raised 50 → 500.
+
+**UI improvements (`ImportFeature.swift`):**
+- "Select All / Deselect All" toolbar button.
+- Cluster list grouped by year with per-year select toggle.
+- Rows now show "June 15, 2024 · 3 photos" instead of raw coordinates.
+- Import button: "Import N memories" (was "Import N places").
+
+**Tests:** 56/56 pass. Three new tests: `testSamePlaceSameDayMergesIntoOneVisit`, `testSamePlaceDifferentDaysProducesSeparateClusters`, `testRecentVisitRanksAboveOlderVisitOfSameSize`.
+
+**Joseph re-test:** scan your library — confirm you now see many more clusters (one per day you visited a place). Try "Select All" then "Import N memories". Re-import the same day is safe (idempotency key includes cluster IDs, which changed with the new algorithm, so same-day re-import will create new memories now).
