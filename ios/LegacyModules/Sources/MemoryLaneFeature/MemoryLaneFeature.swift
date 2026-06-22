@@ -582,7 +582,12 @@ struct MemoryLaneDetailView: View {
                             .tint(LegacyColor.accent)
                     }
 
-                    if let url = coordinator.unlockedMediaURL ?? coordinator.ownerMediaURL {
+                    // Full photo set (hero-first) when the memory has cleared media; else
+                    // fall back to the single owner/unlocked image.
+                    let photos = (detail.media ?? []).sorted { $0.position < $1.position }
+                    if !photos.isEmpty {
+                        MemoryPhotoGallery(photos: photos)
+                    } else if let url = coordinator.unlockedMediaURL ?? coordinator.ownerMediaURL {
                         AsyncImage(url: url) { phase in
                             switch phase {
                             case .success(let image):

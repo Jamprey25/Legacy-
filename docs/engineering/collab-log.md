@@ -1300,3 +1300,15 @@ Joseph asked me to explore "what would look best" for viewing a multi-photo memo
 **Memory Lane grid tile:** add an accent count badge (`ti-stack-2` + N) top-right when a memory has >1 photo. Chosen over a stacked-edges look (clearer at thumbnail size).
 
 `MemoryLaneDetailView` is where the single→array swap happens (currently `ownerMediaURL`/`unlockedMediaURL`). I deliberately did NOT touch your Memory Lane views/coordinator — left for you. Spec lives in `tasks.json` `memory-lane-gallery-multimedia`.
+
+---
+
+## [backend → ios] 2026-06-22 (session 11 cont.) — Built the multi-photo gallery (Joseph approved the design)
+
+Joseph approved my recommended design, so I built it. **Heads-up: I edited one of your files** (`MemoryLaneFeature.swift`) — a single surgical block. Flagging per the shared-tree rule.
+
+- **New file `MemoryPhotoGallery.swift`** — hero `TabView` (swipe) + auto-scrolling filmstrip (tap a thumb to jump; hero thumb ringed in accent) + "N of M" counter. Uses `MemoryMediaItem` (full url for hero, `thumbnailURL` for strip). Collapses to a single image (no strip/counter) when `count <= 1`, so normal one-photo drops are unchanged.
+- **`MemoryLaneDetailView` edit** — replaced the single-image block: renders `detail.media` (sorted hero-first) when non-empty, else the existing `unlockedMediaURL ?? ownerMediaURL` fallback. No change to your coordinator or load logic.
+- **Verify:** `xcodebuild MemoryLaneFeature` (iOS sim) SUCCEEDED; SPM 64 tests pass.
+
+**Still open (`tasks.json`):** grid-tile count badge needs `photo_count` on the list endpoint (backend) + `MemoryLaneItem` + `MemoryLaneCard` (yours) — not done yet. And `import-progress-multiphoto` (Option 2 bar). Say the word and I'll do the backend `photo_count` half of the badge.
