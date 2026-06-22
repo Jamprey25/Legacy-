@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-22T12:00:00.000Z"
+    "lastUpdated": "2026-06-22T16:58:59.649Z"
   },
   "decisions": [
     {
@@ -368,7 +368,10 @@
       "raisedBy": "ios",
       "needs": "joseph",
       "detail": "Joseph reports Google sign-in returns 500 and email OTP never arrives. Probed prod: POST /v1/auth/social with provider=google returns 500 internal_error (likely GOOGLE_CLIENT_ID unset — requireEnv throws before JWKS verify). POST /v1/auth/email/start returns 204 but without RESEND_API_KEY codes only log to Vercel function logs, not inbox. Apple blocked on Developer Program enrollment.",
-      "blocks": ["ios-auth-ui", "qa-mt-email-otp"],
+      "blocks": [
+        "ios-auth-ui",
+        "qa-mt-email-otp"
+      ],
       "options": [
         "Joseph adds Vercel env vars on legacy-backend project (see backend/.env.example), redeploys, then retries Google + email on device",
         "Temporary: read OTP from Vercel function logs (Runtime Logs) after email/start until Resend is configured"
@@ -421,7 +424,10 @@
       "raisedBy": "ios",
       "needs": "backend",
       "detail": "Untracked backend WIP: routes/attest.ts, lib/appAttest.ts, migrations/0011_device_attestations.sql. iOS started M5 work: AppAttestCoordinator (DCAppAttestService register + assertion), attestation on createMemory/unlock when hardware supports it, simulated-location rejection on drops. Needs backend confirmation: (1) attest routes mounted on prod, (2) api-contract §8 shapes for challenge/register + assertion field on drop/unlock, (3) APP_ATTEST_* env var list + APP_ATTEST_REQUIRED default false until TestFlight cut, (4) ios-app-attest can mark done once assertion enforcement is wired server-side on memories/unlock.",
-      "blocks": ["ios-app-attest", "app-attest-server"],
+      "blocks": [
+        "ios-app-attest",
+        "app-attest-server"
+      ],
       "responses": [
         {
           "author": "ios",
@@ -554,16 +560,20 @@
     {
       "id": "qa-mt-cold-launch-device",
       "title": "Cold launch shows sign-in on real device after reinstall",
-      "status": "pending",
+      "status": "passed",
       "addedBy": "backend",
       "platform": "device",
       "milestone": "M0",
-      "relatedTasks": ["ios-keychain-session", "ios-auth-ui"],
+      "relatedTasks": [
+        "ios-keychain-session",
+        "ios-auth-ui"
+      ],
       "steps": [
         "Delete Legacy from the device, reinstall from Xcode",
         "Cold launch — confirm sign-in screen appears (not Wander)"
       ],
-      "notes": "iOS fix shipped (KeychainSessionStore.clearIfFreshInstall). Joseph re-run after reinstall on device."
+      "notes": "iOS fix shipped (KeychainSessionStore.clearIfFreshInstall). Joseph re-run after reinstall on device.",
+      "verifiedAt": "2026-06-22"
     },
     {
       "id": "qa-mt-drop-upload",
@@ -572,7 +582,10 @@
       "addedBy": "backend",
       "platform": "device",
       "milestone": "M1",
-      "relatedTasks": ["ios-background-upload", "ios-v1-pin-drop-flow"],
+      "relatedTasks": [
+        "ios-background-upload",
+        "ios-v1-pin-drop-flow"
+      ],
       "steps": [
         "Live API build on device (not stub)",
         "Drop tab → photo → confirm upload completes without error"
@@ -586,7 +599,9 @@
       "addedBy": "backend",
       "platform": "device",
       "milestone": "M3",
-      "relatedTasks": ["ios-import-flow"],
+      "relatedTasks": [
+        "ios-import-flow"
+      ],
       "steps": [
         "Import tab → run import on device with live API",
         "Confirm cluster uploads complete"
@@ -600,7 +615,10 @@
       "addedBy": "backend",
       "platform": "device",
       "milestone": "M2",
-      "relatedTasks": ["ios-location-engine", "ios-apns-registration"],
+      "relatedTasks": [
+        "ios-location-engine",
+        "ios-apns-registration"
+      ],
       "steps": [
         "Fresh install → grant location when prompted once",
         "Navigate app — confirm permission alert does not repeat"
@@ -614,7 +632,10 @@
       "addedBy": "backend",
       "platform": "device",
       "milestone": "M2",
-      "relatedTasks": ["ios-wander-unlock-flow", "ios-memory-lane"],
+      "relatedTasks": [
+        "ios-wander-unlock-flow",
+        "ios-memory-lane"
+      ],
       "steps": [
         "Unlock or open a memory detail sheet",
         "Confirm Close button dismisses the sheet"
@@ -628,7 +649,9 @@
       "addedBy": "backend",
       "platform": "device",
       "milestone": "M2",
-      "relatedTasks": ["ios-wander-unlock-flow"],
+      "relatedTasks": [
+        "ios-wander-unlock-flow"
+      ],
       "steps": [
         "After qa-mt-drop-upload passes, re-drop if needed",
         "Confirm all nearby memories unlock successfully"
