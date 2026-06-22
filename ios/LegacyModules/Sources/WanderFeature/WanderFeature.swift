@@ -841,6 +841,11 @@ private struct WanderUserMap: View {
     /// cold-launch cache of dozens of pins) never animates enough markers to drop frames.
     private func staggerReveal(incoming: [String], insert: @escaping (String) -> Void) {
         guard !incoming.isEmpty else { return }
+        // Reduce Motion: drop every pin in at once with no spring or cascade.
+        if LegacyMotion.isReduced {
+            withAnimation(nil) { incoming.forEach(insert) }
+            return
+        }
         let staggerCap = 12
         for (index, pinID) in incoming.enumerated() {
             let delay = Double(min(index, staggerCap)) * 0.08
@@ -853,7 +858,7 @@ private struct WanderUserMap: View {
     }
 
     private func syncVisiblePins(animated: Bool) {
-        if animated {
+        if animated && !LegacyMotion.isReduced {
             visibleOwnPinIDs = []
             visibleRevealedPinIDs = []
             for (index, pinID) in ownPins.map(\.memoryID).enumerated() {
@@ -896,7 +901,7 @@ private struct WanderUserMap: View {
             latitudeDelta: max(0.012, (maxLat - minLat) * 1.5 + 0.008),
             longitudeDelta: max(0.012, (maxLng - minLng) * 1.5 + 0.008)
         )
-        withAnimation(.easeInOut(duration: 0.45)) {
+        withAnimation(LegacyMotion.animation(.easeInOut(duration: 0.45))) {
             position = .region(MKCoordinateRegion(center: center, span: span))
         }
     }

@@ -51,7 +51,7 @@ public struct OnboardingView: View {
                     if isLastPage {
                         onComplete()
                     } else {
-                        withAnimation { page += 1 }
+                        withAnimation(LegacyMotion.animation(.default)) { page += 1 }
                     }
                 }
                 .buttonStyle(.legacyPrimary)

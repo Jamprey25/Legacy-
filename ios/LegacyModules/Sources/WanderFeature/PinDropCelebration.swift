@@ -84,11 +84,18 @@ public final class PinDropCelebrationCoordinator {
         var revealed = Set<String>()
         phase = .revealing(revealedIDs: revealed, total: newPins.count)
 
-        for pin in newPins {
-            revealed.insert(pin.memoryID)
+        if LegacyMotion.isReduced {
+            // Reduce Motion: reveal the whole batch at once, no per-pin cascade.
+            revealed = Set(newPins.map(\.memoryID))
             wander.setMapPinFilter(revealed)
             phase = .revealing(revealedIDs: revealed, total: newPins.count)
-            try? await Task.sleep(for: .milliseconds(80))
+        } else {
+            for pin in newPins {
+                revealed.insert(pin.memoryID)
+                wander.setMapPinFilter(revealed)
+                phase = .revealing(revealedIDs: revealed, total: newPins.count)
+                try? await Task.sleep(for: .milliseconds(80))
+            }
         }
 
         try? await Task.sleep(for: .milliseconds(900))
