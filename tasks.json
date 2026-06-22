@@ -364,7 +364,7 @@
       "id": "concern-auth-vercel-env-missing",
       "kind": "concern",
       "title": "Production auth blocked — GOOGLE_CLIENT_ID + RESEND_API_KEY missing on Vercel",
-      "status": "open",
+      "status": "resolved",
       "raisedBy": "ios",
       "needs": "joseph",
       "detail": "Joseph reports Google sign-in returns 500 and email OTP never arrives. Probed prod: POST /v1/auth/social with provider=google returns 500 internal_error (likely GOOGLE_CLIENT_ID unset — requireEnv throws before JWKS verify). POST /v1/auth/email/start returns 204 but without RESEND_API_KEY codes only log to Vercel function logs, not inbox. Apple blocked on Developer Program enrollment.",
@@ -383,6 +383,11 @@
           "author": "ios",
           "text": "Google OAuth wired in Info.plist + CFBundleURLSchemes (iOS client redirect). Simulator QA unblocked via launch arg `-LegacyUseStubAPI` (StubHTTPTransport.qaAuthFlow) — live Google/email still blocked until Joseph adds Vercel env vars.",
           "date": "2026-06-19"
+        },
+        {
+          "author": "joseph",
+          "text": "All three env vars added to Vercel (GOOGLE_CLIENT_ID, RESEND_API_KEY, OTP_FROM_EMAIL). Live Google sign-in and email OTP now unblocked on device.",
+          "date": "2026-06-22"
         }
       ]
     },
