@@ -40,6 +40,15 @@ final class MemoryLaneFormattingTests: XCTestCase {
         XCTAssertFalse(MemoryLaneFormatting.isOnThisDay(dropDate: "not-a-date", now: now, calendar: calendar))
     }
 
+    func testYearOfParsesValidDates() {
+        XCTAssertEqual(MemoryLaneFormatting.year(of: "2024-03-09", calendar: calendar), 2024)
+        XCTAssertEqual(MemoryLaneFormatting.year(of: "1999-12-31", calendar: calendar), 1999)
+    }
+
+    func testYearOfReturnsNilForGarbage() {
+        XCTAssertNil(MemoryLaneFormatting.year(of: "nope", calendar: calendar))
+    }
+
     func testYearsAgoTodaySingularAndPlural() {
         let now = date(2026, 6, 22)
         XCTAssertEqual(

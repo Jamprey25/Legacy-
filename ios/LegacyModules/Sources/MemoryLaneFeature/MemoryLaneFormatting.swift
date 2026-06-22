@@ -28,6 +28,12 @@ enum MemoryLaneFormatting {
         ISO8601DateFormatter().date(from: value) ?? parseDateOnly(value)
     }
 
+    /// Calendar year for a drop date, or `nil` if unparseable.
+    static func year(of dropDate: String, calendar: Calendar = .current) -> Int? {
+        guard let date = parseDay(dropDate) else { return nil }
+        return calendar.component(.year, from: date)
+    }
+
     /// True when `dropDate` falls on today's month+day in a *previous* year ("on this day").
     static func isOnThisDay(dropDate: String, now: Date = Date(), calendar: Calendar = .current) -> Bool {
         guard let date = parseDay(dropDate) else { return false }

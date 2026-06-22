@@ -8,6 +8,16 @@ public enum MemoryLaneFeature {
     public static let version = "0.1.0"
 }
 
+/// A year-bucket of memories for sectioned browsing. `year == 0` means the drop
+/// date could not be parsed and is presented as "Undated".
+public struct MemorySection: Identifiable, Equatable {
+    public let year: Int
+    public let items: [MemoryLaneItem]
+    public var id: Int { year }
+
+    public var title: String { year == 0 ? "Undated" : String(year) }
+}
+
 #if os(iOS)
 import MapKit
 #endif
@@ -47,6 +57,15 @@ public final class MemoryLaneCoordinator {
         items
             .filter { MemoryLaneFormatting.isOnThisDay(dropDate: $0.dropDate) }
             .sorted { $0.dropDate > $1.dropDate }
+    }
+
+    /// Items grouped into year sections for browsing. Section order follows the
+    /// active sort (newest → years descending). Within a year, the backend's
+    /// ordering is preserved. Unparseable dates collect under year 0 ("Undated").
+    public var sections: [MemorySection] {
+        let grouped = Dictionary(grouping: items) { MemoryLaneFormatting.year(of: $0.dropDate) ?? 0 }
+        let unsorted = grouped.map { MemorySection(year: $0.key, items: $0.value) }
+        return unsorted.sorted { sort == .newest ? $0.year > $1.year : $0.year < $1.year }
     }
 
     public func setSort(_ newSort: MemorySort) async {
@@ -203,18 +222,27 @@ public struct MemoryLaneFeatureRootView: View {
                         }
                         #endif
 
-                        LazyVGrid(columns: columns, spacing: LegacySpacing.md) {
-                            ForEach(coordinator.items) { item in
-                                NavigationLink(value: item) {
-                                    MemoryLaneCard(item: item)
-                                }
-                                .buttonStyle(.plain)
-                                .onAppear {
-                                    Task { await coordinator.loadMoreIfNeeded(current: item) }
+                        LazyVStack(alignment: .leading, spacing: LegacySpacing.lg, pinnedViews: [.sectionHeaders]) {
+                            ForEach(coordinator.sections) { section in
+                                Section {
+                                    LazyVGrid(columns: columns, spacing: LegacySpacing.md) {
+                                        ForEach(section.items) { item in
+                                            NavigationLink(value: item) {
+                                                MemoryLaneCard(item: item)
+                                            }
+                                            .buttonStyle(.plain)
+                                            .onAppear {
+                                                Task { await coordinator.loadMoreIfNeeded(current: item) }
+                                            }
+                                        }
+                                    }
+                                    .padding(.horizontal, LegacySpacing.lg)
+                                } header: {
+                                    MemoryLaneSectionHeader(title: section.title, count: section.items.count)
                                 }
                             }
                         }
-                        .padding(LegacySpacing.lg)
+                        .padding(.vertical, LegacySpacing.lg)
 
                         if coordinator.isLoadingMore {
                             ProgressView()
@@ -343,6 +371,27 @@ private struct MemoryLaneFilterMenu: View {
     }
 }
 #endif
+
+/// Sticky year header for the sectioned Memory Lane grid.
+private struct MemoryLaneSectionHeader: View {
+    let title: String
+    let count: Int
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: LegacySpacing.sm) {
+            Text(title)
+                .font(LegacyFont.headline)
+                .foregroundStyle(LegacyColor.textPrimary)
+            Text(count == 1 ? "1 memory" : "\(count) memories")
+                .font(LegacyFont.caption)
+                .foregroundStyle(LegacyColor.textSecondary)
+            Spacer()
+        }
+        .padding(.horizontal, LegacySpacing.lg)
+        .padding(.vertical, LegacySpacing.sm)
+        .background(LegacyColor.background.opacity(0.96))
+    }
+}
 
 #if os(iOS)
 /// "On this day" resurfacing strip — a horizontal carousel of memories from
