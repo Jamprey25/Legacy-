@@ -150,8 +150,19 @@ private struct RootView: View {
     let deviceID: String
     let googleClientID: String?
 
+    @AppStorage("legacyHasSeenOnboarding") private var hasSeenOnboarding = false
+
     @ViewBuilder
     var body: some View {
+        if !hasSeenOnboarding {
+            OnboardingView(onComplete: { hasSeenOnboarding = true })
+        } else {
+            authedOrWelcome
+        }
+    }
+
+    @ViewBuilder
+    private var authedOrWelcome: some View {
         if appModel.isAuthenticated {
             MainTabView(
                 appModel: appModel,
