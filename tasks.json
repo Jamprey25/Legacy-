@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-22T17:12:43.112Z"
+    "lastUpdated": "2026-06-22T22:30:00.000Z"
   },
   "decisions": [
     {
@@ -548,12 +548,100 @@
       "id": "q-pin-reveal-scan-coords",
       "kind": "question",
       "title": "Scan teaser — add pin_revealed + lat/lng at 100m for others' memories?",
-      "status": "open",
+      "status": "resolved",
       "raisedBy": "ios",
       "needs": "backend",
       "detail": "iOS wired map reveal at PinRevealPolicy.revealRadiusMeters (100). Wander renders others' pins when teaser has pin_revealed:true plus lat/lng. Coordinates must NOT persist on device (session-only from latest scan). Proposed contract addition to api-contract §4 scan teaser: optional pin_revealed (bool), lat, lng — only when !is_own && distance <= 100m. Unlock bubble stays ~20m. zones[] glow overlay is ready on iOS.",
       "blocks": [],
-      "responses": []
+      "responses": [
+        {
+          "author": "backend",
+          "date": "2026-06-22",
+          "text": "Shipped in discovery.ts: scan teaser includes pin_revealed (bool) and lat/lng when !is_own && distance <= 100m. zones[] at precision-7 already live. api-contract.md §4 updated on backend deploy."
+        }
+      ]
+    },
+    {
+      "id": "bug-age-gate-continue-noop",
+      "kind": "concern",
+      "title": "Age gate — selecting DOB and pressing Continue does nothing (blocks ALL new-user sign-in)",
+      "status": "resolved",
+      "raisedBy": "joseph",
+      "needs": "ios",
+      "detail": "Manual QA 2026-06-22 (device): DOB Continue appeared to do nothing. Root cause: backend consumed OTP on first verify before returning dob_required; iOS retry hit invalid_code but DOB screen hid the error.",
+      "blocks": ["bug-google-signin-after-delete"],
+      "responses": [
+        {
+          "author": "backend",
+          "date": "2026-06-22",
+          "text": "Initial analysis pointed at iOS confirmDOB(); follow-up: verifyCode ran before dob check, deleting OTP on dob_required."
+        },
+        {
+          "author": "ios",
+          "date": "2026-06-22",
+          "text": "Fixed: backend assertValidCode (validate without consume) before dob_required; verifyCode only after DOB supplied. iOS: error text on DOBGateView + EmailOTPView so retries never fail silently."
+        }
+      ]
+    },
+    {
+      "id": "bug-google-signin-after-delete",
+      "kind": "concern",
+      "title": "Google Sign-In fails after account deletion — blocked by age gate OTP bug",
+      "status": "resolved",
+      "raisedBy": "joseph",
+      "needs": "ios",
+      "detail": "Re-register after hard delete returns dob_required; same OTP/DOB bug as email path.",
+      "blocks": [],
+      "responses": [
+        {
+          "author": "ios",
+          "date": "2026-06-22",
+          "text": "Resolved by bug-age-gate-continue-noop fix — Google confirmDOB path already retries authSocial with DOB."
+        }
+      ]
+    },
+    {
+      "id": "concern-wander-map-scroll",
+      "kind": "concern",
+      "title": "Wander map is too restricted — user cannot scroll/pan the map around",
+      "status": "resolved",
+      "raisedBy": "backend",
+      "needs": "ios",
+      "detail": "Map had allowsHitTesting(false) and fitCamera on every GPS tick, fighting user pan.",
+      "blocks": [],
+      "responses": [
+        {
+          "author": "ios",
+          "date": "2026-06-22",
+          "text": "Removed map allowsHitTesting(false); decorative overlays + empty state pass touches through; stopped auto fitCamera on coordinate.latitude changes."
+        }
+      ]
+    },
+    {
+      "id": "concern-wander-image-layout",
+      "kind": "concern",
+      "title": "Wander — unlocked memory image layout broken",
+      "status": "resolved",
+      "raisedBy": "backend",
+      "needs": "ios",
+      "detail": "UnlockedMemorySheet AsyncImage lacked maxWidth constraint.",
+      "blocks": [],
+      "responses": [
+        {
+          "author": "ios",
+          "date": "2026-06-22",
+          "text": "Added .frame(maxWidth: .infinity) on scaledToFit image in UnlockedMemorySheet."
+        }
+      ]
+    },
+    {
+      "id": "concern-forced-unlock-annoying",
+      "kind": "concern",
+      "title": "Wander — nearby memory auto-opens or forces interaction; should be optional",
+      "status": "open",
+      "raisedBy": "joseph",
+      "needs": "ios",
+      "detail": "Manual QA 2026-06-22: When a memory is in the area, the app forces the user to interact with it (auto-opens detail or blocks other interaction). Joseph: 'I shouldn't be forced to open it, it is kinda annoying.' Wander should passively show warmth cues and pins but NEVER auto-open unlock sheets or block map interaction. User taps a pin to unlock — their choice. Check WanderCoordinator and scan response handling: if in_range triggers an automatic sheet presentation, remove it. Warmth cues + pin presence on map are sufficient — let the user decide when to engage."
     }
   ],
   "manualTests": [
@@ -2085,7 +2173,7 @@
     {
       "id": "backend-scan-zones",
       "title": "Add zones[] array to /scan response for coarse-zone glow",
-      "status": "in-progress",
+      "status": "done",
       "owner": "backend",
       "phase": 1.5,
       "milestone": "M6",

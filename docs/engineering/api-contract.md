@@ -215,13 +215,33 @@ Submit current location; get teasers for eligible nearby memories. **Location is
       "is_own": true,
       "in_range": true,                              // true if within unlock bubble right now
       "warmth": "in_bubble",                         // "coarse" | "approaching" | "in_bubble"
-      "scan_status": "clear"                         // own pending memories may show "pending"
+      "scan_status": "clear",                        // own pending memories may show "pending"
+      "pin_revealed": true,                          // true when pin should materialize on map (see below)
+      "lat": 37.7749,                                // ONLY present when pin_revealed=true
+      "lng": -122.4194                               // ONLY present when pin_revealed=true
+    }
+  ],
+  "zones": [
+    {
+      "geohash_prefix": "9q8yykb",                  // precision-7 (~150m cell)
+      "count": 3                                     // number of others' eligible memories in this cell
     }
   ]
 }
 ```
 
-**Response `204`** — no eligible memories nearby. Empty body. (Decided: 204, not `200 + []`.)
+**`pin_revealed` + coordinates (M6, dec-pin-reveal-radius):**
+- Own memories: always `pin_revealed: true` with `lat`/`lng` (owner placed them).
+- Others' memories: `pin_revealed: true` + `lat`/`lng` only when distance ≤ 100m (reveal radius). Beyond 100m: `pin_revealed: false`, no `lat`/`lng` fields (omitted entirely, not null).
+- iOS must NOT persist revealed coordinates for others' memories — session-only from latest scan (DEC-15).
+
+**`zones[]` (M6, dec-coarse-zone-precision):**
+- Precision-7 geohash cells (~150m) with counts of others' eligible memories.
+- Never contains coordinates, identity, or memory IDs — only the geohash prefix string + count.
+- iOS renders as a soft heat-blob / glow overlay on the Wander map. Intensity scales by count.
+- Phase 1 (private-only): zones will be empty until social tiers ship (Phase 2). iOS glow overlay is wired and ready.
+
+**Response `204`** — no eligible memories nearby (no teasers AND no zones). Empty body. (Decided: 204, not `200 + []`.)
 
 - Coordinates **never** appear in the response. `warmth` is the only proximity signal, and it is restricted to the **3 coarse bands** above — **never a continuous scalar** (no `warmth_level`, distance, bearing, or heading field). Rationale (resolved with iOS, collab-log Ideas): a responsive 0–1 distance proxy is a trilateration oracle — sampled from 2–3 spots it back-solves the pin with no proximity check, defeating DEC-15. The smooth gradient UX is achieved by the **client** easing animation *between* band transitions; the server only ever emits the 3 bands. Bands should be **debounced server-side** so boundary jitter can't be sampled as a fine signal. Do not add a finer field.
 - This call counts as **dwell check #1** for any memory it returns `in_range: true` for (see unlock).

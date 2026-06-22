@@ -25,26 +25,37 @@ export async function issueCode(email: string): Promise<string> {
   return code;
 }
 
+const failInvalidCode = () => new ApiError("invalid_code", "That code is incorrect or expired.");
+
+async function loadOtpRow(email: string) {
+  const rows = await sql`
+    SELECT code_hash, expires_at, attempts FROM email_otps WHERE email = ${email} LIMIT 1
+  `;
+  return rows[0] as { code_hash: string; expires_at: string; attempts: number } | undefined;
+}
+
+/**
+ * Validate a submitted code without consuming it. Used when signup still needs DOB so the
+ * client can retry email/verify with the same OTP after the DOB screen.
+ */
+export async function assertValidCode(email: string, code: string): Promise<void> {
+  const row = await loadOtpRow(email);
+  if (!row) throw failInvalidCode();
+  if (row.attempts >= MAX_ATTEMPTS || new Date(row.expires_at).getTime() < Date.now()) {
+    await sql`DELETE FROM email_otps WHERE email = ${email}`;
+    throw failInvalidCode();
+  }
+  if (row.code_hash !== hashCode(code)) {
+    await sql`UPDATE email_otps SET attempts = attempts + 1 WHERE email = ${email}`;
+    throw failInvalidCode();
+  }
+}
+
 /**
  * Verify a submitted code. Consumes the row on success. Throws ApiError(invalid_code)
  * on mismatch/expiry/too-many-attempts — deliberately indistinguishable to the caller.
  */
 export async function verifyCode(email: string, code: string): Promise<void> {
-  const rows = await sql`
-    SELECT code_hash, expires_at, attempts FROM email_otps WHERE email = ${email} LIMIT 1
-  `;
-  const row = rows[0] as { code_hash: string; expires_at: string; attempts: number } | undefined;
-
-  const fail = () => new ApiError("invalid_code", "That code is incorrect or expired.");
-
-  if (!row) throw fail();
-  if (row.attempts >= MAX_ATTEMPTS || new Date(row.expires_at).getTime() < Date.now()) {
-    await sql`DELETE FROM email_otps WHERE email = ${email}`;
-    throw fail();
-  }
-  if (row.code_hash !== hashCode(code)) {
-    await sql`UPDATE email_otps SET attempts = attempts + 1 WHERE email = ${email}`;
-    throw fail();
-  }
+  await assertValidCode(email, code);
   await sql`DELETE FROM email_otps WHERE email = ${email}`; // single-use
 }

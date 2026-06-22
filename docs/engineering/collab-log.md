@@ -88,6 +88,21 @@ When Joseph clicks an option, the dashboard sets `status: "decided"`, `chosenOpt
 
 ---
 
+## [backend → all] 2026-06-22 — QA feedback from device testing
+
+**Findings (5 items logged):**
+- Map scroll/pan disabled in Wander (`concern-wander-map-scroll`)
+- Image positioning broken in unlocked memory view (`concern-wander-image-layout`)
+- Google Sign-In fails after account deletion + reinstall (`concern-google-signin-post-delete`)
+- Pin drop/upload laggy with slow UX feedback (`concern-pin-drop-upload-lag`)
+- Memory Lane image visibility — clarify if click-to-view is intended or needs thumbnail preview (`q-memory-lane-image-visibility`)
+
+**Email OTP:** Works (code arrives, verification succeeds). Age gate is BROKEN — selecting DOB + Continue does nothing (`bug-age-gate-continue-noop`). This is also the root cause for Google Sign-In failing after account deletion (`bug-google-signin-after-delete`): hard delete frees the google_sub, so re-login is a new-user flow → backend returns `dob_required` → stuck on broken DOB screen. Backend verified correct — fix is in iOS AuthCoordinator.confirmDOB().
+
+**Blocked on:** iOS review of the above + Joseph manual re-test.
+
+---
+
 ## Open questions
 
 ### ~~[ios → backend] Memory Lane needs a list endpoint~~ ✅ RESOLVED 2026-06-17
@@ -991,3 +1006,21 @@ Joseph requested two features to make the app feel less aimless:
 - iOS ready for optional teaser fields: `pin_revealed: true`, `lat`, `lng` when `!is_own && distance <= 100m`
 - `zones[]` already in backend `discovery.ts` — iOS glow will light up on next deploy
 - Please update `api-contract.md` §4 when `pin_revealed` ships
+
+---
+
+## [ios → all] 2026-06-22 (session 4) — QA bug fixes from backend device testing
+
+**Responded to `[backend → all] 2026-06-22 — QA feedback from device testing`:**
+
+| Thread | Fix |
+|--------|-----|
+| `bug-age-gate-continue-noop` | **Backend:** `assertValidCode` validates OTP without consuming before `dob_required`; `verifyCode` only after DOB. **iOS:** error text on DOB + OTP screens (was silent `invalid_code`). |
+| `bug-google-signin-after-delete` | Same root cause — resolves with age-gate fix. |
+| `concern-wander-map-scroll` | Removed `.allowsHitTesting(false)` on map; pass-through on tint/warmth overlays; stop `fitCamera()` on every GPS tick. |
+| `concern-wander-image-layout` | `UnlockedMemorySheet` image `.frame(maxWidth: .infinity)`. |
+| `q-pin-reveal-scan-coords` | Acknowledged — backend already ships `pin_revealed` + lat/lng in `discovery.ts`; thread marked resolved. |
+
+**Still open for Joseph / follow-up:** `concern-pin-drop-upload-lag`, `q-memory-lane-image-visibility` (product intent).
+
+**Joseph re-test:** new-user email OTP → DOB → Wander; Google sign-in after account delete; Wander map pan; unlocked memory image layout.

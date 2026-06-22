@@ -18,7 +18,7 @@ import {
   findExistingByEmail,
   type User,
 } from "../db/users.js";
-import { issueCode, verifyCode } from "../db/otp.js";
+import { assertValidCode, issueCode, verifyCode } from "../db/otp.js";
 import { upsertSession, revokeSession, type DeviceInfo } from "../db/sessions.js";
 import { requireAuth, type AuthVars } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
@@ -105,15 +105,17 @@ authRoutes.post("/email/verify", async (c) => {
   const body = await c.req.json<{ email?: string; code?: string; dob?: string; device?: DeviceInfo }>();
   if (!body.email || !body.code) throw new ApiError("invalid_request", "Email and code are required.");
 
-  await verifyCode(body.email, body.code); // throws invalid_code
-
   const existing = await findExistingByEmail(body.email);
   if (existing) {
+    await verifyCode(body.email, body.code); // throws invalid_code
     audit(c, "auth.login", { method: "email", is_new: false }, existing.id);
     return c.json(await sessionResponse(existing, body.device), 201);
   }
 
+  // New user: validate OTP but do not consume until DOB is supplied (iOS shows DOB gate).
+  await assertValidCode(body.email, body.code);
   if (!body.dob) throw new ApiError("dob_required", "Date of birth is required to sign up.");
+  await verifyCode(body.email, body.code);
   const ageTier = resolveAgeTier(body.dob);
   const user = await findOrCreateByEmail(body.email, body.dob, ageTier);
   audit(c, "auth.login", { method: "email", is_new: true }, user.id);
