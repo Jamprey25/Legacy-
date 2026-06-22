@@ -138,12 +138,14 @@ public struct LegacyAPIClient: LegacyAPIClientProtocol {
     /// Server-side blob upload: POST the (EXIF-stripped) bytes to `/v1/uploads/direct`.
     /// The backend stores them via the official @vercel/blob `put()` and flips scan_status.
     /// Returns the stored public blob URL.
-    public func uploadMemoryMediaDirect(
+    /// Build the authorized `POST /v1/uploads/direct` request WITHOUT a body — for background
+    /// `URLSession` upload tasks that stream the body from a file (the body must not be set
+    /// here). Carries the same auth/app headers as the foreground path.
+    public func directUploadRequest(
         memoryID: String,
-        data: Data,
         contentType: String,
         position: Int = 0
-    ) async throws -> String {
+    ) throws -> URLRequest {
         guard let url = URL(string: "/v1/uploads/direct", relativeTo: configuration.baseURL) else {
             throw LegacyAPIError.invalidRequest(code: "invalid_path", message: "Bad upload path.")
         }
@@ -153,7 +155,6 @@ public struct LegacyAPIClient: LegacyAPIClientProtocol {
 
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
-        req.httpBody = data
         req.setValue(contentType, forHTTPHeaderField: "Content-Type")
         req.setValue(memoryID, forHTTPHeaderField: "X-Memory-Id")
         req.setValue(String(position), forHTTPHeaderField: "X-Media-Position")
@@ -162,19 +163,30 @@ public struct LegacyAPIClient: LegacyAPIClientProtocol {
         req.setValue(configuration.deviceID, forHTTPHeaderField: "X-Device-Id")
         req.setValue(Self.timestampFormatter.string(from: Date()), forHTTPHeaderField: "X-Request-Timestamp")
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        return req
+    }
 
-        let data: Data
+    public func uploadMemoryMediaDirect(
+        memoryID: String,
+        data: Data,
+        contentType: String,
+        position: Int = 0
+    ) async throws -> String {
+        var req = try directUploadRequest(memoryID: memoryID, contentType: contentType, position: position)
+        req.httpBody = data
+
+        let respData: Data
         let response: URLResponse
         do {
-            (data, response) = try await transport.data(for: req)
+            (respData, response) = try await transport.data(for: req)
         } catch {
             throw LegacyAPIError.transport(error.localizedDescription)
         }
         guard let http = response as? HTTPURLResponse else {
             throw LegacyAPIError.invalidResponse(statusCode: -1)
         }
-        try Self.validate(status: http.statusCode, data: data, headers: http)
-        return try decode(data, as: DirectUploadResponse.self).url
+        try Self.validate(status: http.statusCode, data: respData, headers: http)
+        return try decode(respData, as: DirectUploadResponse.self).url
     }
 
     private struct DirectUploadResponse: Decodable { let url: String }

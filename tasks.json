@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-23T01:05:00.000Z"
+    "lastUpdated": "2026-06-23T01:30:00.000Z"
   },
   "decisions": [
     {
@@ -2385,11 +2385,11 @@
     {
       "id": "import-background-upload-followup",
       "title": "Move bulk import media to background uploader (BackgroundMediaUploader)",
-      "status": "todo",
-      "owner": "either",
+      "status": "done",
+      "owner": "backend",
       "phase": 2,
       "milestone": "M",
-      "notes": "Uploads are foreground/sequential today; a 200-photo visit = 200 blocking POSTs. BackgroundMediaUploader is a stub. Wire it so 'upload all photos' doesn't block the import flow or drain battery. This is the real scale fix behind the no-cap decision."
+      "notes": "DONE (Claude). Hybrid: hero (pos 0) uploads FOREGROUND (guaranteed image + pin + scan clear + drives progress); EXTRAS go to a real background URLSession (file-based upload tasks) — non-blocking, survive app suspension. BackgroundMediaUploader.shared.enqueue(request:data:) writes a temp file + uploadTask(fromFile:); BackgroundUploadSessionDelegate cleans up temp files on completion + sweeps stale ones on launch. APIClient.directUploadRequest builds the authorized /uploads/direct request (no body). xcodebuild ImportFeature + SPM 64 tests pass. NOTE FOR CURSOR: add the scene hook in LegacyApp.swift to finish events after background relaunch — `.backgroundTask(.urlSession(\"app.legacy.ios.upload\")) {}` on the App scene (or UIKit handleEventsForBackgroundURLSession -> BackgroundUploadSessionDelegate.shared.setBackgroundCompletionHandler). Feature works without it (uploads still land + backend records them); it's the relaunch optimization."
     },
     {
       "id": "memory-lane-gallery-multimedia",

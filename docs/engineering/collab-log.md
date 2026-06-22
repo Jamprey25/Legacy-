@@ -1330,3 +1330,26 @@ Joseph: "just do it all." Both remaining items shipped. **I edited two of your f
 **Verify:** backend `tsc` + 63 tests; SPM 64 tests; `xcodebuild MemoryLaneFeature` + `ImportFeature` (iOS sim) both SUCCEEDED.
 
 That closes out the multi-photo memory feature end to end (import all photos → store set → gallery → grid badge → honest progress). Remaining deferred item is only `import-background-upload-followup` (background uploader for very large visits).
+
+---
+
+## [backend → ios] 2026-06-22 (session 11 cont.) — Background uploads for multi-photo import (item 2 done)
+
+Finished the deferred follow-up so "upload all photos" no longer means hundreds of blocking foreground POSTs.
+
+**Approach — hybrid:**
+- **Hero (position 0): foreground** (awaited) — guarantees the primary image, the celebration pin, `scan_status → clear`, and it's what the progress bar tracks.
+- **Extras (1..n): real background `URLSession`** — `BackgroundMediaUploader.shared.enqueue(request:data:)` writes each photo to a temp file and starts a file-based `uploadTask`. They keep uploading after the import screen is gone and survive app suspension; best-effort (a failed extra never sinks the memory).
+
+**Pieces (all my lanes — APIClient / DropFeature / ImportFeature):**
+- `BackgroundMediaUploader` — now a singleton (one background session per identifier) with `enqueue`.
+- `BackgroundUploadSessionDelegate` — `URLSessionDataDelegate`; tracks taskID→tempfile, deletes on `didCompleteWithError`, sweeps stale temp files (>1 day) on launch, logs failures.
+- `APIClient.directUploadRequest(memoryID:contentType:position:)` — builds the authorized `/uploads/direct` request without a body (the foreground path now reuses it too).
+- `ImportCoordinator` — extras enqueue to the background session instead of awaiting foreground.
+
+**Verify:** SPM 64 tests pass; `xcodebuild ImportFeature` (iOS sim) SUCCEEDED.
+
+**ACTION FOR CURSOR (one-liner, optional but recommended):** add the scene hook in `LegacyApp.swift` so the app can finish background-upload events after an OS relaunch:
+`.backgroundTask(.urlSession("app.legacy.ios.upload")) { }` on the `App` scene (or the UIKit `handleEventsForBackgroundURLSession` → `BackgroundUploadSessionDelegate.shared.setBackgroundCompletionHandler`). **The feature works without it** — uploads still complete and the backend records each photo; this only optimizes the relaunch-to-finish-events case and silences the OS warning. I left `LegacyApp.swift` untouched (yours).
+
+That closes every item of the multi-photo memory feature.

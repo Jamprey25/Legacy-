@@ -138,21 +138,22 @@ public final class ImportCoordinator {
                 uploadedPhotos += 1
                 phase = .importing(current: uploadedPhotos, total: totalPhotos)
 
-                // Remaining photos are best-effort: a failed extra must not sink the memory,
-                // but it still counts toward progress so the bar reaches 100%.
+                // Extras stream up via the background URLSession: handed to the OS and counted
+                // as soon as they're enqueued, so they keep uploading after this screen is gone
+                // and survive app suspension instead of blocking here. Best-effort — a failed
+                // extra never sinks the memory, and progress still advances so the bar finishes.
                 for (position, assetID) in assetIDs.enumerated().dropFirst() {
                     do {
                         let raw = try await PHAssetImageFetcher.loadJPEGData(assetID: assetID)
                         let stripped = try EXIFStripper.stripMetadata(from: raw)
-                        try await mediaUploader.upload(
+                        let request = try apiClient.directUploadRequest(
                             memoryID: item.memoryID,
-                            data: stripped,
                             contentType: "image/jpeg",
-                            signedPutURL: nil,
                             position: position
                         )
+                        try BackgroundMediaUploader.shared.enqueue(request: request, data: stripped)
                     } catch {
-                        // skip this photo's bytes; still advance progress below
+                        // skip this photo; still advance progress below
                     }
                     uploadedPhotos += 1
                     phase = .importing(current: uploadedPhotos, total: totalPhotos)
