@@ -3,9 +3,10 @@ import XCTest
 
 final class ImportCoordinatorTests: XCTestCase {
     func testIdempotencyKeyIsStableForSameDayAndClusters() {
+        let ref = Date(timeIntervalSince1970: 1_700_000_000)
         let clusters = [
-            PhotoCluster(id: "b", centroidLat: 1, centroidLng: 2, photoCount: 3, sampleIDs: ["s1"], score: 1),
-            PhotoCluster(id: "a", centroidLat: 3, centroidLng: 4, photoCount: 5, sampleIDs: ["s2"], score: 2),
+            PhotoCluster(id: "b", centroidLat: 1, centroidLng: 2, photoCount: 3, sampleIDs: ["s1"], score: 1, date: ref),
+            PhotoCluster(id: "a", centroidLat: 3, centroidLng: 4, photoCount: 5, sampleIDs: ["s2"], score: 2, date: ref),
         ]
         let first = ImportCoordinator.idempotencyKey(for: clusters)
         let second = ImportCoordinator.idempotencyKey(for: clusters.reversed())
@@ -22,7 +23,8 @@ final class ImportCoordinatorTests: XCTestCase {
             centroidLng: 0,
             photoCount: 2,
             sampleIDs: ["a", "b"],
-            score: 1
+            score: 1,
+            date: early
         )
         let samples = [
             PhotoGeoSample(id: "a", lat: 0, lng: 0, capturedAt: late),

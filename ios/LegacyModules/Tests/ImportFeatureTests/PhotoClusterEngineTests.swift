@@ -31,22 +31,52 @@ final class PhotoClusterEngineTests: XCTestCase {
         XCTAssertEqual(PhotoClusterEngine.cluster(samples: samples).count, 2)
     }
 
-    func testRankingPrefersDenseRecencySpreadCluster() {
-        let base = Date(timeIntervalSince1970: 1_700_000_000)
-        let dense = (0..<5).map { i in
+    /// Visit-based: same place, same day, multiple photos → still one cluster.
+    func testSamePlaceSameDayMergesIntoOneVisit() {
+        let day = Date(timeIntervalSince1970: 1_700_000_000)
+        let samples = (0..<4).map { i in
             PhotoGeoSample(
-                id: "d\(i)",
+                id: "p\(i)",
                 lat: 37.7749 + Double(i) * 0.00001,
                 lng: -122.4194,
-                capturedAt: base.addingTimeInterval(Double(i) * 86_400)
+                capturedAt: day.addingTimeInterval(Double(i) * 1800) // 30 min apart, same day
             )
         }
-        let sparse = [
-            PhotoGeoSample(id: "s1", lat: 40.0, lng: -74.0, capturedAt: base),
-        ]
+        let clusters = PhotoClusterEngine.cluster(samples: samples)
+        XCTAssertEqual(clusters.count, 1)
+        XCTAssertEqual(clusters[0].photoCount, 4)
+    }
 
-        let clusters = PhotoClusterEngine.cluster(samples: dense + sparse)
-        XCTAssertEqual(clusters.first?.photoCount, 5)
+    /// Visit-based: same place, different days → separate memories (core new behaviour).
+    func testSamePlaceDifferentDaysProducesSeparateClusters() {
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+        let day1 = base
+        let day2 = base.addingTimeInterval(86_400 * 3)   // 3 days later
+        let day3 = base.addingTimeInterval(86_400 * 10)  // 10 days later
+        let samples = [
+            PhotoGeoSample(id: "a", lat: 37.7749, lng: -122.4194, capturedAt: day1),
+            PhotoGeoSample(id: "b", lat: 37.7749, lng: -122.4194, capturedAt: day2),
+            PhotoGeoSample(id: "c", lat: 37.7749, lng: -122.4194, capturedAt: day3),
+        ]
+        let clusters = PhotoClusterEngine.cluster(samples: samples)
+        // One visit per calendar day → 3 clusters
+        XCTAssertEqual(clusters.count, 3)
+        clusters.forEach { XCTAssertEqual($0.photoCount, 1) }
+    }
+
+    func testRecentVisitRanksAboveOlderVisitOfSameSize() {
+        let recentDate = Date().addingTimeInterval(-86_400 * 2)        // 2 days ago
+        let oldDate    = Date().addingTimeInterval(-86_400 * 400)      // > 1 year ago
+        let recent = [PhotoGeoSample(id: "r1", lat: 37.7749, lng: -122.4194, capturedAt: recentDate)]
+        let old    = [PhotoGeoSample(id: "o1", lat: 40.0,    lng: -74.0,    capturedAt: oldDate)]
+        let clusters = PhotoClusterEngine.cluster(samples: recent + old)
+        XCTAssertEqual(clusters.count, 2)
+        // Recent (daysSince ≈ 2) → recencyBonus ≈ 0.99; old (daysSince ≈ 400) → ≈ 0.48
+        // Both 1-photo clusters, so recent wins on score = 1 × (1 + bonus)
+        XCTAssertLessThan(
+            Date().timeIntervalSince(clusters.first!.date),
+            Date().timeIntervalSince(clusters.last!.date)
+        )
     }
 
     func testMaxClustersCap() {
