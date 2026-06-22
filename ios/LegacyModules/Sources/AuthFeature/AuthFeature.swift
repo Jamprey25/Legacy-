@@ -214,6 +214,7 @@ private struct EmailOTPView: View {
 
             TextField("000000", text: $coordinator.otpCode)
                 .keyboardType(.numberPad)
+                .textContentType(.oneTimeCode)
                 .multilineTextAlignment(.center)
                 .font(LegacyFont.metric)
                 .padding(LegacySpacing.md)

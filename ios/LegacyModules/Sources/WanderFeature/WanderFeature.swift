@@ -85,6 +85,11 @@ public final class WanderCoordinator {
         locationEngine.authorizationStatus
     }
 
+    /// True when the user actively denied/restricted location — offer a Settings deep-link.
+    public var isLocationDenied: Bool {
+        locationAuthorizationStatus == .denied || locationAuthorizationStatus == .restricted
+    }
+
     public var isOffline: Bool { networkMonitor.isOffline }
 
     /// True when offline but still in a coarse-or-closer warmth band (DEC-29).
@@ -357,6 +362,14 @@ public struct WanderFeatureRootView: View {
                         .padding(.bottom, LegacySpacing.sm)
                 }
 
+                #if os(iOS)
+                if coordinator.isLocationDenied {
+                    OpenSettingsButton()
+                        .padding(.horizontal, LegacySpacing.xl)
+                        .padding(.bottom, LegacySpacing.sm)
+                }
+                #endif
+
                 if !coordinator.teasers.isEmpty {
                     WanderTeaserTray(
                         teasers: coordinator.teasers,
@@ -401,6 +414,11 @@ public struct WanderFeatureRootView: View {
         }
         .task {
             await coordinator.scanIfNeeded(force: true)
+        }
+        .onChange(of: coordinator.isShowingUnlockedMedia) { wasShowing, isShowing in
+            if !wasShowing, isShowing {
+                LegacyHaptics.success()
+            }
         }
         .onChange(of: coordinator.locationAuthorizationStatus) { _, status in
             // The first scan returns early at .notDetermined after firing the system

@@ -28,6 +28,7 @@ public struct DropFeatureRootView: View {
     @State private var compose = DropComposeDraft()
     @State private var showLibrary = false
     @State private var showCamera = false
+    @State private var toast: LegacyToast?
     #endif
 
     public var body: some View {
@@ -50,6 +51,18 @@ public struct DropFeatureRootView: View {
             .background(LegacyColor.background)
             .navigationTitle("Drop")
             .navigationBarTitleDisplayMode(.inline)
+        }
+        .legacyToast($toast)
+        .onChange(of: coordinator.state) { _, newState in
+            switch newState {
+            case .succeeded:
+                LegacyHaptics.success()
+                toast = LegacyToast(message: "Memory dropped", style: .success)
+            case .failed:
+                LegacyHaptics.warning()
+            default:
+                break
+            }
         }
         .onChange(of: coordinator.pendingRecovery) { _, recovery in
             guard let recovery else { return }

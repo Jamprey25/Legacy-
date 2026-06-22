@@ -1197,3 +1197,37 @@ This fully explains "OTP keeps coming back as expired": codes expired in 10 min,
 **Verification:** `swift build` + 56/56 tests pass; full `xcodebuild` of the Legacy app target **BUILD SUCCEEDED**.
 
 **Joseph re-test:** fresh install (reset Location privacy for Legacy first) → grant "Allow While Using" → map should populate right away, no second prompt that session. Background discovery upsell appears on a later launch.
+
+---
+
+## [backend → all] 2026-06-22 (session 11) — Import UX: cluster rows now show thumbnails + place names (Claude edited ios/** with Joseph's OK)
+
+**Context:** Joseph asked why imported memories feel thin and hard to evaluate. The import list previously showed only a date + photo count per cluster — no way to tell *where* or *what* a memory was before accepting it. With Joseph's explicit go-ahead, I (Claude/backend) made a contained `ios/**` change.
+
+**Changes (`ios/LegacyModules/Sources/ImportFeature/`):**
+- **`PHAssetThumbnailLoader.swift` (new):** lazy, `NSCache`-backed `PHImageManager` thumbnail loader. Skips degraded iCloud deliveries + guards double-resume (mirrors `PHAssetImageFetcher`). Metadata-only clustering untouched — only visible rows load.
+- **`PlaceNameResolver.swift` (new):** `actor`, reverse-geocodes a cluster centroid → short label ("Dolores Park, San Francisco"). Fresh `CLGeocoder` per call (avoids busy-collisions under actor reentrancy), results cached by ~110 m bucket. POI → neighborhood → locality precedence.
+- **`ImportFeature.swift`:** `ImportClusterRow` now leads with the place name (date falls back while geocoding is in flight), shows a 52pt hero thumbnail of `sampleIDs.first`, and moves the date into the secondary line next to the photo count. Added `UIKit` import under the existing `#if os(iOS)` block; new `ClusterThumbnail` view loads per-row via `.task`.
+
+**Verification:** `xcodebuild -scheme ImportFeature -destination 'generic/platform=iOS Simulator'` → **BUILD SUCCEEDED**.
+
+**iOS → please note (Cursor):** these touch your territory — flag if you want them moved/restyled. CLGeocoder is rate-limited (~50/min); on fast scroll some rows fall back to the date (acceptable). Reverse geocoding requires network.
+
+**Open decision for Joseph — `tasks.json` decision `import-one-photo-per-memory` (kind: idea, needs: joseph):** Joseph's point that "one photo per place makes no human sense" is a real model gap — an imported visit collapses to a single `media_key` (`sampleIDs.first`). Fixing it spans DB (`0002_memories.sql`), api-contract §5, the iOS upload loop, and Memory Lane gallery. Logged options A (incremental top-K upload) vs B (full multi-media model). Needs Joseph's scope call before I start backend schema work.
+
+**Also flagged earlier (not yet actioned):** import `/import` rate limit is 5/hr (`memories.ts:354`) and the client maps every failure to "check connectivity" + wipes the scan screen — reads as a crash after ~5 imports. Recommend raising the limit + surfacing a real rate-limit message inline. Backend-side; can take it next.
+
+---
+
+## [ios → all] 2026-06-22 (session 11) — UX quick wins
+
+Friendly/practical touches (Joseph-requested bundle):
+- **OTP autofill** (`AuthFeature.swift`): added `.textContentType(.oneTimeCode)` so iOS surfaces the emailed code as a QuickType suggestion — fewer manual entries.
+- **"Open Settings" recovery** (`OpenSettingsButton.swift`, new in DesignSystem): deep-links to the app's Settings page. Wired into Wander (when `isLocationDenied`) and Import (failed view when the message references Settings, i.e. photo access off). Users who denied a permission can now recover without hunting.
+- **Success/failure haptics** (`LegacyHaptics.swift`, new): distinct from continuous `WarmthHaptics`. `success()` on Drop completion and on Wander unlock (sheet open); `warning()` on Drop failure.
+- **Toast** (`LegacyToast.swift`, new `.legacyToast($binding)` modifier): floating auto-dismissing confirmation. Used for "Memory dropped" on Drop success.
+- Memory Lane already had `.refreshable` (pull-to-refresh) — confirmed, no change needed.
+
+**Verification:** `swift build` + 56/56 tests pass; `xcodebuild` app target **BUILD SUCCEEDED**.
+
+Backlog (not built — offered, Joseph chose quick wins only): first-run intro + location priming, "On this day" resurfacing, Profile location/notification settings section, Memory Lane map view + search.

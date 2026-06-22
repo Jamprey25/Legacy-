@@ -20,49 +20,83 @@ public struct ProfileView: View {
 
     public var body: some View {
         NavigationStack {
-            List {
-                Section("Account") {
-                    Text(AccountProfileStore.displayLabel)
-                        .foregroundStyle(LegacyColor.textSecondary)
-                    #if DEBUG
-                    if AccountProfileStore.isDevAdmin {
-                        Text("Developer admin · offline stub API")
+            ZStack {
+                LegacyColor.background.ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: LegacySpacing.xl) {
+                        profileHero
+
+                        VStack(alignment: .leading, spacing: LegacySpacing.sm) {
+                            ProfileSectionLabel("Data & privacy")
+                            ProfileActionCard {
+                                ProfileActionRow(
+                                    title: "Export my data",
+                                    subtitle: "Download a copy of your memories",
+                                    icon: "square.and.arrow.up",
+                                    action: { Task { await exportData() } }
+                                )
+                                .disabled(isBusy)
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: LegacySpacing.sm) {
+                            ProfileSectionLabel("Account")
+                            ProfileActionCard {
+                                ProfileActionRow(
+                                    title: "Sign out",
+                                    subtitle: "End this session on this device",
+                                    icon: "rectangle.portrait.and.arrow.right",
+                                    action: { Task { await signOut() } }
+                                )
+                                .disabled(isBusy)
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: LegacySpacing.sm) {
+                            ProfileSectionLabel("Danger zone")
+                            ProfileActionCard {
+                                ProfileActionRow(
+                                    title: "Delete account",
+                                    subtitle: "Permanently erase all memories",
+                                    icon: "trash",
+                                    tint: LegacyColor.danger,
+                                    action: { showDeleteAlert = true }
+                                )
+                                .disabled(isBusy)
+                            }
+                        }
+
+                        if let errorMessage {
+                            Text(errorMessage)
+                                .font(LegacyFont.caption)
+                                .foregroundStyle(LegacyColor.danger)
+                                .multilineTextAlignment(.center)
+                                .frame(maxWidth: .infinity)
+                        }
+
+                        Text(appVersionLabel)
                             .font(LegacyFont.caption)
-                            .foregroundStyle(LegacyColor.textSecondary)
+                            .foregroundStyle(LegacyColor.textSecondary.opacity(0.7))
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, LegacySpacing.xs)
                     }
-                    #endif
-                }
-
-                Section {
-                    Button("Export My Data") {
-                        Task { await exportData() }
-                    }
-                    .disabled(isBusy)
-
-                    Button("Sign Out") {
-                        Task { await signOut() }
-                    }
-                    .disabled(isBusy)
-
-                    Button("Delete Account", role: .destructive) {
-                        showDeleteAlert = true
-                    }
-                    .disabled(isBusy)
-                }
-
-                if let errorMessage {
-                    Section {
-                        Text(errorMessage)
-                            .font(LegacyFont.caption)
-                            .foregroundStyle(.red)
-                    }
+                    .padding(.horizontal, LegacySpacing.xl)
+                    .padding(.top, LegacySpacing.md)
+                    .padding(.bottom, LegacySpacing.xxl)
                 }
             }
             .navigationTitle("Profile")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
             .overlay {
                 if isBusy {
                     ProgressView()
                         .tint(LegacyColor.accent)
+                        .padding(LegacySpacing.lg)
+                        .background(LegacyColor.surface.opacity(0.95))
+                        .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.md, style: .continuous))
                 }
             }
             .alert("Delete Account?", isPresented: $showDeleteAlert) {
@@ -78,6 +112,70 @@ public struct ProfileView: View {
             }
         }
         .preferredColorScheme(.dark)
+    }
+
+    private var profileHero: some View {
+        VStack(spacing: LegacySpacing.md) {
+            ZStack {
+                Circle()
+                    .fill(LegacyColor.accent.opacity(0.22))
+                    .frame(width: 108, height: 108)
+                    .blur(radius: 28)
+
+                Circle()
+                    .stroke(LegacyColor.accent.opacity(0.35), lineWidth: 1)
+                    .frame(width: 88, height: 88)
+
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                LegacyColor.surface,
+                                LegacyColor.background,
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 84, height: 84)
+                    .overlay {
+                        Text(AccountProfileStore.avatarMonogram)
+                            .font(LegacyFont.title)
+                            .foregroundStyle(LegacyColor.accent)
+                    }
+            }
+            .padding(.top, LegacySpacing.sm)
+
+            VStack(spacing: LegacySpacing.xs) {
+                Text(AccountProfileStore.displayName)
+                    .font(LegacyFont.title2)
+                    .foregroundStyle(LegacyColor.textPrimary)
+
+                if let subtitle = AccountProfileStore.profileSubtitle {
+                    Text(subtitle)
+                        .font(LegacyFont.callout)
+                        .foregroundStyle(LegacyColor.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
+            }
+
+            if AccountProfileStore.isDevAdmin {
+                Text("Developer admin")
+                    .font(LegacyFont.caption)
+                    .foregroundStyle(LegacyColor.accent)
+                    .padding(.horizontal, LegacySpacing.md)
+                    .padding(.vertical, LegacySpacing.xs)
+                    .background(LegacyColor.accent.opacity(0.12))
+                    .clipShape(Capsule())
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, LegacySpacing.lg)
+    }
+
+    private var appVersionLabel: String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
+        return "Legacy \(version)"
     }
 
     private func exportData() async {
@@ -130,6 +228,90 @@ public struct ProfileView: View {
         default:
             return "Something went wrong. Please try again."
         }
+    }
+}
+
+// MARK: - Profile chrome
+
+private struct ProfileSectionLabel: View {
+    let title: String
+
+    init(_ title: String) {
+        self.title = title
+    }
+
+    var body: some View {
+        Text(title.uppercased())
+            .font(LegacyFont.caption)
+            .foregroundStyle(LegacyColor.textSecondary)
+            .tracking(0.6)
+    }
+}
+
+private struct ProfileActionCard<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            content
+        }
+        .background(
+            RoundedRectangle(cornerRadius: LegacyRadius.lg, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            LegacyColor.surface,
+                            LegacyColor.background.opacity(0.85),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: LegacyRadius.lg, style: .continuous)
+                .stroke(LegacyColor.separator, lineWidth: 1)
+        }
+    }
+}
+
+private struct ProfileActionRow: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    var tint: Color = LegacyColor.accent
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: LegacySpacing.md) {
+                Image(systemName: icon)
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(tint)
+                    .frame(width: 36, height: 36)
+                    .background(tint.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.sm, style: .continuous))
+
+                VStack(alignment: .leading, spacing: LegacySpacing.xxs) {
+                    Text(title)
+                        .font(LegacyFont.headline)
+                        .foregroundStyle(LegacyColor.textPrimary)
+                    Text(subtitle)
+                        .font(LegacyFont.caption)
+                        .foregroundStyle(LegacyColor.textSecondary)
+                }
+
+                Spacer(minLength: LegacySpacing.sm)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(LegacyColor.textSecondary.opacity(0.6))
+            }
+            .padding(.horizontal, LegacySpacing.lg)
+            .padding(.vertical, LegacySpacing.md)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 

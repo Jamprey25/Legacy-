@@ -4,6 +4,7 @@ import SwiftUI
 
 #if os(iOS)
 import MapKit
+import UIKit
 #endif
 
 /// On-device PHAsset clustering and batch import. GPS metadata never leaves device during clustering.
@@ -198,10 +199,16 @@ public struct ImportFeatureRootView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, LegacySpacing.lg)
             #if os(iOS)
-            Button("Try again") {
-                Task { await coordinator.scanPhotoLibrary() }
+            // Permission failures can't be retried in-app — send the user to Settings.
+            if message.localizedCaseInsensitiveContains("Settings") {
+                OpenSettingsButton()
+                    .padding(.horizontal, LegacySpacing.xl)
+            } else {
+                Button("Try again") {
+                    Task { await coordinator.scanPhotoLibrary() }
+                }
+                .buttonStyle(.legacyPrimary)
             }
-            .buttonStyle(.legacyPrimary)
             #endif
             Button("Start over") { coordinator.reset() }
                 .buttonStyle(.legacySecondary)
@@ -216,6 +223,9 @@ private struct ImportClusterRow: View {
     let isSelected: Bool
     let onToggle: () -> Void
 
+    @Environment(\.displayScale) private var displayScale
+    @State private var placeName: String?
+
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateStyle = .medium
@@ -225,12 +235,19 @@ private struct ImportClusterRow: View {
 
     var body: some View {
         Button(action: onToggle) {
-            HStack {
+            HStack(spacing: LegacySpacing.md) {
+                #if os(iOS)
+                ClusterThumbnail(assetID: cluster.sampleIDs.first, side: 52, scale: displayScale)
+                #endif
+
                 VStack(alignment: .leading, spacing: LegacySpacing.xxs) {
-                    Text(Self.dateFormatter.string(from: cluster.date))
+                    // Lead with the place once we know it; fall back to the date so the
+                    // row is never blank while geocoding is in flight.
+                    Text(placeName ?? Self.dateFormatter.string(from: cluster.date))
                         .font(LegacyFont.headline)
                         .foregroundStyle(LegacyColor.textPrimary)
-                    Text("\(cluster.photoCount) \(cluster.photoCount == 1 ? "photo" : "photos")")
+                        .lineLimit(1)
+                    Text(secondaryLine)
                         .font(LegacyFont.caption)
                         .foregroundStyle(LegacyColor.textSecondary)
                 }
@@ -240,8 +257,57 @@ private struct ImportClusterRow: View {
             }
         }
         .buttonStyle(.plain)
+        .task(id: cluster.id) {
+            #if os(iOS)
+            guard placeName == nil else { return }
+            placeName = await PlaceNameResolver.shared.placeName(
+                lat: cluster.centroidLat,
+                lng: cluster.centroidLng
+            )
+            #endif
+        }
+    }
+
+    /// Photo count, prefixed with the date once the place name has claimed the lead line.
+    private var secondaryLine: String {
+        let photos = "\(cluster.photoCount) \(cluster.photoCount == 1 ? "photo" : "photos")"
+        guard placeName != nil else { return photos }
+        return "\(Self.dateFormatter.string(from: cluster.date)) · \(photos)"
     }
 }
+
+// MARK: - Cluster thumbnail
+
+#if os(iOS)
+private struct ClusterThumbnail: View {
+    let assetID: String?
+    let side: CGFloat
+    let scale: CGFloat
+
+    @State private var image: UIImage?
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: LegacyRadius.sm, style: .continuous)
+            .fill(LegacyColor.textSecondary.opacity(0.12))
+            .frame(width: side, height: side)
+            .overlay {
+                if let image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Image(systemName: "photo")
+                        .foregroundStyle(LegacyColor.textSecondary.opacity(0.6))
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.sm, style: .continuous))
+            .task(id: assetID) {
+                guard let assetID, image == nil else { return }
+                image = await PHAssetThumbnailLoader.thumbnail(assetID: assetID, side: side, scale: scale)
+            }
+    }
+}
+#endif
 
 // MARK: - Cluster map
 
