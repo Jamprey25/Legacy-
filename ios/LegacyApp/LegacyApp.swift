@@ -205,10 +205,19 @@ private struct MainTabView: View {
     @State private var pinCelebration = PinDropCelebrationCoordinator()
     @State private var showBackgroundDiscoveryPrompt = false
     @State private var selectedTab: MainTab = .wander
+    /// True only if the app launched ALREADY having When-In-Use. Apple discourages
+    /// chaining the Always prompt immediately after the When-In-Use grant, and that
+    /// upgrade forces an iOS app relaunch ("kicked out"). So we defer the background
+    /// discovery upsell to a later session rather than the same one the user first
+    /// granted location in. Captured once per view lifetime via State(initialValue:).
+    @State private var hadWhenInUseAtLaunch: Bool
 
     init(appModel: AppModel, locationEngine: LocationEngine) {
         self.appModel = appModel
         self.locationEngine = locationEngine
+        _hadWhenInUseAtLaunch = State(
+            initialValue: locationEngine.authorizationStatus == .authorizedWhenInUse
+        )
         _wanderCoordinator = State(initialValue: WanderCoordinator(
             apiClient: appModel.apiClient,
             locationEngine: locationEngine,
@@ -233,6 +242,9 @@ private struct MainTabView: View {
         guard !BackgroundLocationPermissionGate.hasUserDismissedPrompt else { return false }
         guard !backgroundLocation.isAuthorizedForBackground else { return false }
         guard locationEngine.authorizationStatus == .authorizedWhenInUse else { return false }
+        // Don't chain the Always prompt onto the same session the user first granted
+        // When-In-Use — that double-prompt + relaunch is the "messy / kicked out" UX.
+        guard hadWhenInUseAtLaunch else { return false }
         return !wanderCoordinator.teasers.isEmpty || !wanderCoordinator.cachedOwnPins.isEmpty
     }
 

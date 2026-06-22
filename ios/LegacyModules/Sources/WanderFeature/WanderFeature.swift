@@ -79,6 +79,12 @@ public final class WanderCoordinator {
     /// Latest user fix for map display only — never used to infer teaser direction.
     public private(set) var userCoordinate: CLLocationCoordinate2D?
 
+    /// Passthrough so the view can react to permission grants and auto-rescan.
+    /// (LocationEngine is @Observable, so reading this in a view body tracks changes.)
+    public var locationAuthorizationStatus: CLAuthorizationStatus {
+        locationEngine.authorizationStatus
+    }
+
     public var isOffline: Bool { networkMonitor.isOffline }
 
     /// True when offline but still in a coarse-or-closer warmth band (DEC-29).
@@ -290,6 +296,7 @@ public struct WanderFeatureRootView: View {
     @Bindable private var coordinator: WanderCoordinator
     private var pinCelebration: PinDropCelebrationCoordinator?
     @State private var showsWalkHint = true
+    @State private var trayExpanded = true
 
     private var showsDiscoveryHint: Bool {
         coordinator.teasers.isEmpty && showsWalkHint
@@ -328,18 +335,11 @@ public struct WanderFeatureRootView: View {
                         .frame(maxHeight: .infinity)
                         .allowsHitTesting(false)
                         .transition(.opacity)
-                } else if !coordinator.teasers.isEmpty {
-                    ScrollView {
-                        LazyVStack(spacing: LegacySpacing.md) {
-                            ForEach(coordinator.teasers, id: \.memoryID) { teaser in
-                                TeaserCard(teaser: teaser) {
-                                    Task { await coordinator.unlock(teaser: teaser) }
-                                }
-                            }
-                        }
-                        .padding(.horizontal, LegacySpacing.lg)
-                        .padding(.vertical, LegacySpacing.md)
-                    }
+                } else {
+                    // Map-first: leave the middle open so the map stays pannable.
+                    // A Spacer has no hit-testable content, so touches here fall
+                    // through to the Map behind it (fixes concern-forced-unlock-annoying).
+                    Spacer(minLength: 0)
                 }
 
                 if coordinator.isScanning || coordinator.isUnlocking {
@@ -356,7 +356,20 @@ public struct WanderFeatureRootView: View {
                         .padding(.horizontal, LegacySpacing.lg)
                         .padding(.bottom, LegacySpacing.sm)
                 }
+
+                if !coordinator.teasers.isEmpty {
+                    WanderTeaserTray(
+                        teasers: coordinator.teasers,
+                        isExpanded: $trayExpanded
+                    ) { teaser in
+                        Task { await coordinator.unlock(teaser: teaser) }
+                    }
+                    .padding(.horizontal, LegacySpacing.sm)
+                    .padding(.bottom, LegacySpacing.sm)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
+            .animation(.easeInOut(duration: 0.3), value: coordinator.teasers.isEmpty)
             .overlay(alignment: .bottom) {
                 if let celebration = pinCelebration,
                    let message = celebration.overlayMessage,
@@ -389,6 +402,17 @@ public struct WanderFeatureRootView: View {
         .task {
             await coordinator.scanIfNeeded(force: true)
         }
+        .onChange(of: coordinator.locationAuthorizationStatus) { _, status in
+            // The first scan returns early at .notDetermined after firing the system
+            // prompt. When the user grants access, the status flips here — re-run the
+            // scan automatically so the map populates instead of sitting on
+            // "Waiting for location permission…" (the "nothing happens" symptom).
+            #if os(iOS)
+            if status == .authorizedWhenInUse || status == .authorizedAlways {
+                Task { await coordinator.scanIfNeeded(force: true) }
+            }
+            #endif
+        }
         .sheet(isPresented: Binding(
             get: { coordinator.isShowingUnlockedMedia },
             set: { if !$0 { coordinator.dismissUnlockedMedia() } }
@@ -400,7 +424,9 @@ public struct WanderFeatureRootView: View {
     }
 
     private var backgroundOverlayOpacity: Double {
-        if !coordinator.teasers.isEmpty { return 0.88 }
+        // Map-first when memories are nearby: don't dim the map — the tray carries
+        // its own surface. Only dim heavily for the walk-to-discover hint.
+        if !coordinator.teasers.isEmpty { return 0 }
         return showsWalkHint ? 0.94 : 0.35
     }
 }
@@ -479,6 +505,77 @@ private struct WanderEmptyState: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, LegacySpacing.xl)
         }
+    }
+}
+
+/// Collapsible bottom tray for nearby memory teasers. Bounded height so the map
+/// above it stays visible and pannable; the user chooses when to engage a pin.
+private struct WanderTeaserTray: View {
+    let teasers: [Teaser]
+    @Binding var isExpanded: Bool
+    let onUnlock: (Teaser) -> Void
+
+    private var inRangeCount: Int { teasers.filter(\.inRange).count }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.28)) { isExpanded.toggle() }
+            } label: {
+                VStack(spacing: LegacySpacing.xs) {
+                    Capsule()
+                        .fill(LegacyColor.separator)
+                        .frame(width: 36, height: 5)
+                        .padding(.top, LegacySpacing.sm)
+
+                    HStack(spacing: LegacySpacing.sm) {
+                        Image(systemName: inRangeCount > 0 ? "location.fill" : "sparkles")
+                            .foregroundStyle(LegacyColor.accent)
+                        Text(summary)
+                            .font(LegacyFont.headline)
+                            .foregroundStyle(LegacyColor.textPrimary)
+                        Spacer()
+                        Image(systemName: isExpanded ? "chevron.down" : "chevron.up")
+                            .font(LegacyFont.caption)
+                            .foregroundStyle(LegacyColor.textSecondary)
+                    }
+                    .padding(.horizontal, LegacySpacing.lg)
+                    .padding(.bottom, LegacySpacing.sm)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isExpanded ? "Collapse nearby memories" : "Expand nearby memories")
+
+            if isExpanded {
+                ScrollView {
+                    LazyVStack(spacing: LegacySpacing.md) {
+                        ForEach(teasers, id: \.memoryID) { teaser in
+                            TeaserCard(teaser: teaser) { onUnlock(teaser) }
+                        }
+                    }
+                    .padding(.horizontal, LegacySpacing.lg)
+                    .padding(.bottom, LegacySpacing.md)
+                }
+                .frame(maxHeight: 300)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .background(LegacyColor.surface.opacity(0.97))
+        .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.lg))
+        .overlay(
+            RoundedRectangle(cornerRadius: LegacyRadius.lg)
+                .stroke(LegacyColor.separator, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.25), radius: 12, y: -2)
+    }
+
+    private var summary: String {
+        if inRangeCount > 0 {
+            return inRangeCount == 1 ? "1 memory in range" : "\(inRangeCount) memories in range"
+        }
+        return teasers.count == 1 ? "1 memory nearby" : "\(teasers.count) memories nearby"
     }
 }
 
@@ -697,35 +794,43 @@ private struct WanderUserMap: View {
         .onChange(of: ownPins.map(\.memoryID)) { oldIDs, newIDs in
             guard oldIDs != newIDs else { return }
             let incoming = ownPins.filter { !visibleOwnPinIDs.contains($0.memoryID) }.map(\.memoryID)
-            if incoming.isEmpty {
-                visibleOwnPinIDs = Set(newIDs)
-            } else {
-                for (index, pinID) in incoming.enumerated() {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.08) {
-                        withAnimation(.spring(response: 0.45, dampingFraction: 0.62)) {
-                            _ = visibleOwnPinIDs.insert(pinID)
-                        }
-                    }
-                }
-            }
-            fitCamera()
+            staggerReveal(incoming: incoming) { visibleOwnPinIDs.insert($0) }
+            visibleOwnPinIDs = visibleOwnPinIDs.intersection(Set(newIDs))
         }
         .onChange(of: revealedOthersPins.map(\.memoryID)) { oldIDs, newIDs in
             guard oldIDs != newIDs else { return }
             let incoming = revealedOthersPins.filter { !visibleRevealedPinIDs.contains($0.memoryID) }.map(\.memoryID)
-            if incoming.isEmpty {
-                visibleRevealedPinIDs = Set(newIDs)
-            } else {
-                for (index, pinID) in incoming.enumerated() {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.08) {
-                        withAnimation(.spring(response: 0.45, dampingFraction: 0.62)) {
-                            _ = visibleRevealedPinIDs.insert(pinID)
-                        }
-                    }
+            staggerReveal(incoming: incoming) { visibleRevealedPinIDs.insert($0) }
+            visibleRevealedPinIDs = visibleRevealedPinIDs.intersection(Set(newIDs))
+        }
+        // Debounce camera fitting: the import cascade grows the pin set one pin at a
+        // time (~80ms apart). Fitting per pin fired dozens of overlapping camera
+        // animations (the "glitchy" import). Coalesce into one fit after pins settle.
+        .task(id: cameraFitKey) {
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled else { return }
+            fitCamera()
+        }
+    }
+
+    private var cameraFitKey: String {
+        ownPins.map(\.memoryID).joined(separator: ",")
+            + "|" + revealedOthersPins.map(\.memoryID).joined(separator: ",")
+    }
+
+    /// Reveal newly-arrived pins with a capped stagger. The first `staggerCap` pins
+    /// animate in sequence; any beyond that drop together so a large batch (e.g. a
+    /// cold-launch cache of dozens of pins) never animates enough markers to drop frames.
+    private func staggerReveal(incoming: [String], insert: @escaping (String) -> Void) {
+        guard !incoming.isEmpty else { return }
+        let staggerCap = 12
+        for (index, pinID) in incoming.enumerated() {
+            let delay = Double(min(index, staggerCap)) * 0.08
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.62)) {
+                    insert(pinID)
                 }
             }
-            visibleRevealedPinIDs = visibleRevealedPinIDs.intersection(Set(newIDs))
-            fitCamera()
         }
     }
 

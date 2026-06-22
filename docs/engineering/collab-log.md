@@ -1179,3 +1179,21 @@ This fully explains "OTP keeps coming back as expired": codes expired in 10 min,
 **Verification:** `swift build` clean; 56/56 SPM tests pass.
 
 **Joseph re-test:** sign in with email — code should now be valid for 30 min. If you resend, the field clears and resend is locked for 30s.
+
+---
+
+## [ios → all] 2026-06-22 (session 10) — Location permission flow: "nothing happens" + chained Always prompt
+
+**Report:** Apple "Allow While Using" → nothing happens; then in-app sheet; then Apple "Always Allow" → kicked out → then it works.
+
+**Bug 1 (primary — "nothing happens after Allow While Using"):** `WanderCoordinator.scanIfNeeded` returns early when auth is `.notDetermined` (after firing the system prompt) with a comment claiming "the user re-triggers scan on grant" — but nothing did. After granting, the status flipped but no scan ran, so the screen sat on "Waiting for location permission…".
+- Fix (`WanderFeature.swift`): exposed `WanderCoordinator.locationAuthorizationStatus` passthrough (LocationEngine is `@Observable`); added `.onChange(of: coordinator.locationAuthorizationStatus)` in `WanderFeatureRootView` that re-runs `scanIfNeeded(force: true)` when status becomes `authorizedWhenInUse`/`authorizedAlways`. Map now populates immediately on grant.
+
+**Bug 2 (messy chained prompts + "kicked out"):** the background-discovery (Always) sheet fired the instant the first post-grant scan produced teasers — i.e., immediately after the When-In-Use grant. Granting Always then forces an iOS app relaunch ("kicked out"). Apple discourages chaining When→Always.
+- Fix (`LegacyApp.swift`): added `hadWhenInUseAtLaunch` (captured once via `State(initialValue:)`). `shouldOfferBackgroundDiscovery` now also requires `hadWhenInUseAtLaunch`, so the Always upsell is deferred to a *later* session rather than the one where the user first granted When-In-Use. First-run = single clean When-In-Use prompt; the optional background upsell comes on a subsequent launch.
+
+**Note:** the relaunch on the Always *grant* is unavoidable iOS behavior (background-location capability change). Last session's recovery path (re-request notifications + restart monitoring on relaunch) still applies; this session just stops us from triggering it during onboarding.
+
+**Verification:** `swift build` + 56/56 tests pass; full `xcodebuild` of the Legacy app target **BUILD SUCCEEDED**.
+
+**Joseph re-test:** fresh install (reset Location privacy for Legacy first) → grant "Allow While Using" → map should populate right away, no second prompt that session. Background discovery upsell appears on a later launch.
