@@ -234,14 +234,20 @@ private struct EmailOTPView: View {
                     .foregroundStyle(LegacyColor.danger)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, LegacySpacing.xl)
+            } else if let info = coordinator.infoMessage {
+                Text(info)
+                    .font(LegacyFont.caption)
+                    .foregroundStyle(LegacyColor.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, LegacySpacing.xl)
             }
 
-            Button("Resend code") {
+            Button(coordinator.resendCooldown > 0 ? "Resend code in \(coordinator.resendCooldown)s" : "Resend code") {
                 Task { await coordinator.resendEmailCode() }
             }
             .font(LegacyFont.callout)
-            .foregroundStyle(LegacyColor.textSecondary)
-            .disabled(coordinator.isLoading)
+            .foregroundStyle(coordinator.resendCooldown > 0 ? LegacyColor.textSecondary.opacity(0.5) : LegacyColor.textSecondary)
+            .disabled(coordinator.isLoading || coordinator.resendCooldown > 0)
 
             Button("Back") { coordinator.backToWelcome() }
                 .font(LegacyFont.callout)

@@ -24,6 +24,13 @@ public final class AuthCoordinator {
     public private(set) var route: Route = .welcome
     public private(set) var isLoading = false
     public private(set) var errorMessage: String?
+    /// Non-error confirmation (e.g. "New code sent"). Shown in a neutral style.
+    public private(set) var infoMessage: String?
+    /// Seconds remaining before "Resend code" is allowed again. 0 = enabled.
+    public private(set) var resendCooldown = 0
+
+    private var cooldownTask: Task<Void, Never>?
+    private static let resendCooldownSeconds = 30
 
     public var dob = Calendar.current.date(byAdding: .year, value: -25, to: Date()) ?? Date()
     public var email = ""
@@ -149,7 +156,9 @@ public final class AuthCoordinator {
         do {
             try await apiClient.authEmailStart(trimmed)
             otpCode = ""
+            infoMessage = nil
             route = .emailOTP(email: trimmed)
+            startResendCooldown()
         } catch {
             errorMessage = userFacingMessage(for: error)
         }
@@ -157,22 +166,41 @@ public final class AuthCoordinator {
 
     public func resendEmailCode() async {
         let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.contains("@") else { return }
+        guard trimmed.contains("@"), resendCooldown == 0 else { return }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
 
         do {
             try await apiClient.authEmailStart(trimmed)
+            // A fresh code invalidates the previous one server-side. Clear the field so a
+            // stale code from an earlier email can't be submitted by accident (which would
+            // come back as "incorrect or expired").
+            otpCode = ""
             errorMessage = nil
+            infoMessage = "New code sent. Use the most recent email — older codes no longer work."
+            startResendCooldown()
         } catch {
             errorMessage = userFacingMessage(for: error)
+        }
+    }
+
+    private func startResendCooldown() {
+        cooldownTask?.cancel()
+        resendCooldown = Self.resendCooldownSeconds
+        cooldownTask = Task { [weak self] in
+            while let self, self.resendCooldown > 0 {
+                try? await Task.sleep(for: .seconds(1))
+                if Task.isCancelled { return }
+                self.resendCooldown -= 1
+            }
         }
     }
 
     public func verifyEmailCode() async {
         isLoading = true
         errorMessage = nil
+        infoMessage = nil
         defer { isLoading = false }
 
         let code = otpCode.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -212,7 +240,10 @@ public final class AuthCoordinator {
 
     public func backToWelcome() {
         errorMessage = nil
+        infoMessage = nil
         otpCode = ""
+        cooldownTask?.cancel()
+        resendCooldown = 0
         route = .welcome
     }
 

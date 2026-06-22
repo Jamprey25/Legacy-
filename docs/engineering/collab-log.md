@@ -1154,3 +1154,28 @@ Joseph requested two features to make the app feel less aimless:
 **Tests:** 56/56 pass. Three new tests: `testSamePlaceSameDayMergesIntoOneVisit`, `testSamePlaceDifferentDaysProducesSeparateClusters`, `testRecentVisitRanksAboveOlderVisitOfSameSize`.
 
 **Joseph re-test:** scan your library — confirm you now see many more clusters (one per day you visited a place). Try "Select All" then "Import N memories". Re-import the same day is safe (idempotency key includes cluster IDs, which changed with the new algorithm, so same-day re-import will create new memories now).
+
+---
+
+## [ios → all] 2026-06-22 (session 9) — OTP "expired" ROOT CAUSE: stale prod deploy
+
+**CRITICAL PROCESS FINDING:** The `legacy-backend` Vercel project deploys via **CLI only** (`.vercel/project.json` from a manual `vercel deploy`), NOT via Git integration. **Every `git push` to `main` since the project was linked has NOT reached production.** Production was running 5 sessions of stale backend code.
+
+**Proof (measured against the live URL the iOS app uses):**
+- Deployed OTP TTL was **10 min** (repo: 30 min since commit `0362235`).
+- Deployed per-email send limit was **3** (repo: 5). After 3 sends in a 10-min window, `email/start` silently returns 204 with NO code issued and NO email.
+
+This fully explains "OTP keeps coming back as expired": codes expired in 10 min, and a user who resent a few times got silently throttled (no new code) and/or typed a stale/expired one. All `invalid_code`/expiry/throttle cases surface as the same 401 → same "incorrect or expired" message on iOS.
+
+**Fix:** ran `vercel --prod` from `backend/`. Verified post-deploy against `legacy-backend-jamprey25s-projects.vercel.app`: **TTL now 30.0 min**. New bundle (commit `027a64d`) is live.
+
+**ACTION FOR BACKEND/JOSEPH:** backend changes require a manual `cd backend && vercel --prod` (or wiring up Vercel Git integration so `main` auto-deploys). Pushing to GitHub alone does nothing for prod.
+
+**iOS hardening (this session, `AuthCoordinator` / `AuthFeature`):**
+- Added a **30s resend cooldown** with a live countdown on the button ("Resend code in 24s"). Prevents resend-spam that overwrites the active code and burns the per-email/IP rate limits.
+- **Resend now clears the OTP field** and shows "New code sent. Use the most recent email — older codes no longer work." This kills the out-of-order-email race where a user typed a code from a now-invalidated earlier email.
+- `infoMessage` (neutral confirmation) added alongside `errorMessage`.
+
+**Verification:** `swift build` clean; 56/56 SPM tests pass.
+
+**Joseph re-test:** sign in with email — code should now be valid for 30 min. If you resend, the field clears and resend is locked for 30s.
