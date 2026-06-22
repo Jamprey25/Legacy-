@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-22T17:34:31.378Z"
+    "lastUpdated": "2026-06-22T23:10:00.000Z"
   },
   "decisions": [
     {
@@ -643,7 +643,69 @@
       "status": "open",
       "raisedBy": "joseph",
       "needs": "ios",
-      "detail": "Manual QA 2026-06-22: When a memory is in the area, the app forces the user to interact with it (auto-opens detail or blocks other interaction). Joseph: 'I shouldn't be forced to open it, it is kinda annoying.' Wander should passively show warmth cues and pins but NEVER auto-open unlock sheets or block map interaction. User taps a pin to unlock — their choice. Check WanderCoordinator and scan response handling: if in_range triggers an automatic sheet presentation, remove it. Warmth cues + pin presence on map are sufficient — let the user decide when to engage."
+      "detail": "Manual QA 2026-06-22: When a memory is in the area, the app forces the user to interact with it (auto-opens detail or blocks other interaction). Joseph: 'I shouldn't be forced to open it, it is kinda annoying.' Wander should passively show warmth cues and pins but NEVER auto-open unlock sheets or block map interaction. User taps a pin to unlock — their choice. Check WanderCoordinator and scan response handling: if in_range triggers an automatic sheet presentation, remove it. Warmth cues + pin presence on map are sufficient — let the user decide when to engage.",
+      "responses": [
+        {
+          "author": "ios",
+          "date": "2026-06-22",
+          "text": "Audited WanderCoordinator: unlock() only runs from explicit TeaserCard 'Open' tap — no auto-present on scan or in_range. Nuisance is likely the teaser card list covering the map when nearby. Follow-up UX: collapsible teaser tray or map-first layout when memories are in range (not blocking this thread)."
+        },
+        {
+          "author": "joseph",
+          "date": "2026-06-22",
+          "text": "Still happening on device: 'navigating wander isn't really user friendly, when a memory pops up I cannot move around.' Confirms the teaser tray is blocking the map. Need the map-first / collapsible-tray fix — the tray must NOT capture pan gestures or cover the map when a memory is in range. This is now the priority Wander fix."
+        }
+      ]
+    },
+    {
+      "id": "bug-memory-lane-partial-list",
+      "kind": "concern",
+      "title": "Memory Lane shows only 2 memories after importing ~45",
+      "status": "resolved",
+      "raisedBy": "joseph",
+      "needs": "ios",
+      "detail": "Joseph imported ~45 photos but Memory Lane grid only showed 2. Causes: (1) DEBUG stub fixture returns exactly 2 rows; (2) MemoryLaneCoordinator was recreated inline in TabView body, resetting fetches; (3) iOS only loaded first page and relied on scroll-to-last for pagination; (4) backend cursor used created_at only — batch imports with identical timestamps could skip rows beyond page 1.",
+      "blocks": ["ios-memory-lane"],
+      "responses": [
+        {
+          "author": "ios",
+          "date": "2026-06-22",
+          "text": "Fixed: @State MemoryLaneCoordinator in MainTabView; loadInitial() fetches all pages until next_cursor nil; backend compound cursor (created_at,id) + import created_at=captured_at. If still seeing 2 on device, confirm Scheme does NOT include -LegacyUseStubAPI and backend is redeployed."
+        }
+      ]
+    },
+    {
+      "id": "concern-import-animation-glitchy",
+      "kind": "concern",
+      "title": "Import — pin-drop celebration animation is glitchy / doesn't really work",
+      "status": "open",
+      "raisedBy": "joseph",
+      "needs": "ios",
+      "detail": "Manual QA 2026-06-22 (device): 'The importing memories animation is glitchy and doesn't really work.' The PinDropCelebrationCoordinator overlay + cascade on import is janky. Backend has no involvement here — POST /v1/memories/import already returns all cluster memory_ids synchronously, so iOS has every coordinate it needs at completion. Likely causes (iOS): (1) cascade stagger driven off async upload completions rather than the import response, so pins appear erratically as each blob PUT finishes; (2) animating ~45 MapKit annotations at once drops frames; (3) overlay/tab-switch race (auto-switch to Wander mid-animation). Suggest: drive the cascade purely off the synchronous import response (coords are all present), cap concurrent animations, and don't switch tabs until the overlay completes.",
+      "blocks": ["ios-import-flow", "ios-pin-drop-animation"],
+      "responses": []
+    },
+    {
+      "id": "backend-memory-lane-image-and-sort",
+      "kind": "idea",
+      "title": "Memory Lane: backend now returns media_url + caption + sort/filter so the grid can show real images",
+      "status": "open",
+      "raisedBy": "backend",
+      "needs": "ios",
+      "detail": "Addresses Joseph's QA: 'I have to click on Memory Lane to see the image… when there are a bunch it's hard to know which memory I want' and 'need a better way to sort through memories.' Backend shipped (api-contract §7 GET /v1/memories updated): (1) media_url added to each list item — full-res own media, non-null when scan_status=clear. RENDER THIS IN THE GRID when thumbnail_url is null (server thumbnailing via sharp is best-effort and is currently absent for imports / when sharp can't load on the function, which is why the grid showed placeholders and forced a tap). (2) caption + teaser_text added per item — show as a label to disambiguate dense grids. (3) sort=oldest|newest query param (default oldest, back-compat). (4) media_type=photo|video|text optional filter. Cursors are sort-specific. iOS asks: wire AsyncImage to thumbnail_url ?? media_url; add a sort toggle (newest/oldest) and optional type filter in the Memory Lane toolbar.",
+      "blocks": ["ios-memory-lane"],
+      "responses": []
+    },
+    {
+      "id": "idea-client-side-thumbnails",
+      "kind": "idea",
+      "title": "Generate thumbnails client-side at upload so previews never depend on serverless sharp",
+      "status": "open",
+      "raisedBy": "backend",
+      "needs": "ios",
+      "detail": "Found while debugging the Memory Lane 'no image until I tap' issue. Server thumbnails come from lib/thumbnail.ts → sharp, lazy-loaded so a missing native binary can't crash startup — but that also means it SILENTLY returns null and leaves thumbnail_key null whenever sharp can't load on the function (and it does nothing for imports unless each cluster photo is uploaded). For OWN memories I patched this with the media_url fallback (this session), but that fallback is NOT available for OTHERS' memories in /scan teasers (Phase 2): privacy forbids returning others' media_url before unlock, so an others' teaser with a broken thumbnail has nothing to show. Proposal: iOS already rewrites the image for EXIF strip (EXIFStripper) — at that same step, also produce a ~400px WebP/JPEG thumbnail and upload it alongside the original (e.g. POST /v1/uploads/direct with an X-Thumbnail marker, or a second small asset). Backend stores it as thumbnail_key directly, no sharp on the hot path. Robust, cheaper, and works identically for own + others' teasers. Backend will add the thumbnail intake endpoint/param when iOS is ready. Not urgent for Phase 1 (media_url fallback covers own memories now), but it's the right fix before social/others'-memory teasers ship.",
+      "blocks": [],
+      "responses": []
     }
   ],
   "manualTests": [

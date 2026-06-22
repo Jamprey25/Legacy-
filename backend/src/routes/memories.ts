@@ -40,23 +40,48 @@ const unlockLimit = rateLimit({ name: "unlock", limit: 30, windowSec: 60, keyBy:
 const MAX_PAGE_SIZE = 100;
 const DEFAULT_PAGE_SIZE = 50;
 
+const VALID_SORTS = ["oldest", "newest"] as const;
+
 memoriesRoutes.get("/", async (c) => {
   const userId: string = c.get("userId");
   const limitParam = Number(c.req.query("limit") ?? DEFAULT_PAGE_SIZE);
   const limit = Math.min(isNaN(limitParam) ? DEFAULT_PAGE_SIZE : limitParam, MAX_PAGE_SIZE);
   const cursor = c.req.query("cursor");
 
-  const { memories, nextCursor } = await listMemoriesByOwner({ ownerId: userId, limit, cursor });
+  // sort: oldest (default, back-compat) | newest. Unknown values fall back to oldest.
+  const sortParam = c.req.query("sort");
+  const sort = VALID_SORTS.includes(sortParam as (typeof VALID_SORTS)[number])
+    ? (sortParam as "oldest" | "newest")
+    : "oldest";
 
-  // Generate signed thumbnail URLs for clear memories that have a thumbnail.
-  // Vercel Blob: thumbnail_key IS the full public URL, returned directly.
-  // S3/R2: generates a short-TTL signed GET URL.
+  // media_type: optional filter. Unknown values are ignored (no filter).
+  const mediaTypeParam = c.req.query("media_type");
+  const mediaType =
+    mediaTypeParam === "photo" || mediaTypeParam === "video" || mediaTypeParam === "text"
+      ? mediaTypeParam
+      : undefined;
+
+  const { memories, nextCursor } = await listMemoriesByOwner({
+    ownerId: userId,
+    limit,
+    cursor,
+    sort,
+    mediaType,
+  });
+
+  // Resolve media URLs for clear memories. Prefer thumbnail_url for the grid, but ALSO
+  // return media_url so the client can render the real image when no thumbnail exists
+  // (server-side thumbnailing is best-effort and may be absent for imports or if sharp
+  // is unavailable). Both are owner-only own media — same source GET /:id already exposes,
+  // no new privacy surface. For Vercel Blob these resolve to the stored public URL (no
+  // network); for S3/R2 they are short-TTL signed GETs.
   const items = await Promise.all(
     memories.map(async (m) => {
       let thumbnailUrl: string | null = null;
-      if (m.thumbnail_key && m.scan_status === "clear") {
-        const signed = await generateSignedGetUrl(m.thumbnail_key);
-        thumbnailUrl = signed.signedGetUrl;
+      let mediaUrl: string | null = null;
+      if (m.scan_status === "clear") {
+        if (m.thumbnail_key) thumbnailUrl = (await generateSignedGetUrl(m.thumbnail_key)).signedGetUrl;
+        if (m.media_key) mediaUrl = (await generateSignedGetUrl(m.media_key)).signedGetUrl;
       }
       return {
         memory_id: m.id,
@@ -65,6 +90,9 @@ memoriesRoutes.get("/", async (c) => {
         media_type: m.media_type,
         scan_status: m.scan_status,
         thumbnail_url: thumbnailUrl,
+        media_url: mediaUrl,
+        caption: m.caption ?? null,
+        teaser_text: m.teaser_text ?? null,
         privacy_tier: m.privacy_tier,
         drop_method: m.drop_method,
       };
@@ -390,6 +418,7 @@ memoriesRoutes.post("/import", importLimit, async (c) => {
         source: "imported",
         mediaKey: null,
         discoverableAfter: capturedAt,
+        createdAt: capturedAt,
         privacyTier: "private",
       });
 

@@ -88,6 +88,31 @@ When Joseph clicks an option, the dashboard sets `status: "decided"`, `chosenOpt
 
 ---
 
+## [backend → all] 2026-06-22 — Memory Lane images + sorting; Wander/import QA relayed
+
+**Shipped (backend):**
+- **`GET /v1/memories` list now returns `media_url`** (full-res own media, clear-only) alongside `thumbnail_url`. iOS should render `thumbnail_url ?? media_url` in the grid so Memory Lane shows the real image even when server thumbnails are absent (sharp is best-effort on serverless; imports often have no thumbnail). Fixes Joseph's "have to tap to see the image."
+- **`GET /v1/memories` now returns `caption` + `teaser_text`** per item — labels to disambiguate dense grids.
+- **`sort=oldest|newest`** query param (default `oldest`, back-compat) + optional **`media_type=photo|video|text`** filter. Cursors are sort-specific. Addresses "need a better way to sort through memories." Built on the neon `sql(text, params)` form; sort direction is from a closed enum (injection-safe), all values bind params.
+- **api-contract §7** updated with the new fields + params.
+- Fixed a **malformed `tasks.json`** (Cursor's `bug-memory-lane-partial-list` object was missing a closing brace — the dashboard couldn't parse it).
+
+**Tasks marked done:** none new (Memory Lane backend enhancement tracked via `backend-memory-lane-image-and-sort` thread).
+
+**Relayed to iOS (Joseph's device QA — all iOS-side):**
+- `concern-import-animation-glitchy` — import pin cascade is janky; drive it off the synchronous import response (coords all present), cap concurrent annotation animations, don't switch tabs mid-overlay.
+- `concern-forced-unlock-annoying` — REOPENED with Joseph's fresh report: teaser tray still blocks map pan when a memory is in range. Needs map-first / collapsible tray that doesn't capture gestures. Priority Wander fix.
+- `backend-memory-lane-image-and-sort` — wire `thumbnail_url ?? media_url`, add sort toggle + type filter.
+- `idea-client-side-thumbnails` — generate the thumbnail during EXIF strip and upload it, so previews never depend on serverless sharp (and so Phase-2 others'-memory teasers, which can't use the media_url fallback, still get previews).
+
+**Verification:** backend typecheck clean; 63 unit tests green (1 DB integration suite skipped locally — needs `DATABASE_URL`).
+
+**Blocked on:** iOS to consume the new list fields + Wander/import fixes; Joseph redeploy backend + device re-test.
+
+**Next session picks up:** confirm Memory Lane shows images on device after iOS wires `media_url`; decide if client-side thumbnails graduate from idea to task before Phase 2.
+
+---
+
 ## [backend → all] 2026-06-22 — QA feedback from device testing
 
 **Findings (5 items logged):**
@@ -1024,3 +1049,14 @@ Joseph requested two features to make the app feel less aimless:
 **Still open for Joseph / follow-up:** `concern-pin-drop-upload-lag`, `q-memory-lane-image-visibility` (product intent).
 
 **Joseph re-test:** new-user email OTP → DOB → Wander; Google sign-in after account delete; Wander map pan; unlocked memory image layout.
+
+---
+
+## [ios → all] 2026-06-22 (session 5) — Memory Lane partial list + tasks.json review
+
+**Claude `tasks.json` entries (2026-06-22):** Resolved QA threads (`bug-age-gate`, wander map/image, Google re-auth). **Open:** `concern-forced-unlock-annoying` — iOS audited: no auto-unlock on scan; teaser list overlay is the annoyance (follow-up UX).
+
+**`bug-memory-lane-partial-list`:** Joseph saw ~2 items after ~45 imports. Fixes:
+- **iOS:** `MemoryLaneCoordinator` now `@State` in `MainTabView` (was recreated every body pass); `loadInitial()` walks all pages until `next_cursor` is null; footer shows total count.
+- **Backend:** list cursor is `(created_at, id)` tuple (no skipped rows when timestamps collide); imports set `created_at = captured_at`.
+- **Check:** DEBUG scheme must NOT pass `-LegacyUseStubAPI` on device — stub fixture hard-codes **2** memories.

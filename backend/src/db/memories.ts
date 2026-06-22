@@ -15,6 +15,8 @@ export interface CreateMemoryInput {
   source: "live" | "imported";
   mediaKey: string | null;
   discoverableAfter: Date;
+  /** When set (imports), used for Memory Lane ordering instead of insert time. */
+  createdAt?: Date;
   privacyTier?: "private" | "recipients" | "friends" | "public";
   teaserText?: string | null;
   caption?: string | null;
@@ -41,28 +43,53 @@ export interface MemoryRow {
 
 /** Insert a new memory. scan_status defaults to 'pending'. Returns the new row. */
 export async function createMemory(input: CreateMemoryInput): Promise<MemoryRow> {
-  const rows = await sql`
-    INSERT INTO memories (
-      owner_id, lat, lng, geohash,
-      source, drop_method, media_type, media_key,
-      privacy_tier, teaser_text, caption,
-      discoverable_after
-    ) VALUES (
-      ${input.ownerId},
-      ${input.lat},
-      ${input.lng},
-      ${input.geohash},
-      ${input.source},
-      ${input.dropMethod},
-      ${input.mediaType},
-      ${input.mediaKey},
-      ${input.privacyTier ?? "private"},
-      ${input.teaserText ?? null},
-      ${input.caption ?? null},
-      ${input.discoverableAfter.toISOString()}
-    )
-    RETURNING *
-  `;
+  const createdAt = input.createdAt?.toISOString();
+  const rows = createdAt
+    ? await sql`
+        INSERT INTO memories (
+          owner_id, lat, lng, geohash,
+          source, drop_method, media_type, media_key,
+          privacy_tier, teaser_text, caption,
+          discoverable_after, created_at
+        ) VALUES (
+          ${input.ownerId},
+          ${input.lat},
+          ${input.lng},
+          ${input.geohash},
+          ${input.source},
+          ${input.dropMethod},
+          ${input.mediaType},
+          ${input.mediaKey},
+          ${input.privacyTier ?? "private"},
+          ${input.teaserText ?? null},
+          ${input.caption ?? null},
+          ${input.discoverableAfter.toISOString()},
+          ${createdAt}
+        )
+        RETURNING *
+      `
+    : await sql`
+        INSERT INTO memories (
+          owner_id, lat, lng, geohash,
+          source, drop_method, media_type, media_key,
+          privacy_tier, teaser_text, caption,
+          discoverable_after
+        ) VALUES (
+          ${input.ownerId},
+          ${input.lat},
+          ${input.lng},
+          ${input.geohash},
+          ${input.source},
+          ${input.dropMethod},
+          ${input.mediaType},
+          ${input.mediaKey},
+          ${input.privacyTier ?? "private"},
+          ${input.teaserText ?? null},
+          ${input.caption ?? null},
+          ${input.discoverableAfter.toISOString()}
+        )
+        RETURNING *
+      `;
   return rows[0] as unknown as MemoryRow;
 }
 
@@ -112,10 +139,14 @@ export async function getMemoryWithContext(memoryId: string): Promise<MemoryWith
   return rows.length > 0 ? (rows[0] as unknown as MemoryWithContext) : null;
 }
 
+export type MemorySort = "oldest" | "newest";
+
 export interface ListMemoriesOptions {
   ownerId: string;
   limit: number;
-  cursor?: string; // opaque: base64url-encoded ISO timestamp of last seen created_at
+  cursor?: string; // opaque base64url JSON { created_at, id } or legacy ISO timestamp
+  sort?: MemorySort; // default "oldest" (preserves prior behaviour)
+  mediaType?: "photo" | "video" | "text"; // optional filter
 }
 
 export interface ListMemoriesResult {
@@ -123,42 +154,91 @@ export interface ListMemoriesResult {
   nextCursor: string | null;
 }
 
+interface ListCursor {
+  createdAt: string;
+  id: string;
+}
+
+function encodeListCursor(row: MemoryRow): string {
+  const payload = JSON.stringify({
+    created_at: new Date(row.created_at).toISOString(),
+    id: row.id,
+  });
+  return Buffer.from(payload, "utf8").toString("base64url");
+}
+
+function decodeListCursor(raw: string): ListCursor | null {
+  try {
+    const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as {
+      created_at?: string;
+      id?: string;
+    };
+    if (parsed.created_at && parsed.id) {
+      return { createdAt: parsed.created_at, id: parsed.id };
+    }
+  } catch {
+    // fall through — legacy cursor was a bare ISO timestamp
+  }
+  try {
+    const legacy = Buffer.from(raw, "base64url").toString("utf8");
+    if (legacy) return { createdAt: legacy, id: "" };
+  } catch {
+    // ignore malformed cursor — start from beginning
+  }
+  return null;
+}
+
 /**
- * Paginated oldest-first list of own memories. Cursor is opaque base64url ISO timestamp.
+ * Paginated list of own memories. Defaults to oldest-first; pass sort: "newest" to
+ * reverse. Cursor is opaque base64url JSON ({ created_at, id }) and is direction-aware:
+ * oldest paginates forward in time, newest paginates backward. An optional mediaType
+ * narrows the list (photo/video/text).
+ *
+ * Built with the neon ordinary-function form (`sql(text, params)`) so the optional sort,
+ * filter, and cursor compose without a combinatorial explosion of tagged-template
+ * branches. The sort direction is the only interpolated token and is derived from a
+ * closed enum (never raw input), so this stays injection-safe; all values are bind params.
  */
 export async function listMemoriesByOwner(opts: ListMemoriesOptions): Promise<ListMemoriesResult> {
   const { ownerId, limit } = opts;
-  let cursorDate: string | null = null;
-  if (opts.cursor) {
-    try {
-      cursorDate = Buffer.from(opts.cursor, "base64url").toString("utf8");
-    } catch {
-      // ignore malformed cursor — start from beginning
+  const sort: MemorySort = opts.sort === "newest" ? "newest" : "oldest";
+  const cmp = sort === "newest" ? "<" : ">";
+  const order = sort === "newest" ? "DESC" : "ASC";
+  const cursor = opts.cursor ? decodeListCursor(opts.cursor) : null;
+
+  const conditions: string[] = ["owner_id = $1"];
+  const params: unknown[] = [ownerId];
+
+  if (opts.mediaType) {
+    params.push(opts.mediaType);
+    conditions.push(`media_type = $${params.length}`);
+  }
+
+  if (cursor) {
+    if (cursor.id) {
+      params.push(cursor.createdAt, cursor.id);
+      const cAt = `$${params.length - 1}`;
+      const cId = `$${params.length}`;
+      conditions.push(`(created_at ${cmp} ${cAt} OR (created_at = ${cAt} AND id ${cmp} ${cId}))`);
+    } else {
+      params.push(cursor.createdAt);
+      conditions.push(`created_at ${cmp} $${params.length}`);
     }
   }
 
-  const rows = cursorDate
-    ? await sql`
-        SELECT * FROM memories
-        WHERE owner_id = ${ownerId} AND created_at > ${cursorDate}
-        ORDER BY created_at ASC
-        LIMIT ${limit + 1}
-      `
-    : await sql`
-        SELECT * FROM memories
-        WHERE owner_id = ${ownerId}
-        ORDER BY created_at ASC
-        LIMIT ${limit + 1}
-      `;
+  params.push(limit + 1);
+  const queryText = `
+    SELECT * FROM memories
+    WHERE ${conditions.join(" AND ")}
+    ORDER BY created_at ${order}, id ${order}
+    LIMIT $${params.length}
+  `;
 
-  const typedRows = rows as unknown as MemoryRow[];
-  const hasMore = typedRows.length > limit;
-  const page = hasMore ? typedRows.slice(0, limit) : typedRows;
+  const rows = (await sql(queryText, params)) as unknown as MemoryRow[];
+  const hasMore = rows.length > limit;
+  const page = hasMore ? rows.slice(0, limit) : rows;
   const lastRow = page[page.length - 1];
-  const nextCursor =
-    hasMore && lastRow
-      ? Buffer.from(new Date(lastRow.created_at).toISOString(), "utf8").toString("base64url")
-      : null;
+  const nextCursor = hasMore && lastRow ? encodeListCursor(lastRow) : null;
 
   return { memories: page, nextCursor };
 }

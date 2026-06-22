@@ -361,9 +361,13 @@ Owner-only full memory detail. `404` if not owner.
 - Coordinates (`lat`, `lng`, `geohash`) are included — owner data only, never returned to non-owners.
 
 ### `GET /v1/memories` (list)
-Paginated owner list for Memory Lane. Oldest-first. Auth required.
+Paginated owner list for Memory Lane. Auth required.
 
-**Query params:** `limit` (default 50, max 100), `cursor` (opaque, from `next_cursor`).
+**Query params:**
+- `limit` (default 50, max 100)
+- `cursor` (opaque, from `next_cursor`) — direction-aware; pass back the cursor returned by the same `sort`.
+- `sort` (default `oldest`) — `oldest` | `newest`. Unknown values fall back to `oldest`.
+- `media_type` (optional filter) — `photo` | `video` | `text`. Unknown values are ignored (no filter).
 
 **Response `200`**
 ```json
@@ -376,6 +380,9 @@ Paginated owner list for Memory Lane. Oldest-first. Auth required.
       "media_type": "photo",
       "scan_status": "clear",
       "thumbnail_url": "https://blob.vercel-storage.com/...",
+      "media_url": "https://blob.vercel-storage.com/...",
+      "caption": "First apartment.",
+      "teaser_text": "Where it all began",
       "privacy_tier": "private",
       "drop_method": "pin"
     }
@@ -384,7 +391,9 @@ Paginated owner list for Memory Lane. Oldest-first. Auth required.
 }
 ```
 - `thumbnail_url` is non-null only when `scan_status = "clear"` and a thumbnail has been generated. `null` for text memories, pending media, and un-thumbnailed entries.
-- `next_cursor` is `null` when there are no more pages.
+- **`media_url`** is the full-resolution own media (owner only), non-null when `scan_status = "clear"` and the memory has media. **Render this in the grid when `thumbnail_url` is null** — server-side thumbnailing is best-effort and may be absent for imports or when `sharp` is unavailable on the function, so this guarantees Memory Lane shows the real image without a per-item unlock round-trip. Same source as `GET /:id` `media_url` — no new privacy surface (owner's own media; for Vercel Blob it is the unguessable public URL).
+- `caption` / `teaser_text` are the owner's labels (or `null`) — use them to disambiguate items in a dense grid.
+- `next_cursor` is `null` when there are no more pages. Cursors are sort-specific: don't reuse a cursor from `sort=oldest` with `sort=newest`.
 
 ### `GET /v1/user/export`
 Synchronously packages all own memories into a JSON archive and returns a download URL. Rate-limited 3 per day.
