@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-22T17:34:22.453Z"
+    "lastUpdated": "2026-06-22T17:34:28.829Z"
   },
   "decisions": [
     {
@@ -686,7 +686,7 @@
     {
       "id": "qa-mt-import-upload",
       "title": "Import clusters upload photos to Vercel Blob",
-      "status": "pending",
+      "status": "passed",
       "addedBy": "backend",
       "platform": "device",
       "milestone": "M3",
@@ -697,7 +697,8 @@
         "Import tab → run import on device with live API",
         "Confirm cluster uploads complete"
       ],
-      "notes": "Same upload fix as qa-mt-drop-upload. Joseph re-run on device."
+      "notes": "Same upload fix as qa-mt-drop-upload. Joseph re-run on device.",
+      "verifiedAt": "2026-06-22"
     },
     {
       "id": "qa-mt-location-permission-repeat",
