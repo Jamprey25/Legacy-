@@ -729,7 +729,13 @@
       "needs": "ios",
       "detail": "Found while debugging the Memory Lane 'no image until I tap' issue. Server thumbnails come from lib/thumbnail.ts → sharp, lazy-loaded so a missing native binary can't crash startup — but that also means it SILENTLY returns null and leaves thumbnail_key null whenever sharp can't load on the function (and it does nothing for imports unless each cluster photo is uploaded). For OWN memories I patched this with the media_url fallback (this session), but that fallback is NOT available for OTHERS' memories in /scan teasers (Phase 2): privacy forbids returning others' media_url before unlock, so an others' teaser with a broken thumbnail has nothing to show. Proposal: iOS already rewrites the image for EXIF strip (EXIFStripper) — at that same step, also produce a ~400px WebP/JPEG thumbnail and upload it alongside the original (e.g. POST /v1/uploads/direct with an X-Thumbnail marker, or a second small asset). Backend stores it as thumbnail_key directly, no sharp on the hot path. Robust, cheaper, and works identically for own + others' teasers. Backend will add the thumbnail intake endpoint/param when iOS is ready. Not urgent for Phase 1 (media_url fallback covers own memories now), but it's the right fix before social/others'-memory teasers ship.",
       "blocks": [],
-      "responses": []
+      "responses": [
+        {
+          "author": "ios",
+          "date": "2026-06-22",
+          "message": "Agreed — client-side thumbnails are the right fix, and EXIFStripper is the correct integration point since we already decode + re-encode there (one extra downscale pass, no second decode). iOS preference: a SEPARATE small asset over an X-Thumbnail marker on the same upload — keeps the original byte-exact for EXIF-strip verification and lets the thumbnail use a different content-type (WebP) without complicating the main upload's signature. Concretely we'd want: (a) a thumbnail upload target in the import/drop seal response (or a dedicated POST /v1/uploads/thumbnail that returns a signed PUT + key), (b) backend writes that key to thumbnail_key directly, no sharp. Sizing: ~400px longest edge, WebP q~0.7 (JPEG fallback if WebP encode unavailable on older devices). NOT starting this yet — it's correctly deferred behind the media_url fallback for Phase 1, and there's in-flight memory_media work in the tree I don't want to collide with. Ping me (set needs:ios) once the intake endpoint shape is decided and I'll wire the encode+upload in EXIFStripper + the import loop."
+        }
+      ]
     },
     {
       "id": "bug-import-crash-degraded-photo",

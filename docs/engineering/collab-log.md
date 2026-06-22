@@ -88,6 +88,26 @@ When Joseph clicks an option, the dashboard sets `status: "decided"`, `chosenOpt
 
 ---
 
+## [ios → all] 2026-06-22 (session 7) — UX polish batch: onboarding, On-this-day, permissions, a11y
+
+Autonomous user-friendliness pass (Joseph away, asked to "keep adding practical features"). Six self-contained iOS features, each built + tested + committed separately. **Did not touch `backend/**`** — there is in-flight backend `memory_media` WIP in the tree (migrations `0012_memory_media.sql`, `memoryMedia.ts`, `uploads`/`memories` routes, plus its iOS client `APIClient`/`ImportEndpoints`/`MemoryMediaUploader`/`ImportCoordinator`); I left all of it untouched and staged only my own files per-commit.
+
+**Shipped (iOS):**
+- **First-run onboarding** (`OnboardingView`, `c80f66c`→`f6aad8f`) — 3-page intro gated by `@AppStorage("legacyHasSeenOnboarding")`, shown before the welcome screen. Primes location + notification prompts (does NOT trigger system prompts itself). Directly targets the permission confusion from session 6 device QA.
+- **"On this day" resurfacing** (`c80f66c`) — Memory Lane shows a horizontal carousel of memories from today's date in prior years; empty on no-match days. New `MemoryLaneFeatureTests` target covers the date logic.
+- **Actionable empty state** (`dffc78c`) — Memory Lane empty view now offers "Drop your first memory" / "Import from Photos" (cross-tab callbacks from the tab host) or "Clear filter" when a filter hid everything.
+- **Reduce Motion support** (`7bb0ee5`) — new `LegacyMotion` gate (reads `UIAccessibility.isReduceMotionEnabled` so it works from coordinators too). Pin reveals, the import/drop celebration cascade, camera-fit, and onboarding paging all collapse to instant when Reduce Motion is on.
+- **Profile → App permissions** (`852d1b3`) — live Location + Notifications status rows, tap to deep-link Settings, re-read on foreground (`scenePhase`).
+- **Memory Lane year grouping** (`766c44e`) — sticky year-section headers with per-year counts, ordered by active sort; makes large imported libraries browsable. "Undated" bucket for unparseable dates.
+
+**Verification:** all SPM tests green (62 → 66 with new MemoryLane tests); full Xcode app build (`Legacy` scheme, iOS Simulator) succeeds after every feature.
+
+**For backend / other agent:** no API changes, no contract changes. The parallel `memory_media` work is untouched and uncommitted by me — it's safe to commit on your side independently.
+
+**Next session could pick up:** VoiceOver label pass on the new cards; "On this day" could broaden to a ±N-day window if exact-day matches feel too rare on small libraries.
+
+---
+
 ## [backend → all] 2026-06-22 — Memory Lane images + sorting; Wander/import QA relayed
 
 **Shipped (backend):**
