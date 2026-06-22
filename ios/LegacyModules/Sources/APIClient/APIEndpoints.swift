@@ -317,6 +317,21 @@ public struct ListMemoriesResponse: Decodable, Sendable, Equatable {
     }
 }
 
+/// One photo of a memory's ordered set (`GET /v1/memories/{id}` → `media[]`). Hero = position 0.
+public struct MemoryMediaItem: Decodable, Sendable, Equatable, Identifiable {
+    public let url: String
+    public let thumbnailURL: String?
+    public let type: String
+    public let position: Int
+
+    public var id: Int { position }
+
+    enum CodingKeys: String, CodingKey {
+        case url, type, position
+        case thumbnailURL = "thumbnail_url"
+    }
+}
+
 /// Owner-only full memory row (`GET /v1/memories/{id}`). Includes coordinates — owner only.
 public struct MemoryDetail: Decodable, Sendable, Equatable {
     public let memoryID: String
@@ -330,6 +345,9 @@ public struct MemoryDetail: Decodable, Sendable, Equatable {
     public let mediaType: String
     public let mediaURL: String?
     public let thumbnailURL: String?
+    /// Full ordered photo set (hero-first). Optional — older servers omit it; mediaURL is
+    /// the hero for back-compat. Empty/absent until the upload pipeline clears each photo.
+    public let media: [MemoryMediaItem]?
     public let discoverableAfter: String
     public let createdAt: String
 
@@ -342,6 +360,7 @@ public struct MemoryDetail: Decodable, Sendable, Equatable {
         case mediaType = "media_type"
         case mediaURL = "media_url"
         case thumbnailURL = "thumbnail_url"
+        case media
         case discoverableAfter = "discoverable_after"
         case createdAt = "created_at"
     }
@@ -476,9 +495,11 @@ public struct UnlockedMedia: Decodable, Sendable, Equatable {
     public let url: String
     public let type: String
     public let expiresAt: String
+    /// Order within the memory's photo set (hero = 0). Optional — older servers omit it.
+    public let position: Int?
 
     enum CodingKeys: String, CodingKey {
-        case url, type
+        case url, type, position
         case expiresAt = "expires_at"
     }
 }

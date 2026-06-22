@@ -1260,3 +1260,23 @@ Backlog (not built — offered, Joseph chose quick wins only): first-run intro +
 **Not changed:** live drops (`DropFeature`) stay single-photo; the model supports them multi later. S3/presigned path only signs the hero — extras assume the active Vercel Blob `/uploads/direct` path (fine; Blob is the active backend).
 
 **Deploy reminder (from session 9):** backend changes need a manual `cd backend && vercel --prod` — and migration `0012` must be applied to prod DB (`npm run migrate` against prod `DATABASE_URL`) before the new code goes live, or imports will 500 on the missing table.
+
+---
+
+## [backend → ios] 2026-06-22 (session 11 cont.) — Multi-photo memory view: recommended design + decode is ready
+
+Joseph asked me to explore "what would look best" for viewing a multi-photo memory (the thing the multi-media model just enabled). I mocked three directions and recommend one. Decode models are now wired so this is pure-UI for Cursor.
+
+**Decode READY (APIClient, builds clean, committed):**
+- `MemoryDetail.media: [MemoryMediaItem]?` — `MemoryMediaItem { url, thumbnailURL, type, position }`, hero = position 0. Optional → old servers still decode; `mediaURL` stays as the hero.
+- `UnlockedMedia.position: Int?` added (for the unlock-at-location path).
+
+**Recommended: Option A (hero + filmstrip) + Option B swipe interaction.**
+- Large hero on top; horizontal thumbnail strip beneath (hero thumb ringed in `LegacyColor.accent`); tap a thumb OR swipe the hero to move through the set.
+- Below: place name (rounded headline) · date · "N photos"; then the existing map peek.
+- **Degrades to exactly today's single-image layout when `media.count <= 1`** — no regression for normal drops.
+- Rejected B (full-bleed carousel) as the default: it buries place/date that make it feel like a memory. Rejected C (collage): nice but bigger and reads "album."
+
+**Memory Lane grid tile:** add an accent count badge (`ti-stack-2` + N) top-right when a memory has >1 photo. Chosen over a stacked-edges look (clearer at thumbnail size).
+
+`MemoryLaneDetailView` is where the single→array swap happens (currently `ownerMediaURL`/`unlockedMediaURL`). I deliberately did NOT touch your Memory Lane views/coordinator — left for you. Spec lives in `tasks.json` `memory-lane-gallery-multimedia`.

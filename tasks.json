@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-22T23:55:00.000Z"
+    "lastUpdated": "2026-06-23T00:20:00.000Z"
   },
   "decisions": [
     {
@@ -2392,7 +2392,7 @@
       "owner": "ios",
       "phase": 2,
       "milestone": "M",
-      "notes": "Cursor handoff. GET /:id and unlock now return media[]: [{url,thumbnail_url,type,position}] hero-first. media_url/thumbnail_url kept as hero for back-compat. Render the full set instead of a single image."
+      "notes": "Cursor handoff. Decode is now READY in APIClient: MemoryDetail.media: [MemoryMediaItem]? (url, thumbnailURL, type, position) and UnlockedMedia.position added — both optional/back-compat. RECOMMENDED DESIGN (Claude, session 11, see collab-log + mockup): Option A 'hero + filmstrip' as the structure with Option B swipe as the interaction — hero image + horizontal thumbnail strip (hero ring = accent), tap thumb OR swipe hero to move; place name + date + 'N photos' below; map peek. Degrades to today's single-image layout when media.count<=1. Grid tile: accent count badge (ti-stack-2 + N) top-right when count>1. MemoryLaneDetailView currently shows one image (ownerMediaURL/unlockedMediaURL) — swap for the media[] array, hero-first. Keep mediaURL as hero for cheap first paint."
     }
   ]
 }
