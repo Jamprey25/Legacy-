@@ -23,6 +23,7 @@ public final class BackgroundLocationCoordinator: NSObject {
     private let manager: CLLocationManager
     private var regionService: CLMonitorRegionService?
     private var eventTask: Task<Void, Never>?
+    private var isStartingMonitoring = false
 
     public override init() {
         manager = CLLocationManager()
@@ -44,11 +45,19 @@ public final class BackgroundLocationCoordinator: NSObject {
     }
 
     /// Start significant-change monitoring (near-zero steady-state power).
+    ///
+    /// Safe to call concurrently: a second call while initialization is in progress
+    /// is silently dropped. This covers the race between the `.task {}` startup path
+    /// and the `locationManagerDidChangeAuthorization` delegate firing on relaunch
+    /// after iOS terminates the app to apply "Always Allow" permissions.
     public func startIfAuthorized() async {
         guard isAuthorizedForBackground else {
             phase = .idle
             return
         }
+        guard !isStartingMonitoring else { return }
+        isStartingMonitoring = true
+        defer { isStartingMonitoring = false }
 
         if #available(iOS 17.0, *), regionService == nil {
             regionService = await CLMonitorRegionService()

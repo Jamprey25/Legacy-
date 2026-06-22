@@ -1077,3 +1077,57 @@ Joseph requested two features to make the app feel less aimless:
 - **iOS:** `MemoryLaneCoordinator` now `@State` in `MainTabView` (was recreated every body pass); `loadInitial()` walks all pages until `next_cursor` is null; footer shows total count.
 - **Backend:** list cursor is `(created_at, id)` tuple (no skipped rows when timestamps collide); imports set `created_at = captured_at`.
 - **Check:** DEBUG scheme must NOT pass `-LegacyUseStubAPI` on device — stub fixture hard-codes **2** memories.
+
+---
+
+## [ios → all] 2026-06-22 (session 6) — Wander map-first tray + import celebration fix
+
+**Tasks resolved:** `concern-forced-unlock-annoying`, `concern-import-animation-glitchy` (both Joseph device QA, iOS-only).
+
+**`concern-forced-unlock-annoying` (Wander map blocked by teaser list):**
+- Root cause: the teaser `ScrollView` was greedy and filled the whole area below the header, and a full-screen `0.88` dim covered the map — the list captured every pan gesture.
+- Fix (`WanderFeature.swift`): teasers now live in a **collapsible bottom tray** (`WanderTeaserTray`) capped at 300pt with a tap-to-collapse handle + summary ("N memories nearby / in range"). The middle of the screen is a `Spacer` (no hit-testable content) so touches fall through to the `Map` → pans/zooms freely. Map dim removed when memories are present. Opening a memory is still an explicit tap (no auto-unlock).
+
+**`concern-import-animation-glitchy` (import pin cascade janky):**
+- Root cause: `WanderUserMap` called `fitCamera()` on **every** pin insertion; the celebration grows the pin filter one pin at a time (~80ms apart), firing ~45 overlapping 0.45s camera animations → thrash.
+- Fix: camera fitting **debounced** via `.task(id: pin-set)` (one fit ~350ms after pins settle); per-pin reveal stagger **capped at 12** (extra pins drop together) to protect frame rate on big batches; `celebratePins` (`LegacyApp.swift`) runs `scanIfNeeded` **concurrently** with the celebration loading phase so the map has a user coordinate before the reveal (was racing the tab switch onto a blank map).
+
+**Verification:** `swift build` clean; **54/54** SPM tests pass.
+
+**Joseph re-test:** Wander with a memory nearby — confirm you can pan/zoom the map and collapse the tray; Import ~many photos — confirm the pin-drop cascade is smooth (no camera jumping) and lands on the map.
+
+---
+
+## [ios → all] 2026-06-22 (session 7) — Import crash + location Always Allow crash
+
+**Bug reports (Joseph device QA):**
+1. "tried to import some memories got kicked out the app. The memories did drop tho"
+2. "I get asked to share my location but the most is 'allow while using the app', then i get enable discovery by my app then apple asked always allow. but after that happens i get booted out the app"
+
+### Bug 1 — Import crash: `PHAsset` continuation resumed twice
+
+**Root cause:** `PHImageManager.requestImageDataAndOrientation` calls its completion block **more than once** when the asset is in iCloud (or not immediately available in full quality):
+- First call: degraded/preview version while the full-quality bytes download — `PHImageResultIsDegradedKey = true`
+- Second call: full-quality result — `PHImageResultIsDegradedKey = false`
+
+`PHAssetImageFetcher.loadJPEGData` used `withCheckedThrowingContinuation`, which **crashes** (`Fatal error: SWIFT TASK CONTINUATION MISUSE`) if resumed more than once. Since the memories were already created server-side before the upload loop began, the memories dropped but the app was killed mid-upload.
+
+**Fix (`PHAssetImageFetcher.swift`):** Check `info?[PHImageResultIsDegradedKey] as? Bool == true` and `return` early for intermediate deliveries. The continuation is only resumed on the final, non-degraded result.
+
+### Bug 2 — "Always Allow" terminates the app
+
+**Root cause (iOS lifecycle):** When a user upgrades from "When In Use" to "Always Allow" location permission, iOS terminates and relaunches the foreground app to apply the new background capability. This looks like a crash to the user but is expected OS behaviour. Two secondary issues compounded it:
+
+1. **Race condition in `startIfAuthorized`:** On relaunch, both `locationManagerDidChangeAuthorization` and the MainTabView `.task {}` startup path could call `startIfAuthorized()` concurrently. Both would see `regionService == nil` and create two `CLMonitorRegionService` / `CLMonitor` instances, starting two event loop tasks and leaking resources.
+
+2. **Lost notification permission request:** The `onEnable` Task that calls `APNsRegistrationService.requestAuthorizationAndRegister()` is killed by the iOS termination before the notification prompt shows. On relaunch nothing requested notification permission, so background proximity alerts were silently broken.
+
+**Fixes:**
+- `BackgroundLocationCoordinator.startIfAuthorized` (`BackgroundLocationCoordinator.swift`): `isStartingMonitoring` bool guard — a second concurrent call is silently dropped until the first completes.
+- `MainTabView` startup `.task {}` (`LegacyApp.swift`): if `backgroundLocation.isAuthorizedForBackground` is true on launch, call `APNsRegistrationService.requestAuthorizationAndRegister()` as a recovery path. The system call is a no-op if the user already answered (`.authorized` or `.denied`); it only presents the prompt if still `.notDetermined`.
+
+**Verification:** `swift build` clean.
+
+**Joseph re-test:**
+- Import: import any photos that include ones from iCloud or not cached on device — confirm the app completes the import without crashing.
+- Location: fresh permission flow (reset privacy in Settings → Legacy) — grant "Allow While Using", tap Enable background discovery, grant "Always Allow". App should come back immediately (short relaunch) and on return the notification permission prompt should appear automatically.

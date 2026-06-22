@@ -23,6 +23,11 @@ public enum PHAssetImageFetcher {
             options.isSynchronous = false
 
             PHImageManager.default().requestImageDataAndOrientation(for: asset, options: options) { data, _, _, info in
+                // Photos fires this callback twice for iCloud assets: first a degraded
+                // preview, then the full-quality data. Resuming a CheckedContinuation
+                // twice is a fatal crash, so skip all degraded/intermediate deliveries.
+                if info?[PHImageResultIsDegradedKey] as? Bool == true { return }
+
                 if let error = info?[PHImageErrorKey] as? Error {
                     continuation.resume(throwing: error)
                     return

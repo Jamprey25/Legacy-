@@ -301,6 +301,13 @@ private struct MainTabView: View {
                 }
             }
             await backgroundLocation.startIfAuthorized()
+            // Recovery path: iOS terminates and relaunches the app after the user grants
+            // "Always Allow". The onEnable Task that shows the notification permission
+            // prompt is killed before it can run. On relaunch, request it here — the
+            // system call is a no-op if the user already made a choice (notDetermined only).
+            if backgroundLocation.isAuthorizedForBackground {
+                _ = await APNsRegistrationService.requestAuthorizationAndRegister()
+            }
             await APNsRegistrationService.uploadTokenIfNeeded(apiClient: appModel.apiClient)
             let pending = ProximityPushNotifications.consumePending()
             if pending.refresh {
@@ -316,8 +323,13 @@ private struct MainTabView: View {
     private func celebratePins(_ pins: [CachedOwnPin]) {
         selectedTab = .wander
         Task {
+            // Run the location/scan refresh concurrently with the celebration's loading
+            // phase so the overlay appears immediately AND the map has a user coordinate
+            // (and fresh server state) by the time the staggered pin reveal begins.
+            // Previously the reveal raced the tab switch, so pins landed on a blank map.
+            async let refresh: Void = wanderCoordinator.scanIfNeeded(force: true)
             await pinCelebration.celebrate(pins: pins, wander: wanderCoordinator)
-            await wanderCoordinator.scanIfNeeded(force: true)
+            _ = await refresh
         }
     }
 
