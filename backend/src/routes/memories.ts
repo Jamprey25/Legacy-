@@ -92,6 +92,8 @@ memoriesRoutes.get("/", async (c) => {
         scan_status: m.scan_status,
         thumbnail_url: thumbnailUrl,
         media_url: mediaUrl,
+        // Cleared photo count — drives the grid "multi-photo" badge. Hero-only/text = 1/0.
+        photo_count: m.media_count ?? (m.media_key ? 1 : 0),
         caption: m.caption ?? null,
         teaser_text: m.teaser_text ?? null,
         privacy_tier: m.privacy_tier,

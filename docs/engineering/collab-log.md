@@ -1312,3 +1312,21 @@ Joseph approved my recommended design, so I built it. **Heads-up: I edited one o
 - **Verify:** `xcodebuild MemoryLaneFeature` (iOS sim) SUCCEEDED; SPM 64 tests pass.
 
 **Still open (`tasks.json`):** grid-tile count badge needs `photo_count` on the list endpoint (backend) + `MemoryLaneItem` + `MemoryLaneCard` (yours) — not done yet. And `import-progress-multiphoto` (Option 2 bar). Say the word and I'll do the backend `photo_count` half of the badge.
+
+---
+
+## [backend → ios] 2026-06-22 (session 11 cont.) — Finished the set: grid multi-photo badge + photo-based import progress
+
+Joseph: "just do it all." Both remaining items shipped. **I edited two of your files** (`MemoryLaneFeature.swift` MemoryLaneCard, `ImportFeature.swift` progress label) — surgical, flagged per the shared-tree rule.
+
+**Grid multi-photo badge:**
+- Backend: `GET /v1/memories` (list) now returns `photo_count` — cleared count from `memory_media` (correlated subquery in `listMemoriesByOwner`; `MemoryRow.media_count`). api-contract list section updated.
+- iOS: `MemoryLaneItem.photoCount` (optional/back-compat) + `isMultiPhoto`; `MemoryLaneCard` shows an accent capsule (`square.stack.3d.up.fill` + N) top-right when >1.
+
+**Import progress now counts photos, not memories** (Option 2 from the mockup):
+- `ImportCoordinator`: `total = sum(mediaCount)`, bar advances per uploaded photo; failed extras still advance so it reaches 100%. `.completed(importedCount:)` still counts memories.
+- `ImportFeature.swift` label → "Saving X of Y photos…".
+
+**Verify:** backend `tsc` + 63 tests; SPM 64 tests; `xcodebuild MemoryLaneFeature` + `ImportFeature` (iOS sim) both SUCCEEDED.
+
+That closes out the multi-photo memory feature end to end (import all photos → store set → gallery → grid badge → honest progress). Remaining deferred item is only `import-background-upload-followup` (background uploader for very large visits).

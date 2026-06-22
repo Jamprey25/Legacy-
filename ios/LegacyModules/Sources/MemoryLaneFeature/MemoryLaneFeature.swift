@@ -511,6 +511,27 @@ private struct MemoryLaneCard: View {
                         .font(.title2)
                         .foregroundStyle(LegacyColor.textSecondary)
                 }
+
+                // Multi-photo badge: signals the memory holds the whole visit.
+                if item.isMultiPhoto, let count = item.photoCount {
+                    VStack {
+                        HStack {
+                            Spacer()
+                            HStack(spacing: 3) {
+                                Image(systemName: "square.stack.3d.up.fill")
+                                    .font(.system(size: 10, weight: .semibold))
+                                Text("\(count)")
+                                    .font(.system(size: 11, weight: .semibold))
+                            }
+                            .foregroundStyle(LegacyColor.textOnAccent)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(LegacyColor.accent, in: Capsule())
+                            .padding(LegacySpacing.xs)
+                        }
+                        Spacer()
+                    }
+                }
             }
             .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.sm))
 

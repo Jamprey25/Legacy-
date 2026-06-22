@@ -39,6 +39,8 @@ export interface MemoryRow {
   teaser_text: string | null;
   discoverable_after: Date;
   created_at: Date;
+  /** Count of cleared photos (from memory_media). Only populated by listMemoriesByOwner. */
+  media_count?: number;
 }
 
 /** Insert a new memory. scan_status defaults to 'pending'. Returns the new row. */
@@ -228,7 +230,10 @@ export async function listMemoriesByOwner(opts: ListMemoriesOptions): Promise<Li
 
   params.push(limit + 1);
   const queryText = `
-    SELECT * FROM memories
+    SELECT *,
+      (SELECT count(*)::int FROM memory_media mm
+         WHERE mm.memory_id = memories.id AND mm.scan_status = 'clear') AS media_count
+    FROM memories
     WHERE ${conditions.join(" AND ")}
     ORDER BY created_at ${order}, id ${order}
     LIMIT $${params.length}

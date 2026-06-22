@@ -278,6 +278,8 @@ public struct MemoryLaneItem: Decodable, Sendable, Equatable, Identifiable, Hash
     public let teaserText: String?
     public let privacyTier: String
     public let dropMethod: String
+    /// Cleared photos in this memory. Optional — older servers omit it (treated as 1).
+    public let photoCount: Int?
 
     /// A short label to disambiguate items in a dense grid (caption preferred, else teaser).
     public var displayLabel: String? {
@@ -292,6 +294,9 @@ public struct MemoryLaneItem: Decodable, Sendable, Equatable, Identifiable, Hash
         return thumbnailURL ?? mediaURL
     }
 
+    /// True when the memory has more than one photo — drives the grid count badge.
+    public var isMultiPhoto: Bool { (photoCount ?? 1) > 1 }
+
     enum CodingKeys: String, CodingKey {
         case memoryID = "memory_id"
         case dropDate = "drop_date"
@@ -304,6 +309,7 @@ public struct MemoryLaneItem: Decodable, Sendable, Equatable, Identifiable, Hash
         case teaserText = "teaser_text"
         case privacyTier = "privacy_tier"
         case dropMethod = "drop_method"
+        case photoCount = "photo_count"
     }
 }
 

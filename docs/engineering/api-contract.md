@@ -396,6 +396,7 @@ Paginated owner list for Memory Lane. Auth required.
       "scan_status": "clear",
       "thumbnail_url": "https://blob.vercel-storage.com/...",
       "media_url": "https://blob.vercel-storage.com/...",
+      "photo_count": 12,
       "caption": "First apartment.",
       "teaser_text": "Where it all began",
       "privacy_tier": "private",
@@ -405,6 +406,9 @@ Paginated owner list for Memory Lane. Auth required.
   "next_cursor": "<opaque>"
 }
 ```
+- `photo_count`: cleared photos in the memory (from `memory_media`). Drives the grid
+  "multi-photo" badge; hero-only memories = 1, text = 0. (GET `/:id` returns the full
+  `media[]` array.)
 - `thumbnail_url` is non-null only when `scan_status = "clear"` and a thumbnail has been generated. `null` for text memories, pending media, and un-thumbnailed entries.
 - **`media_url`** is the full-resolution own media (owner only), non-null when `scan_status = "clear"` and the memory has media. **Render this in the grid when `thumbnail_url` is null** — server-side thumbnailing is best-effort and may be absent for imports or when `sharp` is unavailable on the function, so this guarantees Memory Lane shows the real image without a per-item unlock round-trip. Same source as `GET /:id` `media_url` — no new privacy surface (owner's own media; for Vercel Blob it is the unguessable public URL).
 - `caption` / `teaser_text` are the owner's labels (or `null`) — use them to disambiguate items in a dense grid.

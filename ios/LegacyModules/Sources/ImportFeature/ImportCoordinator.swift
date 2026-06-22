@@ -87,7 +87,9 @@ public final class ImportCoordinator {
         let chosen = selectedClusters
         guard !chosen.isEmpty, !isImporting else { return }
 
-        phase = .importing(current: 0, total: chosen.count)
+        // Progress is counted in PHOTOS, not memories — a single visit can be many photos.
+        let estimatedPhotos = max(1, chosen.reduce(0) { $0 + $1.photoCount })
+        phase = .importing(current: 0, total: estimatedPhotos)
         pendingCelebrationPins = []
 
         do {
@@ -108,10 +110,11 @@ public final class ImportCoordinator {
             let response = try await apiClient.importMemories(request)
             var uploaded = 0
             let sortedItems = response.memories.sorted { $0.clusterIndex < $1.clusterIndex }
+            let totalPhotos = max(1, sortedItems.reduce(0) { $0 + max(1, $1.mediaCount) })
+            var uploadedPhotos = 0
+            phase = .importing(current: 0, total: totalPhotos)
 
-            for (progressIndex, item) in sortedItems.enumerated() {
-                phase = .importing(current: progressIndex, total: sortedItems.count)
-
+            for item in sortedItems {
                 guard item.clusterIndex < chosen.count else { continue }
 
                 let cluster = chosen[item.clusterIndex]
@@ -132,8 +135,11 @@ public final class ImportCoordinator {
                     signedPutURL: item.upload?.signedPutURL,
                     position: 0
                 )
+                uploadedPhotos += 1
+                phase = .importing(current: uploadedPhotos, total: totalPhotos)
 
-                // Remaining photos are best-effort: a failed extra must not sink the memory.
+                // Remaining photos are best-effort: a failed extra must not sink the memory,
+                // but it still counts toward progress so the bar reaches 100%.
                 for (position, assetID) in assetIDs.enumerated().dropFirst() {
                     do {
                         let raw = try await PHAssetImageFetcher.loadJPEGData(assetID: assetID)
@@ -146,8 +152,10 @@ public final class ImportCoordinator {
                             position: position
                         )
                     } catch {
-                        continue
+                        // skip this photo's bytes; still advance progress below
                     }
+                    uploadedPhotos += 1
+                    phase = .importing(current: uploadedPhotos, total: totalPhotos)
                 }
                 let pin = CachedOwnPin(
                     memoryID: item.memoryID,

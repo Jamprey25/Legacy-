@@ -73,10 +73,14 @@ public struct ImportFeatureRootView: View {
     private var clusterExplorer: some View {
         VStack(spacing: 0) {
             if case .importing(let current, let total) = coordinator.phase {
-                ProgressView("Uploading \(current + 1) of \(total)…", value: Double(current + 1), total: Double(total))
-                    .tint(LegacyColor.accent)
-                    .padding(.horizontal, LegacySpacing.lg)
-                    .padding(.top, LegacySpacing.sm)
+                ProgressView(
+                    "Saving \(current) of \(total) \(total == 1 ? "photo" : "photos")…",
+                    value: Double(current),
+                    total: Double(total)
+                )
+                .tint(LegacyColor.accent)
+                .padding(.horizontal, LegacySpacing.lg)
+                .padding(.top, LegacySpacing.sm)
             }
 
             Text("\(coordinator.geoSampleCount) geotagged photos → \(coordinator.clusters.count) visits")

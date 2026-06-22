@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-23T00:45:00.000Z"
+    "lastUpdated": "2026-06-23T01:05:00.000Z"
   },
   "decisions": [
     {
@@ -2403,11 +2403,20 @@
     {
       "id": "import-progress-multiphoto",
       "title": "Import progress should count photos, not memories",
-      "status": "todo",
+      "status": "done",
       "owner": "either",
       "phase": 2,
       "milestone": "M",
-      "notes": "Since a memory now uploads ALL its photos, '.importing(current,total)' over memories sits frozen while a 12-photo visit uploads. RECOMMENDED (Claude session 11, see mockup): Option 2 — one determinate bar over TOTAL photos ('47 / 120'), since the coordinator knows sum(mediaCount) up front. ImportCoordinator.swift (mine) owns the phase; the label text is in ImportFeature.swift (Cursor). Left unimplemented to avoid churning a shared file while Cursor is active — coordinate before doing."
+      "notes": "DONE (Claude). ImportCoordinator counts PHOTOS not memories: total=sum(mediaCount), bar advances per photo (failed extras still advance so it reaches 100%). Label in ImportFeature.swift -> 'Saving X of Y photos…'. xcodebuild ImportFeature SUCCEEDED."
+    },
+    {
+      "id": "memory-lane-photo-count-badge",
+      "title": "Grid tile multi-photo count badge",
+      "status": "done",
+      "owner": "backend",
+      "phase": 2,
+      "milestone": "M",
+      "notes": "DONE (Claude, edited Cursor's MemoryLaneCard with Joseph's OK). Backend: list endpoint returns photo_count (cleared count from memory_media via correlated subquery in listMemoriesByOwner; MemoryRow.media_count). iOS: MemoryLaneItem.photoCount + isMultiPhoto; MemoryLaneCard shows accent capsule badge (square.stack.3d.up.fill + N) top-right when >1. api-contract list section updated. Backend tsc+63 tests; xcodebuild MemoryLaneFeature SUCCEEDED."
     }
   ]
 }
