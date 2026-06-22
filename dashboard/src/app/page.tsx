@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import type { TasksFile, Task, Owner } from "./types";
+import type { TasksFile, Task, Owner, ManualTest } from "./types";
 import TaskCard from "./components/TaskCard";
 import MilestoneGroup, {
   collapseMilestones,
@@ -9,8 +9,6 @@ import MilestoneGroup, {
 import DecisionsPanel from "./components/DecisionsPanel";
 import ManualTestPanel from "./components/ManualTestPanel";
 
-const GITHUB_RAW =
-  "https://raw.githubusercontent.com/Jamprey25/Legacy-/main/tasks.json";
 const POLL_INTERVAL = 30;
 
 const ANIMATIONS = `
@@ -78,7 +76,7 @@ export default function Dashboard() {
 
   const fetchTasks = useCallback(async () => {
     try {
-      const res = await fetch(`${GITHUB_RAW}?t=${Date.now()}`, { cache: "no-store" });
+      const res = await fetch(`/api/tasks?t=${Date.now()}`, { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json: TasksFile = await res.json();
       setData(json);
@@ -89,6 +87,17 @@ export default function Dashboard() {
       setFetchFailed(true);
     }
   }, []);
+
+  const handleManualTestUpdate = useCallback((updated: ManualTest) => {
+    setData((prev) => {
+      if (!prev) return prev;
+      const manualTests = (prev.manualTests ?? []).map((t) =>
+        t.id === updated.id ? updated : t
+      );
+      return { ...prev, manualTests };
+    });
+    void fetchTasks();
+  }, [fetchTasks]);
 
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
 
@@ -105,7 +114,7 @@ export default function Dashboard() {
   if (!data && fetchFailed) {
     return (
       <main style={{ padding: 40, color: "#ff6b6b" }}>
-        Failed to load tasks.json from GitHub. Make sure the repo is public and tasks.json is on main.
+        Failed to load tasks.json. Check that the dashboard can read tasks (local file or GITHUB_TOKEN).
       </main>
     );
   }
@@ -249,7 +258,7 @@ export default function Dashboard() {
           </div>
 
           {/* Manual QA — Joseph's Xcode checklist (prominent, near top) */}
-          <ManualTestPanel tests={manualTests} onUpdate={fetchTasks} />
+          <ManualTestPanel tests={manualTests} onUpdate={handleManualTestUpdate} />
 
           {/* Segmented progress bar */}
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14 }}>

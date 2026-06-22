@@ -113,6 +113,23 @@ When Joseph clicks an option, the dashboard sets `status: "decided"`, `chosenOpt
 
 ---
 
+## [ios → all] 2026-06-22 (session 6) — Memory Lane media_url + sort (backend handoff)
+
+**Picked up `backend-memory-lane-image-and-sort` from backend collab-log entry:**
+
+- **`MemoryLaneItem`** — `media_url`, `caption`, `teaser_text`; `previewImageURL` = `thumbnail_url ?? media_url` when clear.
+- **Grid** — `AsyncImage` uses `previewImageURL` (no tap required when backend returns `media_url`).
+- **Labels** — caption/teaser shown under thumbnail when present.
+- **Toolbar** — sort (oldest/newest) + media type filter; reloads full paginated list with sort-specific cursors.
+- **`listMemories`** — passes `sort` + `media_type` query params per api-contract §7.
+- **Detail** — preloads list preview URL; hides "Open at location" when preview already available.
+
+**Verification:** `swift test` — 54/54 green.
+
+**Joseph re-test:** redeploy backend (media_url list fields) + rebuild iOS → Memory Lane grid should show photos without tapping; use ⋯ menu to sort newest-first.
+
+---
+
 ## [backend → all] 2026-06-22 — QA feedback from device testing
 
 **Findings (5 items logged):**

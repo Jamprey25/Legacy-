@@ -147,6 +147,14 @@ private struct DOBGateView: View {
             .padding(.horizontal, LegacySpacing.xl)
             .disabled(coordinator.isLoading)
 
+            if let error = coordinator.errorMessage {
+                Text(error)
+                    .font(LegacyFont.caption)
+                    .foregroundStyle(LegacyColor.danger)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, LegacySpacing.xl)
+            }
+
             Button("Back") { coordinator.backToWelcome() }
                 .font(LegacyFont.callout)
                 .foregroundStyle(LegacyColor.textSecondary)
@@ -219,6 +227,14 @@ private struct EmailOTPView: View {
             .buttonStyle(.legacyPrimary)
             .padding(.horizontal, LegacySpacing.xl)
             .disabled(coordinator.isLoading || coordinator.otpCode.count < 6)
+
+            if let error = coordinator.errorMessage {
+                Text(error)
+                    .font(LegacyFont.caption)
+                    .foregroundStyle(LegacyColor.danger)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, LegacySpacing.xl)
+            }
 
             Button("Resend code") {
                 Task { await coordinator.resendEmailCode() }

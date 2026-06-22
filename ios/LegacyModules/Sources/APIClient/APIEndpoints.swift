@@ -229,6 +229,40 @@ public struct CreateMemoryResponse: Decodable, Sendable, Equatable {
 
 // MARK: - Memory Lane (owner list)
 
+/// Memory Lane list sort order (maps to the backend `sort` query param).
+public enum MemorySort: String, Sendable, CaseIterable {
+    case oldest
+    case newest
+
+    public var label: String {
+        switch self {
+        case .oldest: return "Oldest first"
+        case .newest: return "Newest first"
+        }
+    }
+}
+
+/// Optional Memory Lane list filter (`media_type` query param). `all` omits the param.
+public enum MemoryMediaTypeFilter: String, Sendable, CaseIterable {
+    case all
+    case photo
+    case video
+    case text
+
+    public var queryValue: String? {
+        self == .all ? nil : rawValue
+    }
+
+    public var label: String {
+        switch self {
+        case .all: return "All types"
+        case .photo: return "Photos"
+        case .video: return "Videos"
+        case .text: return "Notes"
+        }
+    }
+}
+
 public struct MemoryLaneItem: Decodable, Sendable, Equatable, Identifiable, Hashable {
     public var id: String { memoryID }
     public let memoryID: String
@@ -237,8 +271,26 @@ public struct MemoryLaneItem: Decodable, Sendable, Equatable, Identifiable, Hash
     public let mediaType: String
     public let scanStatus: String
     public let thumbnailURL: String?
+    /// Full-resolution own media. Present (when clear) so the grid can show the real
+    /// image even when no server thumbnail exists — render `thumbnailURL ?? mediaURL`.
+    public let mediaURL: String?
+    public let caption: String?
+    public let teaserText: String?
     public let privacyTier: String
     public let dropMethod: String
+
+    /// A short label to disambiguate items in a dense grid (caption preferred, else teaser).
+    public var displayLabel: String? {
+        if let caption, !caption.isEmpty { return caption }
+        if let teaserText, !teaserText.isEmpty { return teaserText }
+        return nil
+    }
+
+    /// Grid preview: prefer thumbnail, fall back to full-res own media when clear.
+    public var previewImageURL: String? {
+        guard scanStatus == "clear" else { return nil }
+        return thumbnailURL ?? mediaURL
+    }
 
     enum CodingKeys: String, CodingKey {
         case memoryID = "memory_id"
@@ -247,6 +299,9 @@ public struct MemoryLaneItem: Decodable, Sendable, Equatable, Identifiable, Hash
         case mediaType = "media_type"
         case scanStatus = "scan_status"
         case thumbnailURL = "thumbnail_url"
+        case mediaURL = "media_url"
+        case caption
+        case teaserText = "teaser_text"
         case privacyTier = "privacy_tier"
         case dropMethod = "drop_method"
     }
@@ -551,9 +606,18 @@ extension LegacyAPIClient {
         return response.clientToken
     }
 
-    /// Paginated owner list for Memory Lane — oldest first, no coordinates.
-    public func listMemories(cursor: String? = nil, limit: Int = 50) async throws -> ListMemoriesResponse {
-        var path = "/v1/memories?limit=\(limit)"
+    /// Paginated owner list for Memory Lane — no coordinates.
+    public func listMemories(
+        cursor: String? = nil,
+        limit: Int = 50,
+        sort: MemorySort = .oldest,
+        mediaType: MemoryMediaTypeFilter = .all
+    ) async throws -> ListMemoriesResponse {
+        var path = "/v1/memories?limit=\(limit)&sort=\(sort.rawValue)"
+        if let mediaTypeValue = mediaType.queryValue {
+            let encoded = mediaTypeValue.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? mediaTypeValue
+            path += "&media_type=\(encoded)"
+        }
         if let cursor, !cursor.isEmpty {
             let encoded = cursor.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? cursor
             path += "&cursor=\(encoded)"

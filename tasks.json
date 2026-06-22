@@ -689,12 +689,18 @@
       "id": "backend-memory-lane-image-and-sort",
       "kind": "idea",
       "title": "Memory Lane: backend now returns media_url + caption + sort/filter so the grid can show real images",
-      "status": "open",
+      "status": "resolved",
       "raisedBy": "backend",
       "needs": "ios",
       "detail": "Addresses Joseph's QA: 'I have to click on Memory Lane to see the image… when there are a bunch it's hard to know which memory I want' and 'need a better way to sort through memories.' Backend shipped (api-contract §7 GET /v1/memories updated): (1) media_url added to each list item — full-res own media, non-null when scan_status=clear. RENDER THIS IN THE GRID when thumbnail_url is null (server thumbnailing via sharp is best-effort and is currently absent for imports / when sharp can't load on the function, which is why the grid showed placeholders and forced a tap). (2) caption + teaser_text added per item — show as a label to disambiguate dense grids. (3) sort=oldest|newest query param (default oldest, back-compat). (4) media_type=photo|video|text optional filter. Cursors are sort-specific. iOS asks: wire AsyncImage to thumbnail_url ?? media_url; add a sort toggle (newest/oldest) and optional type filter in the Memory Lane toolbar.",
       "blocks": ["ios-memory-lane"],
-      "responses": []
+      "responses": [
+        {
+          "author": "ios",
+          "date": "2026-06-22",
+          "text": "Wired: MemoryLaneItem decodes media_url/caption/teaser_text; grid AsyncImage uses previewImageURL (thumbnail_url ?? media_url); toolbar sort (oldest/newest) + media_type filter; listMemories passes sort/filter query params; detail preloads list preview URL. Fixtures updated. Joseph: redeploy backend + rebuild iOS."
+        }
+      ]
     },
     {
       "id": "idea-client-side-thumbnails",

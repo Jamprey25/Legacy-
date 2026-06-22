@@ -289,6 +289,11 @@ public struct WanderFeatureRootView: View {
 
     @Bindable private var coordinator: WanderCoordinator
     private var pinCelebration: PinDropCelebrationCoordinator?
+    @State private var showsWalkHint = true
+
+    private var showsDiscoveryHint: Bool {
+        coordinator.teasers.isEmpty && showsWalkHint
+    }
 
     public var body: some View {
         ZStack {
@@ -305,21 +310,25 @@ public struct WanderFeatureRootView: View {
             #endif
 
             LegacyColor.background
-                .opacity(coordinator.teasers.isEmpty ? 0.94 : 0.88)
+                .opacity(backgroundOverlayOpacity)
                 .ignoresSafeArea()
+                .allowsHitTesting(false)
 
             VStack(spacing: 0) {
                 WanderHeaderBar(
                     warmthLevel: WarmthLevel(intensity: coordinator.warmthIntensity),
-                    isScanning: coordinator.isScanning
+                    isScanning: coordinator.isScanning,
+                    showsDiscoveryHint: showsDiscoveryHint
                 )
                 .padding(.horizontal, LegacySpacing.lg)
                 .padding(.top, LegacySpacing.sm)
 
-                if coordinator.teasers.isEmpty {
+                if showsDiscoveryHint {
                     WanderEmptyState()
                         .frame(maxHeight: .infinity)
-                } else {
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                } else if !coordinator.teasers.isEmpty {
                     ScrollView {
                         LazyVStack(spacing: LegacySpacing.md) {
                             ForEach(coordinator.teasers, id: \.memoryID) { teaser in
@@ -364,6 +373,18 @@ public struct WanderFeatureRootView: View {
 
             WarmthCueOverlay(intensity: coordinator.warmthIntensity)
                 .ignoresSafeArea()
+                .allowsHitTesting(false)
+        }
+        .animation(.easeOut(duration: 0.45), value: showsWalkHint)
+        .task(id: coordinator.teasers.isEmpty) {
+            guard coordinator.teasers.isEmpty else {
+                showsWalkHint = false
+                return
+            }
+            showsWalkHint = true
+            try? await Task.sleep(for: .seconds(7))
+            guard !Task.isCancelled else { return }
+            showsWalkHint = false
         }
         .task {
             await coordinator.scanIfNeeded(force: true)
@@ -377,11 +398,17 @@ public struct WanderFeatureRootView: View {
             }
         }
     }
+
+    private var backgroundOverlayOpacity: Double {
+        if !coordinator.teasers.isEmpty { return 0.88 }
+        return showsWalkHint ? 0.94 : 0.35
+    }
 }
 
 private struct WanderHeaderBar: View {
     let warmthLevel: WarmthLevel
     let isScanning: Bool
+    var showsDiscoveryHint: Bool = false
 
     var body: some View {
         HStack {
@@ -405,7 +432,8 @@ private struct WanderHeaderBar: View {
 
     private var subtitle: String {
         switch warmthLevel {
-        case .none: return "Walk to discover memories"
+        case .none:
+            return showsDiscoveryHint ? "Walk to discover memories" : "Keep wandering"
         case .coarse: return "Something is in the area"
         case .approaching: return "Getting warmer"
         case .inBubble: return "Very close"
@@ -575,6 +603,7 @@ private struct UnlockedMemorySheet: View {
                             image
                                 .resizable()
                                 .scaledToFit()
+                                .frame(maxWidth: .infinity)
                                 .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.md))
                         case .failure:
                             ContentUnavailableView("Could not load", systemImage: "photo")
@@ -661,12 +690,10 @@ private struct WanderUserMap: View {
             }
         }
         .mapStyle(.standard(elevation: .realistic))
-        .allowsHitTesting(false)
         .onAppear {
             syncVisiblePins(animated: false)
             fitCamera()
         }
-        .onChange(of: coordinate.latitude) { _, _ in fitCamera() }
         .onChange(of: ownPins.map(\.memoryID)) { oldIDs, newIDs in
             guard oldIDs != newIDs else { return }
             let incoming = ownPins.filter { !visibleOwnPinIDs.contains($0.memoryID) }.map(\.memoryID)

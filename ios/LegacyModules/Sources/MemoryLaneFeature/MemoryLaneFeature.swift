@@ -24,6 +24,9 @@ public final class MemoryLaneCoordinator {
     private let locationEngine: LocationEngine
     private var nextCursor: String?
 
+    public var sort: MemorySort = .oldest
+    public var mediaTypeFilter: MemoryMediaTypeFilter = .all
+
     public private(set) var items: [MemoryLaneItem] = []
     public private(set) var isLoading = false
     public private(set) var isLoadingMore = false
@@ -38,6 +41,18 @@ public final class MemoryLaneCoordinator {
 
     public var canLoadMore: Bool { nextCursor != nil }
 
+    public func setSort(_ newSort: MemorySort) async {
+        guard newSort != sort else { return }
+        sort = newSort
+        await loadInitial()
+    }
+
+    public func setMediaTypeFilter(_ filter: MemoryMediaTypeFilter) async {
+        guard filter != mediaTypeFilter else { return }
+        mediaTypeFilter = filter
+        await loadInitial()
+    }
+
     public func loadInitial() async {
         guard !isLoading else { return }
         isLoading = true
@@ -45,12 +60,26 @@ public final class MemoryLaneCoordinator {
         defer { isLoading = false }
 
         do {
-            let response = try await apiClient.listMemories()
-            items = response.memories
-            nextCursor = response.nextCursor
+            items = try await fetchAllPages()
+            nextCursor = nil
         } catch {
             errorMessage = "Could not load your memories."
         }
+    }
+
+    private func fetchAllPages() async throws -> [MemoryLaneItem] {
+        var aggregated: [MemoryLaneItem] = []
+        var cursor: String?
+        repeat {
+            let response = try await apiClient.listMemories(
+                cursor: cursor,
+                sort: sort,
+                mediaType: mediaTypeFilter
+            )
+            aggregated.append(contentsOf: response.memories)
+            cursor = response.nextCursor
+        } while cursor != nil
+        return aggregated
     }
 
     public func loadMoreIfNeeded(current item: MemoryLaneItem) async {
@@ -61,7 +90,11 @@ public final class MemoryLaneCoordinator {
         defer { isLoadingMore = false }
 
         do {
-            let response = try await apiClient.listMemories(cursor: cursor)
+            let response = try await apiClient.listMemories(
+                cursor: cursor,
+                sort: sort,
+                mediaType: mediaTypeFilter
+            )
             items.append(contentsOf: response.memories)
             nextCursor = response.nextCursor
         } catch {
@@ -76,6 +109,12 @@ public final class MemoryLaneCoordinator {
         unlockedMediaURL = nil
         unlockMessage = nil
         defer { isLoadingDetail = false }
+
+        if item.scanStatus == "clear",
+           let urlString = item.previewImageURL,
+           let url = URL(string: urlString) {
+            ownerMediaURL = url
+        }
 
         do {
             let loaded = try await apiClient.getMemory(id: item.memoryID)
@@ -142,7 +181,7 @@ public struct MemoryLaneFeatureRootView: View {
                     ContentUnavailableView(
                         "Memory Lane",
                         systemImage: "photo.on.rectangle.angled",
-                        description: Text("Memories you drop will appear here, oldest first.")
+                        description: Text(emptyDescription)
                     )
                 } else {
                     ScrollView {
@@ -164,6 +203,13 @@ public struct MemoryLaneFeatureRootView: View {
                                 .tint(LegacyColor.accent)
                                 .padding(.bottom, LegacySpacing.lg)
                         }
+
+                        if coordinator.items.count > 1 {
+                            Text("\(coordinator.items.count) memories")
+                                .font(LegacyFont.caption)
+                                .foregroundStyle(LegacyColor.textSecondary)
+                                .padding(.bottom, LegacySpacing.lg)
+                        }
                     }
                 }
             }
@@ -171,6 +217,11 @@ public struct MemoryLaneFeatureRootView: View {
             .navigationTitle("Memory Lane")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    MemoryLaneFilterMenu(coordinator: coordinator)
+                }
+            }
             .navigationDestination(for: MemoryLaneItem.self) { item in
                 MemoryLaneDetailView(item: item, coordinator: coordinator)
             }
@@ -189,7 +240,56 @@ public struct MemoryLaneFeatureRootView: View {
             }
         }
     }
+
+    private var emptyDescription: String {
+        if coordinator.mediaTypeFilter != .all {
+            return "No \(coordinator.mediaTypeFilter.label.lowercased()) match this filter."
+        }
+        return coordinator.sort == .newest
+            ? "Memories you drop will appear here, newest first."
+            : "Memories you drop will appear here, oldest first."
+    }
 }
+
+#if os(iOS)
+private struct MemoryLaneFilterMenu: View {
+    @Bindable var coordinator: MemoryLaneCoordinator
+
+    var body: some View {
+        Menu {
+            Section("Sort") {
+                ForEach(MemorySort.allCases, id: \.self) { order in
+                    Button {
+                        Task { await coordinator.setSort(order) }
+                    } label: {
+                        if coordinator.sort == order {
+                            Label(order.label, systemImage: "checkmark")
+                        } else {
+                            Text(order.label)
+                        }
+                    }
+                }
+            }
+            Section("Type") {
+                ForEach(MemoryMediaTypeFilter.allCases, id: \.self) { filter in
+                    Button {
+                        Task { await coordinator.setMediaTypeFilter(filter) }
+                    } label: {
+                        if coordinator.mediaTypeFilter == filter {
+                            Label(filter.label, systemImage: "checkmark")
+                        } else {
+                            Text(filter.label)
+                        }
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "line.3.horizontal.decrease.circle")
+        }
+        .accessibilityLabel("Sort and filter memories")
+    }
+}
+#endif
 
 private struct MemoryLaneCard: View {
     let item: MemoryLaneItem
@@ -201,8 +301,7 @@ private struct MemoryLaneCard: View {
                     .fill(LegacyColor.surface)
                     .aspectRatio(1, contentMode: .fit)
 
-                if item.scanStatus == "clear",
-                   let urlString = item.thumbnailURL,
+                if let urlString = item.previewImageURL,
                    let url = URL(string: urlString) {
                     AsyncImage(url: url) { phase in
                         switch phase {
@@ -224,6 +323,13 @@ private struct MemoryLaneCard: View {
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.sm))
+
+            if let label = item.displayLabel {
+                Text(label)
+                    .font(LegacyFont.caption)
+                    .foregroundStyle(LegacyColor.textPrimary)
+                    .lineLimit(2)
+            }
 
             Text(item.dropDate)
                 .font(LegacyFont.caption)
@@ -271,7 +377,8 @@ struct MemoryLaneDetailView: View {
                     }
 
                     if detail.scanStatus == "clear" {
-                        if coordinator.ownerMediaURL == nil && coordinator.unlockedMediaURL == nil {
+                        if coordinator.ownerMediaURL == nil && coordinator.unlockedMediaURL == nil,
+                           item.previewImageURL == nil {
                             Button("Open at location") {
                                 Task { await coordinator.openAtLocation(memoryID: detail.memoryID) }
                             }

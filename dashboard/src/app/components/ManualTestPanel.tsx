@@ -23,18 +23,26 @@ function TestRow({
   onUpdate,
 }: {
   test: ManualTest;
-  onUpdate: () => void;
+  onUpdate: (updated: ManualTest) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needsSecret, setNeedsSecret] = useState(false);
   const [secretInput, setSecretInput] = useState("");
+  const [optimisticStatus, setOptimisticStatus] = useState<ManualTestStatus | null>(null);
+
+  const displayStatus = optimisticStatus ?? test.status;
+  const verifiedAt =
+    optimisticStatus && optimisticStatus !== "pending"
+      ? new Date().toISOString().slice(0, 10)
+      : test.verifiedAt;
 
   const setStatus = useCallback(
     async (status: ManualTestStatus, secret?: string) => {
       setBusy(true);
       setError(null);
+      setOptimisticStatus(status);
       try {
         const stored = secret ?? getStoredSecret();
         const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -49,9 +57,10 @@ function TestRow({
             secret: stored || undefined,
           }),
         });
-        const json = (await res.json()) as { error?: string };
+        const json = (await res.json()) as { error?: string; test?: ManualTest };
 
         if (res.status === 401) {
+          setOptimisticStatus(null);
           setNeedsSecret(true);
           setError("Enter your dashboard PIN to save QA results.");
           return;
@@ -60,8 +69,12 @@ function TestRow({
 
         if (secret) sessionStorage.setItem(DASHBOARD_SECRET_STORAGE_KEY, secret);
         setNeedsSecret(false);
-        onUpdate();
+        if (json.test) {
+          setOptimisticStatus(null);
+          onUpdate(json.test);
+        }
       } catch (err) {
+        setOptimisticStatus(null);
         setError(err instanceof Error ? err.message : "Failed to save");
       } finally {
         setBusy(false);
@@ -78,8 +91,8 @@ function TestRow({
     void setStatus("passed", needsSecret ? secretInput.trim() : undefined);
   };
 
-  const isPassed = test.status === "passed";
-  const isFailed = test.status === "failed";
+  const isPassed = displayStatus === "passed";
+  const isFailed = displayStatus === "failed";
 
   return (
     <div
@@ -103,18 +116,19 @@ function TestRow({
             flexShrink: 0,
             marginTop: 1,
             borderRadius: 5,
-            border: isPassed ? "none" : "2px solid #555",
-            background: isPassed ? "#16a34a" : "transparent",
+            border: isPassed ? "none" : busy ? "2px solid #0ea5e9" : "2px solid #555",
+            background: isPassed ? "#16a34a" : busy ? "#0ea5e922" : "transparent",
             color: isPassed ? "#fff" : "transparent",
-            cursor: busy ? "not-allowed" : "pointer",
+            cursor: busy ? "wait" : "pointer",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             fontSize: 14,
             fontWeight: 700,
+            transition: "background 0.15s, border-color 0.15s",
           }}
         >
-          {isPassed ? "✓" : ""}
+          {busy ? "…" : isPassed ? "✓" : ""}
         </button>
 
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -146,8 +160,8 @@ function TestRow({
                 Failed
               </span>
             )}
-            {isPassed && test.verifiedAt && (
-              <span style={{ fontSize: 10, color: "#16a34a" }}>✓ {test.verifiedAt}</span>
+            {isPassed && verifiedAt && (
+              <span style={{ fontSize: 10, color: "#16a34a" }}>✓ {verifiedAt}</span>
             )}
           </div>
 
@@ -247,7 +261,7 @@ function TestRow({
               Pass
             </button>
           )}
-          {!isFailed && test.status !== "passed" && (
+          {!isFailed && displayStatus !== "passed" && (
             <button
               type="button"
               disabled={busy}
@@ -295,7 +309,7 @@ export default function ManualTestPanel({
   onUpdate,
 }: {
   tests: ManualTest[];
-  onUpdate: () => void;
+  onUpdate: (updated: ManualTest) => void;
 }) {
   const [showPassed, setShowPassed] = useState(false);
 

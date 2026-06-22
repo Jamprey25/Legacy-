@@ -201,6 +201,7 @@ private struct MainTabView: View {
     @State private var wanderCoordinator: WanderCoordinator
     @State private var dropCoordinator: DropCoordinator
     @State private var importCoordinator: ImportCoordinator
+    @State private var memoryLaneCoordinator: MemoryLaneCoordinator
     @State private var pinCelebration = PinDropCelebrationCoordinator()
     @State private var showBackgroundDiscoveryPrompt = false
     @State private var selectedTab: MainTab = .wander
@@ -221,6 +222,10 @@ private struct MainTabView: View {
         _importCoordinator = State(initialValue: ImportCoordinator(
             apiClient: appModel.apiClient,
             mediaUploader: appModel.makeMediaUploader()
+        ))
+        _memoryLaneCoordinator = State(initialValue: MemoryLaneCoordinator(
+            apiClient: appModel.apiClient,
+            locationEngine: locationEngine
         ))
     }
 
@@ -347,12 +352,7 @@ private struct MainTabView: View {
 
     @ViewBuilder
     private var laneTab: some View {
-        MemoryLaneFeatureRootView(
-            coordinator: MemoryLaneCoordinator(
-                apiClient: appModel.apiClient,
-                locationEngine: locationEngine
-            )
-        )
+        MemoryLaneFeatureRootView(coordinator: memoryLaneCoordinator)
         .tabItem { Label("Lane", systemImage: "photo.on.rectangle.angled") }
         .tag(MainTab.lane)
     }

@@ -96,6 +96,9 @@ public enum LegacyFixtures {
           "media_type": "photo",
           "scan_status": "clear",
           "thumbnail_url": null,
+          "media_url": "https://blob.vercel-storage.com/memories/22222222/full.jpg",
+          "caption": "Summer trip",
+          "teaser_text": null,
           "privacy_tier": "private",
           "drop_method": "pin"
         },
