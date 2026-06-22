@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-22T22:30:00.000Z"
+    "lastUpdated": "2026-06-22T17:34:20.453Z"
   },
   "decisions": [
     {
@@ -569,7 +569,9 @@
       "raisedBy": "joseph",
       "needs": "ios",
       "detail": "Manual QA 2026-06-22 (device): DOB Continue appeared to do nothing. Root cause: backend consumed OTP on first verify before returning dob_required; iOS retry hit invalid_code but DOB screen hid the error.",
-      "blocks": ["bug-google-signin-after-delete"],
+      "blocks": [
+        "bug-google-signin-after-delete"
+      ],
       "responses": [
         {
           "author": "backend",
@@ -666,7 +668,7 @@
     {
       "id": "qa-mt-drop-upload",
       "title": "Photo drop uploads successfully to Vercel Blob",
-      "status": "pending",
+      "status": "passed",
       "addedBy": "backend",
       "platform": "device",
       "milestone": "M1",
@@ -678,7 +680,8 @@
         "Live API build on device (not stub)",
         "Drop tab → photo → confirm upload completes without error"
       ],
-      "notes": "iOS fix shipped (foreground URLSession for Blob PUT). Joseph re-run on device with live API."
+      "notes": "iOS fix shipped (foreground URLSession for Blob PUT). Joseph re-run on device with live API.",
+      "verifiedAt": "2026-06-22"
     },
     {
       "id": "qa-mt-import-upload",
