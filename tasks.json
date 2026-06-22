@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-22T16:58:59.649Z"
+    "lastUpdated": "2026-06-22T16:59:11.401Z"
   },
   "decisions": [
     {
@@ -611,7 +611,7 @@
     {
       "id": "qa-mt-location-permission-repeat",
       "title": "Location permission prompt appears only once",
-      "status": "pending",
+      "status": "passed",
       "addedBy": "backend",
       "platform": "device",
       "milestone": "M2",
@@ -623,7 +623,8 @@
         "Fresh install → grant location when prompted once",
         "Navigate app — confirm permission alert does not repeat"
       ],
-      "notes": "iOS fix shipped (status guards + single prompt path). Joseph re-run on device."
+      "notes": "iOS fix shipped (status guards + single prompt path). Joseph re-run on device.",
+      "verifiedAt": "2026-06-22"
     },
     {
       "id": "qa-mt-memory-detail-dismiss",
