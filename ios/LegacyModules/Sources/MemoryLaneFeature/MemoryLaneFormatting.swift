@@ -23,6 +23,30 @@ enum MemoryLaneFormatting {
         return years == 1 ? "1 year ago" : "\(years) years ago"
     }
 
+    /// Parses a "yyyy-MM-dd" (or ISO8601) drop date into a `Date`.
+    static func parseDay(_ value: String) -> Date? {
+        ISO8601DateFormatter().date(from: value) ?? parseDateOnly(value)
+    }
+
+    /// True when `dropDate` falls on today's month+day in a *previous* year ("on this day").
+    static func isOnThisDay(dropDate: String, now: Date = Date(), calendar: Calendar = .current) -> Bool {
+        guard let date = parseDay(dropDate) else { return false }
+        let drop = calendar.dateComponents([.month, .day, .year], from: date)
+        let today = calendar.dateComponents([.month, .day, .year], from: now)
+        guard let dMonth = drop.month, let dDay = drop.day, let dYear = drop.year,
+              let tMonth = today.month, let tDay = today.day, let tYear = today.year else {
+            return false
+        }
+        return dMonth == tMonth && dDay == tDay && dYear < tYear
+    }
+
+    /// "1 year ago today" / "3 years ago today" for the on-this-day banner.
+    static func yearsAgoToday(dropDate: String, now: Date = Date(), calendar: Calendar = .current) -> String {
+        guard let date = parseDay(dropDate) else { return "" }
+        let years = max(1, calendar.component(.year, from: now) - calendar.component(.year, from: date))
+        return years == 1 ? "1 year ago today" : "\(years) years ago today"
+    }
+
     private static func parseDateOnly(_ value: String) -> Date? {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)

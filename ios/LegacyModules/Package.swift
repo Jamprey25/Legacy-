@@ -79,5 +79,9 @@ let package = Package(
             name: "ImportFeatureTests",
             dependencies: ["ImportFeature"]
         ),
+        .testTarget(
+            name: "MemoryLaneFeatureTests",
+            dependencies: ["MemoryLaneFeature", "APIClient"]
+        ),
     ]
 )

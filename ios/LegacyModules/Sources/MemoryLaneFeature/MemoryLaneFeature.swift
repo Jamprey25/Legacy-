@@ -41,6 +41,14 @@ public final class MemoryLaneCoordinator {
 
     public var canLoadMore: Bool { nextCursor != nil }
 
+    /// Memories dropped on today's calendar day in previous years — surfaced as a
+    /// resurfacing banner. Most-recent year first. Empty on days with no match.
+    public var onThisDayItems: [MemoryLaneItem] {
+        items
+            .filter { MemoryLaneFormatting.isOnThisDay(dropDate: $0.dropDate) }
+            .sorted { $0.dropDate > $1.dropDate }
+    }
+
     public func setSort(_ newSort: MemorySort) async {
         guard newSort != sort else { return }
         sort = newSort
@@ -185,6 +193,12 @@ public struct MemoryLaneFeatureRootView: View {
                     )
                 } else {
                     ScrollView {
+                        #if os(iOS)
+                        if !coordinator.onThisDayItems.isEmpty {
+                            OnThisDaySection(items: coordinator.onThisDayItems)
+                        }
+                        #endif
+
                         LazyVGrid(columns: columns, spacing: LegacySpacing.md) {
                             ForEach(coordinator.items) { item in
                                 NavigationLink(value: item) {
@@ -287,6 +301,94 @@ private struct MemoryLaneFilterMenu: View {
             Image(systemName: "line.3.horizontal.decrease.circle")
         }
         .accessibilityLabel("Sort and filter memories")
+    }
+}
+#endif
+
+#if os(iOS)
+/// "On this day" resurfacing strip — a horizontal carousel of memories from
+/// today's date in previous years. Taps open the same detail destination.
+private struct OnThisDaySection: View {
+    let items: [MemoryLaneItem]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: LegacySpacing.sm) {
+            HStack(spacing: LegacySpacing.xs) {
+                Image(systemName: "sparkles")
+                    .foregroundStyle(LegacyColor.accent)
+                Text("On this day")
+                    .font(LegacyFont.headline)
+                    .foregroundStyle(LegacyColor.textPrimary)
+            }
+            .padding(.horizontal, LegacySpacing.lg)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: LegacySpacing.md) {
+                    ForEach(items) { item in
+                        NavigationLink(value: item) {
+                            OnThisDayCard(item: item)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, LegacySpacing.lg)
+            }
+        }
+        .padding(.top, LegacySpacing.md)
+        .padding(.bottom, LegacySpacing.xs)
+    }
+}
+
+private struct OnThisDayCard: View {
+    let item: MemoryLaneItem
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            RoundedRectangle(cornerRadius: LegacyRadius.md)
+                .fill(LegacyColor.surface)
+                .frame(width: 160, height: 160)
+
+            if let urlString = item.previewImageURL, let url = URL(string: urlString) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image.resizable().scaledToFill()
+                    case .failure:
+                        placeholderIcon
+                    default:
+                        ProgressView().tint(LegacyColor.accent)
+                    }
+                }
+                .frame(width: 160, height: 160)
+                .clipped()
+            } else {
+                placeholderIcon
+                    .frame(width: 160, height: 160)
+            }
+
+            LinearGradient(
+                colors: [.black.opacity(0.0), .black.opacity(0.65)],
+                startPoint: .center,
+                endPoint: .bottom
+            )
+
+            Text(MemoryLaneFormatting.yearsAgoToday(dropDate: item.dropDate))
+                .font(LegacyFont.caption)
+                .foregroundStyle(.white)
+                .padding(LegacySpacing.sm)
+        }
+        .frame(width: 160, height: 160)
+        .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.md))
+        .overlay(
+            RoundedRectangle(cornerRadius: LegacyRadius.md)
+                .stroke(LegacyColor.accent.opacity(0.4), lineWidth: 1)
+        )
+    }
+
+    private var placeholderIcon: some View {
+        Image(systemName: item.mediaType == "text" ? "text.quote" : "photo")
+            .font(.title)
+            .foregroundStyle(LegacyColor.textSecondary)
     }
 }
 #endif
