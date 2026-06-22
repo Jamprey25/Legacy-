@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-22T17:02:35.093Z"
+    "lastUpdated": "2026-06-22T17:02:52.451Z"
   },
   "decisions": [
     {
@@ -679,7 +679,7 @@
     {
       "id": "qa-auth-email-otp-debug",
       "title": "Email OTP sign-in works in DEBUG (stubbed API)",
-      "status": "pending",
+      "status": "passed",
       "addedBy": "ios",
       "platform": "simulator",
       "milestone": "M0",
@@ -693,7 +693,8 @@
         "Complete DOB picker if shown",
         "Confirm you land on the empty Wander map"
       ],
-      "notes": "Alternative: tap Admin on welcome screen for instant stub sign-in. Live email OTP blocked until Joseph sets RESEND_API_KEY on Vercel."
+      "notes": "Alternative: tap Admin on welcome screen for instant stub sign-in. Live email OTP blocked until Joseph sets RESEND_API_KEY on Vercel.",
+      "verifiedAt": "2026-06-22"
     },
     {
       "id": "qa-auth-dob-under13",
