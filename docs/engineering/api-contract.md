@@ -167,20 +167,28 @@ POST /v1/uploads/direct
 Authorization: Bearer <session_token>
 Content-Type: <image/jpeg | image/png | image/webp | video/mp4>
 X-Memory-Id: <memory_id>
+X-Media-Position: <int >= 0>     // optional, default 0. A memory holds many photos;
+                                 // 0 = hero (mirrored to memories.media_key + drives
+                                 // discovery), 1+ = additional photos in capture order.
 Body: raw EXIF-stripped bytes (max 25 MB)
 ```
 
 Response `200`:
 ```json
-{ "url": "https://public.blob.vercel-storage.com/memories/…/original.jpg" }
+{ "url": "https://public.blob.vercel-storage.com/memories/…/0.jpg" }
 ```
 
 Flow:
 1. `POST /v1/memories` → `{ memory_id, upload: null, scan_status: "pending" }`.
 2. Strip EXIF client-side (iOS: `EXIFStripper.strip()`).
-3. `POST /v1/uploads/direct` with stripped bytes, `X-Memory-Id: memory_id`. Backend calls
-   `@vercel/blob put()`, stores public URL as `media_key`, flips `scan_status → clear`,
-   generates thumbnail. Returns `{ url }`.
+3. `POST /v1/uploads/direct` with stripped bytes, `X-Memory-Id: memory_id` (and
+   `X-Media-Position` for photo 1+). Backend calls `@vercel/blob put()`, writes the photo to
+   `memory_media`; position 0 also sets `media_key` + flips `scan_status → clear` + thumbnails.
+
+**Multi-photo:** call once per photo with an increasing `X-Media-Position`. Reads
+(`GET /:id`, unlock) return the ordered `media[]` array (hero = position 0). The
+`/uploads/*` rate limit was raised **20 → 500 / hr per user** so a multi-photo import can
+complete; very large imports should move to the background uploader (follow-up).
 
 Dev/simulator: use `POST /v1/internal/webhook/storage` stub to flip `scan_status` instead
 of the real upload (Vercel can't reach localhost).
@@ -290,23 +298,30 @@ Batch-create private memories from on-device clusters. Idempotent.
 {
   "idempotency_key": "<geohash5>:<capture-date-bucket>",
   "clusters": [
-    { "lat": 37.77, "lng": -122.41, "captured_at": "2022-06-01T12:00:00Z", "asset_count": 14 }
+    { "lat": 37.77, "lng": -122.41, "captured_at": "2022-06-01T12:00:00Z", "asset_count": 14, "photo_count": 14 }
   ]
 }
 ```
+- `photo_count` (optional, default 1): how many photos the client will upload for this
+  visit — the **whole visit**, not a cap. Clamped server-side to 1000 (anti-abuse, not
+  curation). The backend pre-creates that many pending `memory_media` slots.
 
 **Response `201`**
 ```json
 {
   "import_id": "<uuid>",
   "memories": [
-    { "cluster_index": 0, "memory_id": "<uuid>", "upload": { "signed_put_url": "...", "expires_at": "..." } }
+    { "cluster_index": 0, "memory_id": "<uuid>", "media_count": 14, "upload": { "signed_put_url": "...", "expires_at": "..." } }
   ]
 }
 ```
+- `media_count`: number of photos to upload for this memory. Upload each via
+  `POST /v1/uploads/direct` with `X-Memory-Id` + `X-Media-Position` 0..media_count-1
+  (Blob path: `upload` is `null`).
 - All imported memories are `source: imported`, `privacy_tier: private`, forced.
 - Replaying the same `idempotency_key` returns the **prior** result (`409 idempotency_replay` is NOT thrown; the original 201 body is returned) — safe to retry.
 - Any later attempt to set a non-private tier on an imported memory → `422 cannot_elevate_import`.
+- Rate limit raised **5 → 30 imports/hr per user** (5 was misread as "crashes after 5 imports").
 
 ---
 

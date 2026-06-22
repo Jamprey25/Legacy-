@@ -7,6 +7,8 @@ import { sql } from "./client.js";
 export interface ImportResultItem {
   cluster_index: number;
   memory_id: string;
+  /** Number of photos the client should upload for this memory (positions 0..media_count-1). */
+  media_count?: number;
   upload: { signed_put_url: string; expires_at: string } | null;
 }
 

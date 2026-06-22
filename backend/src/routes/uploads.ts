@@ -26,6 +26,7 @@ import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { put } from "@vercel/blob";
 import { ApiError } from "../lib/errors.js";
 import { getMemoryByOwner, updateMemoryAfterUpload, setThumbnailKey } from "../db/memories.js";
+import { setMediaAfterUpload, setMediaThumbnail } from "../db/memoryMedia.js";
 import { generateAndStoreThumbnail } from "../lib/thumbnail.js";
 import { requireAuth, type AuthVars } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
@@ -34,8 +35,11 @@ import { audit } from "../lib/audit.js";
 export const uploadsRoutes = new Hono<{ Variables: AuthVars }>();
 
 uploadsRoutes.use("*", requireAuth);
-// Same budget as drops — uploads are 1:1 with memory creates.
-uploadsRoutes.use("*", rateLimit({ name: "upload", limit: 20, windowSec: 3600, keyBy: "user" }));
+// A memory holds many photos, so uploads are no longer 1:1 with memory creates — an import
+// of several multi-photo visits can push hundreds of blobs. Generous per-user/hour budget;
+// the real fix for very large imports is the background uploader (BackgroundMediaUploader),
+// tracked as a follow-up. Until then this ceiling keeps "upload all photos" workable.
+uploadsRoutes.use("*", rateLimit({ name: "upload", limit: 500, windowSec: 3600, keyBy: "user" }));
 
 const ALLOWED_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp", "video/mp4"];
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024; // 25 MB — generous for a phone photo/short clip
@@ -56,9 +60,17 @@ uploadsRoutes.post("/direct", async (c) => {
   const memoryId = c.req.header("x-memory-id");
   const contentType = c.req.header("content-type") ?? "application/octet-stream";
 
+  // Which photo of the memory this is. Absent/0 = hero (mirrored onto memories.media_key);
+  // 1+ = additional photos that live only in memory_media.
+  const positionRaw = c.req.header("x-media-position");
+  const position = positionRaw ? Number.parseInt(positionRaw, 10) : 0;
+
   if (!memoryId) throw new ApiError("invalid_request", "X-Memory-Id header is required.");
   if (!ALLOWED_CONTENT_TYPES.includes(contentType)) {
     throw new ApiError("invalid_request", `Unsupported content type: ${contentType}`);
+  }
+  if (!Number.isInteger(position) || position < 0) {
+    throw new ApiError("invalid_request", "X-Media-Position must be a non-negative integer.");
   }
 
   // Authorize: memory must exist and belong to the requesting user.
@@ -69,21 +81,29 @@ uploadsRoutes.post("/direct", async (c) => {
   if (body.byteLength === 0) throw new ApiError("invalid_request", "Empty upload body.");
   if (body.byteLength > MAX_UPLOAD_BYTES) throw new ApiError("invalid_request", "File too large.");
 
-  const pathname = `memories/${memoryId}/original.${extFor(contentType)}`;
+  const mediaType = contentType.includes("mp4") ? "video" : "photo";
+  const pathname = `memories/${memoryId}/${position}.${extFor(contentType)}`;
   const blob = await put(pathname, body, {
     access: "public",
     addRandomSuffix: true,
     contentType,
   });
 
-  // Store the public blob URL as media_key and flip scan_status → clear.
-  await updateMemoryAfterUpload(memoryId, blob.url);
+  // Record this photo in the media set. Position 0 is also mirrored onto the memory row
+  // (media_key + scan_status → clear) so discovery/proximity keep working off the hero.
+  await setMediaAfterUpload(memoryId, position, blob.url, mediaType);
+  if (position === 0) {
+    await updateMemoryAfterUpload(memoryId, blob.url);
+  }
 
   // Best-effort teaser thumbnail (images only; never blocks — sharp may be unavailable).
   const thumbnailKey = await generateAndStoreThumbnail(blob.url, memoryId, contentType);
-  if (thumbnailKey) await setThumbnailKey(memoryId, thumbnailKey);
+  if (thumbnailKey) {
+    await setMediaThumbnail(memoryId, position, thumbnailKey);
+    if (position === 0) await setThumbnailKey(memoryId, thumbnailKey);
+  }
 
-  audit(c, "memory.upload_direct", {});
+  audit(c, "memory.upload_direct", { position });
   return c.json({ url: blob.url });
 });
 

@@ -22,6 +22,7 @@ import { rateLimit } from "../middleware/rateLimit.js";
 import { validateLocationInput } from "../lib/locationInput.js";
 import { audit } from "../lib/audit.js";
 import { storeImportResult, findImportByKey } from "../db/imports.js";
+import { createMediaSlots, listMediaByMemory } from "../db/memoryMedia.js";
 
 export const memoriesRoutes = new Hono<{ Variables: AuthVars }>();
 
@@ -351,7 +352,14 @@ memoriesRoutes.post("/", dropLimit, async (c) => {
 // Registered before /:id so "import" is not consumed as an id param.
 // ---------------------------------------------------------------------------
 
-const importLimit = rateLimit({ name: "import", limit: 5, windowSec: 3600, keyBy: "user" });
+// One import session = one request that can carry up to 200 clusters, so this is a
+// session budget, not a memory budget. 5/hr was far too tight (it read as "crashes after
+// 5 imports"); 30 leaves room to import in batches.
+const importLimit = rateLimit({ name: "import", limit: 30, windowSec: 3600, keyBy: "user" });
+
+// Anti-abuse backstop on photos per imported memory — NOT a curation cap. A real visit is
+// at most a few hundred photos; this only stops a pathological/malicious count.
+const MAX_PHOTOS_PER_MEMORY = 1000;
 
 memoriesRoutes.post("/import", importLimit, async (c) => {
   const userId: string = c.get("userId");
@@ -387,6 +395,7 @@ memoriesRoutes.post("/import", importLimit, async (c) => {
     lng?: unknown;
     captured_at?: unknown;
     asset_count?: unknown;
+    photo_count?: unknown;
   }>;
 
   clusters.forEach((cl, i) => {
@@ -400,6 +409,13 @@ memoriesRoutes.post("/import", importLimit, async (c) => {
     }
   });
 
+  // How many photos the client will upload for each cluster (the whole visit, not a cap).
+  // Defaults to 1 for older clients. Clamped to a sane anti-abuse ceiling.
+  const photoCountFor = (cl: { photo_count?: unknown }): number => {
+    const raw = typeof cl.photo_count === "number" ? Math.floor(cl.photo_count) : 1;
+    return Math.max(1, Math.min(raw, MAX_PHOTOS_PER_MEMORY));
+  };
+
   const importId = crypto.randomUUID();
   const memories = await Promise.all(
     clusters.map(async (cl, i) => {
@@ -407,6 +423,7 @@ memoriesRoutes.post("/import", importLimit, async (c) => {
       const lng = cl.lng as number;
       const capturedAt = new Date(cl.captured_at as string);
       const geohash = geohashEncode(lat, lng, 9);
+      const photoCount = photoCountFor(cl);
 
       const memory = await createMemory({
         ownerId: userId,
@@ -422,6 +439,10 @@ memoriesRoutes.post("/import", importLimit, async (c) => {
         privacyTier: "private",
       });
 
+      // Pre-create one pending media slot per photo (positions 0..photoCount-1). The client
+      // then uploads each via POST /uploads/direct with X-Media-Position.
+      await createMediaSlots(memory.id, photoCount, "photo");
+
       // Blob: client-upload handshake (POST /v1/uploads). S3/R2/stub: presigned PUT.
       let upload: { signed_put_url: string; expires_at: string } | null = null;
       if (!usesClientUpload()) {
@@ -429,7 +450,7 @@ memoriesRoutes.post("/import", importLimit, async (c) => {
         upload = { signed_put_url: signedPutUrl, expires_at: expiresAt };
       }
 
-      return { cluster_index: i, memory_id: memory.id, upload };
+      return { cluster_index: i, memory_id: memory.id, media_count: photoCount, upload };
     }),
   );
 
@@ -444,6 +465,36 @@ memoriesRoutes.post("/import", importLimit, async (c) => {
 // GET /memories/:id
 // ---------------------------------------------------------------------------
 
+/**
+ * Project a memory's cleared photos into an ordered, signed media array. Hero is position 0.
+ * Pending/blocked slots are omitted — no peeking before the pipeline clears each photo.
+ */
+async function clearedMediaFor(memoryId: string): Promise<
+  Array<{ url: string; thumbnail_url: string | null; type: string; position: number; expires_at: string }>
+> {
+  const rows = await listMediaByMemory(memoryId);
+  const out: Array<{
+    url: string;
+    thumbnail_url: string | null;
+    type: string;
+    position: number;
+    expires_at: string;
+  }> = [];
+  for (const m of rows) {
+    if (m.scan_status !== "clear" || !m.media_key) continue;
+    const signed = await generateSignedGetUrl(m.media_key);
+    const thumb = m.thumbnail_key ? await generateSignedGetUrl(m.thumbnail_key) : null;
+    out.push({
+      url: signed.signedGetUrl,
+      thumbnail_url: thumb?.signedGetUrl ?? null,
+      type: m.media_type,
+      position: m.position,
+      expires_at: signed.expiresAt,
+    });
+  }
+  return out;
+}
+
 memoriesRoutes.get("/:id", async (c) => {
   const memoryId = c.req.param("id");
   const userId: string = c.get("userId");
@@ -451,21 +502,10 @@ memoriesRoutes.get("/:id", async (c) => {
   const memory = await getMemoryByOwner(memoryId, userId);
   if (!memory) throw new ApiError("not_found", "Memory not found.");
 
-  // Include media_url + thumbnail_url for owner when media is clear.
-  // Vercel Blob stores the full public URL as media_key; for S3/R2 we generate a
-  // signed GET. Non-clear memories get null — no peeking before pipeline clears it.
-  let mediaUrl: string | null = null;
-  let thumbnailUrl: string | null = null;
-  if (memory.scan_status === "clear") {
-    if (memory.media_key) {
-      const signed = await generateSignedGetUrl(memory.media_key);
-      mediaUrl = signed.signedGetUrl;
-    }
-    if (memory.thumbnail_key) {
-      const signed = await generateSignedGetUrl(memory.thumbnail_key);
-      thumbnailUrl = signed.signedGetUrl;
-    }
-  }
+  // Full ordered photo set. media_url/thumbnail_url remain as the hero (position 0) for
+  // back-compat with clients that haven't adopted the array yet.
+  const media = await clearedMediaFor(memoryId);
+  const hero = media[0] ?? null;
 
   return c.json({
     memory_id: memory.id,
@@ -477,8 +517,9 @@ memoriesRoutes.get("/:id", async (c) => {
     privacy_tier: memory.privacy_tier,
     scan_status: memory.scan_status,
     media_type: memory.media_type,
-    media_url: mediaUrl,
-    thumbnail_url: thumbnailUrl,
+    media_url: hero?.url ?? null,
+    thumbnail_url: hero?.thumbnail_url ?? null,
+    media: media.map(({ url, thumbnail_url, type, position }) => ({ url, thumbnail_url, type, position })),
     discoverable_after: memory.discoverable_after,
     created_at: memory.created_at,
   });
@@ -582,16 +623,13 @@ memoriesRoutes.post("/:id/unlock", unlockLimit, async (c) => {
     }
   }
 
-  // --- Generate signed GET URL for media ---
-  const media: Array<{ url: string; type: string; expires_at: string }> = [];
-  if (memory.media_key && memory.scan_status === "clear") {
-    const signed = await generateSignedGetUrl(memory.media_key);
-    media.push({
-      url: signed.signedGetUrl,
-      type: memory.media_type,
-      expires_at: signed.expiresAt,
-    });
-  }
+  // --- Signed GET URLs for the full photo set (hero first) ---
+  const media = (await clearedMediaFor(memoryId)).map(({ url, type, expires_at, position }) => ({
+    url,
+    type,
+    expires_at,
+    position,
+  }));
 
   // --- Record Find ---
   await createFind(memoryId, userId);

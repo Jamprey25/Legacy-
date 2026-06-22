@@ -98,7 +98,9 @@ public final class ImportCoordinator {
                         lat: cluster.centroidLat,
                         lng: cluster.centroidLng,
                         capturedAt: Self.capturedAtISO(for: cluster, samples: geoSamples),
-                        assetCount: cluster.photoCount
+                        assetCount: cluster.photoCount,
+                        // Upload the whole visit — a memory holds all its photos, not one.
+                        photoCount: cluster.photoCount
                     )
                 }
             )
@@ -114,15 +116,39 @@ public final class ImportCoordinator {
 
                 let cluster = chosen[item.clusterIndex]
                 #if os(iOS)
-                guard let assetID = cluster.sampleIDs.first else { continue }
-                let raw = try await PHAssetImageFetcher.loadJPEGData(assetID: assetID)
-                let stripped = try EXIFStripper.stripMetadata(from: raw)
+                // Upload every photo of the visit. mediaCount is the server-accepted count
+                // (clamped); positions 0..mediaCount-1 map to memory_media slots.
+                let assetIDs = Array(cluster.sampleIDs.prefix(item.mediaCount))
+                guard let heroID = assetIDs.first else { continue }
+
+                // Hero (position 0) must succeed — it drives discovery, the thumbnail, and
+                // the celebration pin. A throw here fails this memory.
+                let heroRaw = try await PHAssetImageFetcher.loadJPEGData(assetID: heroID)
+                let heroStripped = try EXIFStripper.stripMetadata(from: heroRaw)
                 try await mediaUploader.upload(
                     memoryID: item.memoryID,
-                    data: stripped,
+                    data: heroStripped,
                     contentType: "image/jpeg",
-                    signedPutURL: item.upload?.signedPutURL
+                    signedPutURL: item.upload?.signedPutURL,
+                    position: 0
                 )
+
+                // Remaining photos are best-effort: a failed extra must not sink the memory.
+                for (position, assetID) in assetIDs.enumerated().dropFirst() {
+                    do {
+                        let raw = try await PHAssetImageFetcher.loadJPEGData(assetID: assetID)
+                        let stripped = try EXIFStripper.stripMetadata(from: raw)
+                        try await mediaUploader.upload(
+                            memoryID: item.memoryID,
+                            data: stripped,
+                            contentType: "image/jpeg",
+                            signedPutURL: nil,
+                            position: position
+                        )
+                    } catch {
+                        continue
+                    }
+                }
                 let pin = CachedOwnPin(
                     memoryID: item.memoryID,
                     lat: cluster.centroidLat,

@@ -1231,3 +1231,32 @@ Friendly/practical touches (Joseph-requested bundle):
 **Verification:** `swift build` + 56/56 tests pass; `xcodebuild` app target **BUILD SUCCEEDED**.
 
 Backlog (not built — offered, Joseph chose quick wins only): first-run intro + location priming, "On this day" resurfacing, Profile location/notification settings section, Memory Lane map view + search.
+
+---
+
+## [backend → all] 2026-06-22 (session 11) — Multi-media memories: a memory now holds the WHOLE visit's photos (Joseph chose full model, no cap)
+
+**Decision (`tasks.json` `import-one-photo-per-memory`, resolved):** Joseph — "shouldn't it be all? that's the whole point." So no cap. A memory holds every photo of the visit, not `sampleIDs.first`.
+
+**Model:** hero photo stays denormalised on `memories` (`media_key`/`thumbnail_key`/`scan_status`) so discovery/proximity + the partial index are **untouched**; new `memory_media` table holds the full ordered set (hero = position 0).
+
+**Backend (all shipped, `tsc` clean + 63 unit tests pass):**
+- **Migration `0012_memory_media.sql`** — `memory_media (memory_id, position, media_type, media_key, thumbnail_key, scan_status)`, UNIQUE(memory_id, position), backfilled from existing `memories.media_key` as position 0. Runner picks it up via `schema_migrations` (CI applies automatically; needs live DB).
+- **`db/memoryMedia.ts`** — createMediaSlots / listMediaByMemory / setMediaAfterUpload (upsert) / setMediaThumbnail.
+- **`POST /v1/uploads/direct`** — new optional `X-Media-Position` header (default 0). Position 0 mirrors to `memories.media_key` + flips `scan_status → clear` (keeps discovery working); 1+ writes only `memory_media`. Blob path stores `memories/{id}/{position}.{ext}`.
+- **`POST /v1/memories/import`** — per-cluster `photo_count` (the whole visit, clamped to 1000 anti-abuse — NOT curation); pre-creates that many pending slots; response item adds `media_count`.
+- **`GET /memories/:id` + unlock** — return ordered `media[]: [{url, thumbnail_url?, type, position, expires_at?}]` (signed, hero-first). `media_url`/`thumbnail_url` kept as the hero for back-compat.
+- **Rate limits raised:** import **5 → 30/hr** (the "crashes after 5"), uploads **20 → 500/hr** (so a multi-photo import can finish). `api-contract.md` §3.2/§4/§5 updated.
+
+**iOS (Claude edited `ios/**` with Joseph's OK; `xcodebuild ImportFeature` iOS-sim SUCCEEDED, SPM 62 tests pass):**
+- `ImportClusterInput.photo_count`, `ImportedMemoryItem.media_count` (defaults 1 for old servers).
+- `uploadMemoryMediaDirect` / `MemoryMediaUploader.upload` take `position` → `X-Media-Position`.
+- `ImportCoordinator.importSelected` uploads `sampleIDs.prefix(mediaCount)`: hero (pos 0) required, extras best-effort (a failed extra never sinks the memory).
+
+**iOS → Cursor — ACTION (`tasks.json` `memory-lane-gallery-multimedia`):** Memory Lane / memory detail should render the new `media[]` array (swipeable gallery) instead of the single image. Hero-first; `media_url` still present for the hero if you want a cheap first paint.
+
+**Known follow-up (`import-background-upload-followup`):** uploads are still foreground/sequential — a 200-photo visit = 200 blocking POSTs. The real scale fix is wiring the stubbed `BackgroundMediaUploader`. Until then, very large visits will be slow but correct. This is the deferred half of the "no cap" decision, not a regression.
+
+**Not changed:** live drops (`DropFeature`) stay single-photo; the model supports them multi later. S3/presigned path only signs the hero — extras assume the active Vercel Blob `/uploads/direct` path (fine; Blob is the active backend).
+
+**Deploy reminder (from session 9):** backend changes need a manual `cd backend && vercel --prod` — and migration `0012` must be applied to prod DB (`npm run migrate` against prod `DATABASE_URL`) before the new code goes live, or imports will 500 on the missing table.

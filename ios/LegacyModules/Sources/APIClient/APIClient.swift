@@ -141,7 +141,8 @@ public struct LegacyAPIClient: LegacyAPIClientProtocol {
     public func uploadMemoryMediaDirect(
         memoryID: String,
         data: Data,
-        contentType: String
+        contentType: String,
+        position: Int = 0
     ) async throws -> String {
         guard let url = URL(string: "/v1/uploads/direct", relativeTo: configuration.baseURL) else {
             throw LegacyAPIError.invalidRequest(code: "invalid_path", message: "Bad upload path.")
@@ -155,6 +156,7 @@ public struct LegacyAPIClient: LegacyAPIClientProtocol {
         req.httpBody = data
         req.setValue(contentType, forHTTPHeaderField: "Content-Type")
         req.setValue(memoryID, forHTTPHeaderField: "X-Memory-Id")
+        req.setValue(String(position), forHTTPHeaderField: "X-Media-Position")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         req.setValue(configuration.appVersion, forHTTPHeaderField: "X-App-Version")
         req.setValue(configuration.deviceID, forHTTPHeaderField: "X-Device-Id")

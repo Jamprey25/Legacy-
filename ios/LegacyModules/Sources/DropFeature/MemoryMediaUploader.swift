@@ -29,7 +29,8 @@ public struct MemoryMediaUploader: Sendable {
         data: Data,
         contentType: String,
         signedPutURL: String?,
-        uploadHeaders: [String: String] = [:]
+        uploadHeaders: [String: String] = [:],
+        position: Int = 0
     ) async throws -> String? {
         if skipNetworkUpload {
             return "https://stub.legacy.app/\(VercelBlobUpload.pathname(memoryID: memoryID, contentType: contentType))"
@@ -52,7 +53,8 @@ public struct MemoryMediaUploader: Sendable {
         return try await apiClient.uploadMemoryMediaDirect(
             memoryID: memoryID,
             data: data,
-            contentType: contentType
+            contentType: contentType,
+            position: position
         )
     }
 
