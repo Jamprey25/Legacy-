@@ -1,6 +1,8 @@
 import APIClient
+import CoreLocation
 import DesignSystem
 import SwiftUI
+import UserNotifications
 
 #if os(iOS)
 
@@ -13,10 +15,13 @@ public struct ProfileView: View {
     private let apiClient: LegacyAPIClient
     private let onSignOut: () -> Void
 
+    @Environment(\.scenePhase) private var scenePhase
     @State private var isBusy = false
     @State private var errorMessage: String?
     @State private var showDeleteAlert = false
     @State private var exportShareURL: URL?
+    @State private var locationStatus = "Checking…"
+    @State private var notificationStatus = "Checking…"
 
     public var body: some View {
         NavigationStack {
@@ -37,6 +42,24 @@ public struct ProfileView: View {
                                     action: { Task { await exportData() } }
                                 )
                                 .disabled(isBusy)
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: LegacySpacing.sm) {
+                            ProfileSectionLabel("App permissions")
+                            ProfileActionCard {
+                                ProfileActionRow(
+                                    title: "Location",
+                                    subtitle: locationStatus,
+                                    icon: "location",
+                                    action: openSystemSettings
+                                )
+                                ProfileActionRow(
+                                    title: "Notifications",
+                                    subtitle: notificationStatus,
+                                    icon: "bell",
+                                    action: openSystemSettings
+                                )
                             }
                         }
 
@@ -110,8 +133,46 @@ public struct ProfileView: View {
             .sheet(item: $exportShareURL) { url in
                 ShareSheet(items: [url])
             }
+            .task { await refreshPermissionStatuses() }
+            .onChange(of: scenePhase) { _, phase in
+                // Re-read after the user may have toggled permissions in Settings.
+                if phase == .active { Task { await refreshPermissionStatuses() } }
+            }
         }
         .preferredColorScheme(.dark)
+    }
+
+    private func openSystemSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
+    }
+
+    private func refreshPermissionStatuses() async {
+        locationStatus = Self.locationStatusText(CLLocationManager().authorizationStatus)
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        notificationStatus = Self.notificationStatusText(settings.authorizationStatus)
+    }
+
+    private static func locationStatusText(_ status: CLAuthorizationStatus) -> String {
+        switch status {
+        case .authorizedAlways: return "Always — full background discovery"
+        case .authorizedWhenInUse: return "While using the app"
+        case .denied: return "Off — tap to enable in Settings"
+        case .restricted: return "Restricted"
+        case .notDetermined: return "Not set yet"
+        @unknown default: return "Unknown"
+        }
+    }
+
+    private static func notificationStatusText(_ status: UNAuthorizationStatus) -> String {
+        switch status {
+        case .authorized: return "On"
+        case .provisional: return "Quiet delivery"
+        case .ephemeral: return "Temporary"
+        case .denied: return "Off — tap to enable in Settings"
+        case .notDetermined: return "Not set yet"
+        @unknown default: return "Unknown"
+        }
     }
 
     private var profileHero: some View {
