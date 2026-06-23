@@ -48,9 +48,13 @@ struct ImportRegionLevel: View {
                 ForEach(sortedVisits) { cluster in
                     ImportClusterRow(
                         cluster: cluster,
-                        isSelected: coordinator.selectedClusterIDs.contains(cluster.id)
+                        isSelected: coordinator.selectedClusterIDs.contains(cluster.id),
+                        placeName: coordinator.placeName(for: cluster.id)
                     ) {
                         coordinator.toggleSelection(cluster)
+                    }
+                    .task(id: cluster.id) {
+                        await coordinator.resolveRegions(for: [cluster.id])
                     }
                 }
             } else {
@@ -68,6 +72,9 @@ struct ImportRegionLevel: View {
                             )
                         }
                     )
+                    .task(id: group.id) {
+                        await coordinator.resolveRegions(for: group.clusters.map(\.id))
+                    }
                 }
             }
         }

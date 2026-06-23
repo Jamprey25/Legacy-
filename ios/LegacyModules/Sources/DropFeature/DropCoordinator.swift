@@ -175,14 +175,16 @@ public final class DropCoordinator {
             state = .failed("Simulated location is not allowed for drops.")
         } catch is EXIFStripError {
             state = .failed("Could not prepare photo for upload.")
-        } catch let LegacyAPIError.unauthorized {
-            state = .failed("Session expired. Sign out and sign in again.")
         } catch let LegacyAPIError.invalidRequest(code, message) {
             state = .failed(message.isEmpty ? code : message)
             stageRecovery(memoryID: memoryID, photoData: strippedData, signedPutURL: signedPutURL, contentType: contentType)
         } catch let LegacyAPIError.server(status) {
             state = .failed("Server error (\(status)) creating memory.")
             stageRecovery(memoryID: memoryID, photoData: strippedData, signedPutURL: signedPutURL, contentType: contentType)
+        } catch let error as LegacyAPIError where error.isAppAttestFailure {
+            state = .failed("Device attestation failed. Reopen Legacy and try again on a real device.")
+        } catch LegacyAPIError.unauthorized {
+            state = .failed("Session expired. Sign out and sign in again.")
         } catch let error as MediaUploadError {
             state = .failed(dropUploadMessage(for: error))
             stageRecovery(memoryID: memoryID, photoData: strippedData, signedPutURL: signedPutURL, contentType: contentType)
@@ -229,6 +231,10 @@ public final class DropCoordinator {
                 cachedAt: Date()
             )
             state = .succeeded(memoryID: response.memoryID)
+        } catch let error as LegacyAPIError where error.isAppAttestFailure {
+            state = .failed("Device attestation failed. Reopen Legacy and try again on a real device.")
+        } catch LegacyAPIError.unauthorized {
+            state = .failed("Session expired. Sign out and sign in again.")
         } catch let LegacyAPIError.invalidRequest(code, message) {
             state = .failed(message.isEmpty ? code : message)
         } catch {

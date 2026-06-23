@@ -49,11 +49,18 @@ public final class AppAttestCoordinator {
 
     /// Base64 CBOR assertion for sensitive requests; `nil` on simulator / unsupported hardware.
     public func currentAssertionBase64() async -> String? {
-        guard isSupported, let apiClient, AppAttestKeyStore.isRegistered,
-              let keyId = AppAttestKeyStore.keyId
+        guard isSupported, apiClient != nil else { return nil }
+        // Opportunistically self-heal registration before protected requests.
+        // This prevents first-request failures when auth succeeded but register
+        // has not completed yet (e.g. fresh install, keychain reset).
+        if !AppAttestKeyStore.isRegistered {
+            await ensureRegistered()
+        }
+        guard let keyId = AppAttestKeyStore.keyId, AppAttestKeyStore.isRegistered
         else { return nil }
 
         do {
+            guard let apiClient else { return nil }
             let challenge = try await apiClient.fetchAttestChallenge()
             let clientDataHash = try AppAttestChallenge.clientDataHash(for: challenge.challengeToken)
             let assertion = try await generateAssertion(keyId: keyId, clientDataHash: clientDataHash)

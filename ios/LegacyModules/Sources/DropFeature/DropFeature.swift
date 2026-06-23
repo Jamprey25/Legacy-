@@ -77,7 +77,7 @@ public struct DropFeatureRootView: View {
             PhotoLibraryPicker(
                 onPick: { data in
                     showLibrary = false
-                    coordinator.selectPhoto(data)
+                    handlePickedPhoto(data)
                 },
                 onCancel: { showLibrary = false }
             )
@@ -86,7 +86,7 @@ public struct DropFeatureRootView: View {
             CameraPicker(
                 onPick: { data in
                     showCamera = false
-                    coordinator.selectPhoto(data)
+                    handlePickedPhoto(data)
                 },
                 onCancel: { showCamera = false }
             )
@@ -267,6 +267,14 @@ public struct DropFeatureRootView: View {
 
     private func retryDraft(_ draft: DropDraft) async {
         await coordinator.retryDraft(draft, context: modelContext)
+    }
+
+    private func handlePickedPhoto(_ data: Data) {
+        coordinator.selectPhoto(data)
+        // Quick Pin should feel instant: pick -> drop, without an extra confirmation tap.
+        if mode == .pin {
+            Task { await coordinator.confirmPinDrop() }
+        }
     }
 
     private var modePicker: some View {

@@ -1,16 +1,22 @@
 #if os(iOS)
 import Foundation
 import Photos
-import UIKit
 
 public enum PHAssetImageError: Error, Sendable {
     case notFound
     case decodeFailed
 }
 
-/// Loads JPEG bytes for a single asset when the user confirms import. Not used during clustering.
+/// Loads the original encoded bytes for a single asset when the user confirms import. Not used
+/// during clustering.
+///
+/// Returns the asset's **original encoded data** (HEIC/JPEG) without decoding it into a bitmap.
+/// Decoding/downsizing is deferred to `EXIFStripper.downsampledStrippedJPEG`, which decodes once
+/// at a bounded size — so the full-resolution bitmap is never allocated here. (The previous
+/// `UIImage(data:).jpegData()` round-trip decoded the entire image into memory, which on a large
+/// multi-photo visit accumulated across the import loop and got the app jetsam-killed.)
 public enum PHAssetImageFetcher {
-    public static func loadJPEGData(assetID: String) async throws -> Data {
+    public static func loadImageData(assetID: String) async throws -> Data {
         let assets = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil)
         guard let asset = assets.firstObject else {
             throw PHAssetImageError.notFound
@@ -36,11 +42,7 @@ public enum PHAssetImageFetcher {
                     continuation.resume(throwing: PHAssetImageError.decodeFailed)
                     return
                 }
-                if let jpeg = UIImage(data: data)?.jpegData(compressionQuality: 0.92) {
-                    continuation.resume(returning: jpeg)
-                } else {
-                    continuation.resume(returning: data)
-                }
+                continuation.resume(returning: data)
             }
         }
     }

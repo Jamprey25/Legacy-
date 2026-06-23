@@ -1396,3 +1396,139 @@ That closes every item of the multi-photo memory feature.
 - **⚠️ CURSOR — please validate on-device:** confirm (a) launch-while-Always no longer crashes, and (b) the first background region rotation doesn't re-trigger the `CLMonitor` assert on iOS 26.x. If it still asserts at lazy creation, `CLMonitor`/background-region monitoring may need to be feature-flagged off on iOS 26 until Apple's fix — foreground Wander/Drop/Import don't depend on it.
 
 **COORDINATION — not committed:** my fixes are layered on top of Cursor's **uncommitted session-12 work** (esp. `ImportFeature.swift`, co-edited). I did **not** commit, to avoid clobbering in-flight changes. My files: `PHAssetMetadataFetcher.swift`, `PlaceNameResolver.swift`, `ImportCoordinator.swift`, `WanderFeature.swift`, `ImportFeature.swift` (shared), NEW `ImportLocationBrowser.swift`. Joseph to coordinate the commit.
+
+
+---
+
+## [ios → all] 2026-06-23 (session 13) — M5 hardening: App Attest client completion + clearer protected-flow errors
+
+**Shipped:**
+- `AppAttestCoordinator.currentAssertionBase64()` now self-heals registration (`ensureRegistered()`) before protected calls when the key exists but registration flag is missing (fresh install/keychain-reset edge).
+- Added explicit App Attest failure detection in `LegacyAPIError` (`isAppAttestFailure`) for M5 enforcement codes.
+- Wired user-facing attestation enforcement messages in protected flows:
+  - `DropCoordinator` photo + note drops
+  - `WanderCoordinator.unlock`
+  - `MemoryLaneCoordinator.openAtLocation`
+- Result: when backend flips `APP_ATTEST_REQUIRED`, users get actionable guidance (attestation failed vs generic auth/network copy).
+
+**Tasks marked done:** `ios-app-attest`
+
+**Blocked on Joseph / other agent:**
+- `testflight-beta` still blocked by backend/security release gates (`csam-vendor-live` etc.) per task board.
+
+**Uncommitted / branch:** `main`, local iOS + docs/tasks edits present.
+
+**Next session picks up:**
+1. Device QA pass with `APP_ATTEST_REQUIRED=true` in a TestFlight-like environment.
+2. Close out final M5 release ops (`testflight-beta`) once backend compliance blockers clear.
+
+---
+
+## [ios → all] 2026-06-23 — UX polish batch (session-12 continuation)
+
+**Shipped:**
+- **Unlock hero moment** (`WanderFeature.swift`): blur-to-sharp + scale-in reveal on unlock instead of plain transition; premium gradient/material depth on unlocked surface.
+- **Living warmth signal** (`WarmthCue.swift`): `WarmthCueOverlay` now breathes — pulse tempo increases by band (coarse → approaching → in_bubble); still non-directional, DEC-15 compliant.
+- **Onboarding live demo** (`OnboardingView.swift`): "Rediscover" page replaced static icon with animated mini-loop (pin drop → warmth bloom → memory reveal).
+- **Depth + materials** (`WanderFeature.swift`): teaser tray uses `.ultraThinMaterial`-style treatment and stronger layered depth cues.
+- **Skeleton loading** (`MemoryLaneFeature.swift`): `MemoryLaneSkeletonGallery` shimmer placeholders on first load; map skeleton in Wander during bootstrap.
+- **Lower-friction quick drop** (`DropFeature.swift`): photo pick → auto-drop in Quick Pin mode (one fewer confirmation tap).
+- **Contextual permission timing** (`LegacyApp.swift`): background discovery prompt now gates on `legacyHasCompletedFirstDrop` — asks after first successful drop, not up front.
+- **Empty state CTA** (`WanderFeature.swift`): Wander hint now shows "Drop your first memory" button wired to tab switch.
+
+**Tests:** 64/64 green, build succeeded.
+
+**Backend → iOS (no action needed):** All backend M5 tasks remain done. No API contract changes in this batch.
+
+**Next session picks up:**
+1. Device QA pass — walk through the full loop on hardware to feel the choreography.
+2. Consider extracting all hero-motion timings into a `LegacyMotionPreset` token file for single-place A/B tuning.
+3. TestFlight submit once Apple Developer ID clears.
+
+---
+
+## [backend → ios] 2026-06-23 — Testing feedback: 3 iOS tasks logged
+
+**From Joseph's testing session.**
+
+### 1. Import UI looks bad (`ios-import-ui-polish`)
+Root cause: blue glow (`Color(red:0.56,green:0.76,blue:0.96)`) clashes with warm amber accent everywhere else. Scanning phase shows bare spinner. "Archive Scanner" is cold copy.
+- Replace blue glow with `LegacyColor.accent` throughout `ImportFeature.swift`
+- Replace `ProgressView("Scanning…")` with live scan counter once perf task lands
+- Rename "Archive Scanner" → warmer label; make idle state copy more inviting
+
+### 2. Wander map pin entrance animation (`ios-pin-appear-animation`)
+Already 90% built. `PinDropMarker` has `scaleEffect(isVisible ? 1.0 : 0.01)` + `offset(y: isVisible ? 0 : -24)` and `staggerReveal()` exists. **Missing one line:**
+```swift
+.animation(LegacyMotion.animation(.spring(response: 0.38, dampingFraction: 0.72)), value: isVisible)
+```
+Also: `onAppear` calls `syncVisiblePins(animated: false)` — change to `animated: true` so cold-launch pins stagger in instead of popping.
+Files: `WanderFeature.swift` — `PinDropMarker` ~line 989, `syncVisiblePins` call ~line 888.
+
+### 3. Scan optimization for large photo dumps (`ios-import-scan-perf`)
+Two bottlenecks:
+- `PHAssetMetadataFetcher.fetchGeoSamples()` scans up to 20k assets with zero progress reporting — UI freezes on a bare spinner for 3–5 seconds. Add a progress callback so `ImportCoordinator` can publish `(scanned: Int, found: Int)` and the scanning state shows "Scanning 4,821 of 20,000 — 312 geotagged".
+- `resolveRegions()` is a fully serial geocode loop. For 500 clusters at CLGeocoder rate limits = potentially minutes. Fix: geocode only top 50 by score first, lazy-load rest as user scrolls.
+Files: `PHAssetMetadataFetcher.swift`, `ImportCoordinator.swift`, `ImportLocationBrowser.swift`
+
+**No backend changes needed for any of these.**
+
+---
+
+## [ios → all] 2026-06-23 (session 14) — Pin animation + import polish + scan performance
+
+**Shipped (iOS only):**
+- `WanderFeature.swift`: enabled cold-launch pin cascade (`syncVisiblePins(animated: true)`) and added missing pin entrance spring animation on `PinDropMarker` (`.animation(..., value: isVisible)`).
+- `ImportFeature.swift`: replaced blue glow literals with `LegacyColor.accent`, added live scanning progress card (scanned/total/found), and warmed copy ("Build your memory atlas", "Start memory scan", "Memory Atlas").
+- `PHAssetMetadataFetcher.swift`: scan now runs on a background queue and reports throttled progress updates during enumeration.
+- `ImportCoordinator.swift`: added `scanProgress` state for UI updates; `resolveRegions()` now primes top 50 clusters by score first, with lazy subset geocoding via `resolveRegions(for:)`.
+- `ImportLocationBrowser.swift`: triggers lazy region resolution for visible groups/rows.
+- `ImportFeature.swift` (`ImportClusterRow`): removed direct per-row geocoder call; place label now reads from coordinator-resolved region data.
+
+**Task board updates:**
+- Marked done: `ios-pin-appear-animation`
+- Marked done: `ios-import-ui-polish`
+- Marked done: `ios-import-scan-perf`
+
+**Verification:**
+- `swift test --package-path ios/LegacyModules` → 64/64 passing.
+
+**Blocked on Joseph / backend:** none.
+
+---
+
+## [ios → all] 2026-06-23 — Dashboard crash fix (missing `blockedBy` / `blocks`)
+
+**Root cause:** `tasks.json` has several done tasks without `blockedBy` and several decisions without `blocks`. Dashboard assumed both arrays always exist — `TaskCard` called `task.blockedBy.map(...)` and `DecisionCard` called `d.blocks.map(...)`, throwing `Cannot read properties of undefined (reading 'map')` and crashing the whole page (Next.js "This page couldn't load").
+
+**Fix (dashboard only):**
+- `TaskCard.tsx`: `(task.blockedBy ?? [])`
+- `page.tsx`: `(t.blockedBy ?? [])` in blocked/ready filters
+- `DecisionsPanel.tsx`: `(d.blocks ?? [])`; thread replies fall back to `message` when `text` absent
+
+**Verify:** `npm run build` in `dashboard/` succeeds; local dev loads full dashboard after cache clear.
+
+**Follow-up (optional):** normalize `tasks.json` entries to always include `"blockedBy": []` / `"blocks": []` so agents don't reintroduce the gap.
+
+---
+
+## [backend → all] 2026-06-23 (session 15) — Import memory-safety: crash-proof photo scan/upload
+
+**Context:** Joseph reported the photo import needs to be "fast and stable so no crashes." The metadata *scan* was already safe (background queue, no image bytes). The crash risk was in `ImportCoordinator.importSelected()`'s per-photo upload loop. Touched `ios/**` at Joseph's request — flagging here per protocol.
+
+**Root cause (OOM / jetsam kill on large multi-photo visits):**
+- Each photo was decoded to a **full-resolution bitmap twice**: once by `PHAssetImageFetcher.loadJPEGData` (`UIImage(data:).jpegData()`) and again by `EXIFStripper.stripMetadata`. A 48 MP photo ≈ 190 MB uncompressed.
+- This ran in a tight `async` loop over an entire visit. Autorelease pools don't drain across `await`, so the transient bitmaps accumulated → memory warning → the OS jetsam-killed the app.
+
+**Fix (iOS only):**
+- `EXIFStripper.swift` (DropFeature): added `downsampledStrippedJPEG(from:maxPixelSize:quality:)`. Single ImageIO pass — `CGImageSourceCreateThumbnailAtIndex` with `kCGImageSourceThumbnailMaxPixelSize` downsamples **at decode time** (full bitmap never allocated), bakes in orientation, and re-encodes JPEG with no metadata dicts (GPS stripped by construction — same SEC-MED guarantee). Wrapped in `autoreleasepool` so each photo's buffers free immediately.
+- `PHAssetImageFetcher.swift`: `loadJPEGData` → `loadImageData`. Now returns the asset's **original encoded bytes** without the full `UIImage` decode; the single decode happens in the downsampler. Kept the degraded-iCloud continuation guard.
+- `ImportCoordinator.swift`: both hero + extras now use `loadImageData` + `downsampledStrippedJPEG(maxPixelSize: 3000)`. New `maxUploadPixelSize = 3000` (~8 MP longest edge). Hero failure now **skips just that memory** (advances the progress bar) instead of throwing to the outer catch and aborting the whole batch — one corrupt photo no longer sinks the import.
+
+**Effect:** peak per-photo memory ~190 MB → ~50 MB transient, reclaimed every iteration → flat memory regardless of visit size. Uploads also smaller/faster.
+
+**Product decision (Joseph):** uploads downscaled to ~3000px longest edge (visually identical on-device). If full-resolution originals are ever required, only the `maxUploadPixelSize` constant + the single-decode/`autoreleasepool` structure need revisiting.
+
+**Verification:** `xcodebuild build -scheme ImportFeature -destination 'iOS Simulator'` → **BUILD SUCCEEDED** (pulls in DropFeature/EXIFStripper).
+
+**No backend changes.** Upload contract unchanged (still `image/jpeg`, same positions/slots).

@@ -35,6 +35,23 @@ public enum LegacyAPIError: Error, Sendable, Equatable {
         if case .transport = self { return true }
         return false
     }
+
+    /// True when backend rejected a protected request due to missing/invalid App Attest proof.
+    public var isAppAttestFailure: Bool {
+        switch self {
+        case .unauthorized(let code), .forbidden(let code, _):
+            return [
+                "attestation_required",
+                "attestation_invalid",
+                "attestation_mismatch",
+                "attestation_replay",
+                "attestation_untrusted",
+                "attestation_stale",
+            ].contains(code)
+        default:
+            return false
+        }
+    }
 }
 
 /// Extra body fields carried on `423 Locked` responses (contract §4).

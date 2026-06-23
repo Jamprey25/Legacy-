@@ -18,7 +18,7 @@ function DecisionCard({
   tasks: Task[];
   resolved: boolean;
 }) {
-  const blockedTasks = d.blocks
+  const blockedTasks = (d.blocks ?? [])
     .map((id) => tasks.find((t) => t.id === id))
     .filter(Boolean) as Task[];
   const accent = resolved ? "#16a34a" : d.kind === "blocker" ? "#ff6b6b" : "#d97706";
@@ -458,7 +458,9 @@ function ThreadCard({
                     }}>{r.author}</span>
                     <span style={{ fontSize: 10, color: "#444" }}>{r.date}</span>
                   </div>
-                  <p style={{ color: "#ccc", fontSize: 12, lineHeight: 1.6, margin: 0 }}>{r.text}</p>
+                  <p style={{ color: "#ccc", fontSize: 12, lineHeight: 1.6, margin: 0 }}>
+                    {r.text ?? (r as { message?: string }).message ?? ""}
+                  </p>
                 </div>
               ))}
             </div>

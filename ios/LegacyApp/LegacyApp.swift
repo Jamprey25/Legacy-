@@ -216,6 +216,7 @@ private struct MainTabView: View {
     @State private var pinCelebration = PinDropCelebrationCoordinator()
     @State private var showBackgroundDiscoveryPrompt = false
     @State private var selectedTab: MainTab = .wander
+    @AppStorage("legacyHasCompletedFirstDrop") private var hasCompletedFirstDrop = false
     /// True only if the app launched ALREADY having When-In-Use. Apple discourages
     /// chaining the Always prompt immediately after the When-In-Use grant, and that
     /// upgrade forces an iOS app relaunch ("kicked out"). So we defer the background
@@ -253,10 +254,12 @@ private struct MainTabView: View {
         guard !BackgroundLocationPermissionGate.hasUserDismissedPrompt else { return false }
         guard !backgroundLocation.isAuthorizedForBackground else { return false }
         guard locationEngine.authorizationStatus == .authorizedWhenInUse else { return false }
+        // Ask contextually after the first successful drop, when value is obvious.
+        guard hasCompletedFirstDrop else { return false }
         // Don't chain the Always prompt onto the same session the user first granted
         // When-In-Use — that double-prompt + relaunch is the "messy / kicked out" UX.
         guard hadWhenInUseAtLaunch else { return false }
-        return !wanderCoordinator.teasers.isEmpty || !wanderCoordinator.cachedOwnPins.isEmpty
+        return true
     }
 
     var body: some View {
@@ -288,11 +291,6 @@ private struct MainTabView: View {
             )
             .presentationDetents([.medium])
         }
-        .onChange(of: wanderCoordinator.teasers.count) { _, _ in
-            if shouldOfferBackgroundDiscovery {
-                showBackgroundDiscoveryPrompt = true
-            }
-        }
         .onChange(of: APNsTokenStore.tokenHex) { _, _ in
             Task { await APNsRegistrationService.uploadTokenIfNeeded(apiClient: appModel.apiClient) }
         }
@@ -301,8 +299,12 @@ private struct MainTabView: View {
             handleProximityPush(openWander: openWander)
         }
         .onChange(of: dropCoordinator.state) { _, newState in
-            if case .succeeded = newState, let pin = dropCoordinator.consumeCelebrationPin() {
-                celebratePins([pin])
+            if case .succeeded = newState {
+                hasCompletedFirstDrop = true
+                presentBackgroundDiscoveryIfEligible()
+                if let pin = dropCoordinator.consumeCelebrationPin() {
+                    celebratePins([pin])
+                }
             }
         }
         .onChange(of: importCoordinator.phase) { _, phase in
@@ -340,9 +342,7 @@ private struct MainTabView: View {
                 if pending.openWander { selectedTab = .wander }
                 await wanderCoordinator.scanIfNeeded(force: true)
             }
-            if shouldOfferBackgroundDiscovery {
-                showBackgroundDiscoveryPrompt = true
-            }
+            presentBackgroundDiscoveryIfEligible()
         }
     }
 
@@ -364,6 +364,11 @@ private struct MainTabView: View {
         Task { await wanderCoordinator.scanIfNeeded(force: true) }
     }
 
+    private func presentBackgroundDiscoveryIfEligible() {
+        guard shouldOfferBackgroundDiscovery else { return }
+        showBackgroundDiscoveryPrompt = true
+    }
+
     private func configureTabBarAppearance() {
         #if os(iOS)
         let appearance = UITabBarAppearance()
@@ -383,7 +388,8 @@ private struct MainTabView: View {
     private var wanderTab: some View {
         WanderFeatureRootView(
             coordinator: wanderCoordinator,
-            pinCelebration: pinCelebration
+            pinCelebration: pinCelebration,
+            onStartDropping: { selectedTab = .drop }
         )
             .tabItem { Label("Wander", systemImage: "map") }
             .tag(MainTab.wander)

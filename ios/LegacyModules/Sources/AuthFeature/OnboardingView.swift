@@ -17,17 +17,17 @@ public struct OnboardingView: View {
 
     private static let pages: [OnboardingPage] = [
         OnboardingPage(
-            icon: "mappin.and.ellipse",
+            kind: .icon("mappin.and.ellipse"),
             title: "Leave memories where they happened",
             body: "Drop a photo or a note at a real place. It stays there, waiting."
         ),
         OnboardingPage(
-            icon: "map",
+            kind: .liveDemo,
             title: "Rediscover them by being there",
             body: "Memories unlock when you return to the spot you left them — yours and ones shared with you."
         ),
         OnboardingPage(
-            icon: "bell.badge",
+            kind: .icon("bell.badge"),
             title: "Works quietly in the background",
             body: "With your permission, Legacy uses your location to nudge you when a memory is nearby. You're always in control in Settings."
         ),
@@ -72,9 +72,14 @@ public struct OnboardingView: View {
 
 private struct OnboardingPage: Identifiable {
     let id = UUID()
-    let icon: String
+    let kind: OnboardingVisualKind
     let title: String
     let body: String
+}
+
+private enum OnboardingVisualKind {
+    case icon(String)
+    case liveDemo
 }
 
 private struct OnboardingPageView: View {
@@ -84,10 +89,7 @@ private struct OnboardingPageView: View {
         VStack(spacing: LegacySpacing.xl) {
             Spacer()
 
-            Image(systemName: page.icon)
-                .font(.system(size: 72, weight: .light))
-                .foregroundStyle(LegacyColor.accent)
-                .accessibilityHidden(true)
+            visual
 
             VStack(spacing: LegacySpacing.md) {
                 Text(page.title)
@@ -102,6 +104,108 @@ private struct OnboardingPageView: View {
             }
 
             Spacer()
+        }
+    }
+
+    @ViewBuilder
+    private var visual: some View {
+        switch page.kind {
+        case .icon(let icon):
+            Image(systemName: icon)
+                .font(.system(size: 72, weight: .light))
+                .foregroundStyle(LegacyColor.accent)
+                .accessibilityHidden(true)
+        case .liveDemo:
+            OnboardingDiscoveryDemo()
+                .frame(height: 220)
+                .accessibilityHidden(true)
+        }
+    }
+}
+
+private struct OnboardingDiscoveryDemo: View {
+    @State private var pinVisible = false
+    @State private var warmth = 0.15
+    @State private var reveal = false
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: LegacyRadius.lg, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [LegacyColor.surface, LegacyColor.background],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: LegacyRadius.lg, style: .continuous)
+                        .stroke(LegacyColor.separator, lineWidth: 1)
+                }
+
+            WarmthCueOverlay(intensity: warmth)
+                .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.lg, style: .continuous))
+
+            VStack(spacing: LegacySpacing.sm) {
+                ZStack {
+                    Circle()
+                        .fill(LegacyColor.accent.opacity(0.22))
+                        .frame(width: 48, height: 48)
+                        .scaleEffect(pinVisible ? 1 : 0.2)
+                        .opacity(pinVisible ? 1 : 0)
+                    Image(systemName: "mappin.circle.fill")
+                        .font(.system(size: 30, weight: .semibold))
+                        .foregroundStyle(LegacyColor.accent)
+                        .scaleEffect(pinVisible ? 1 : 0.2)
+                        .offset(y: pinVisible ? 0 : -22)
+                        .opacity(pinVisible ? 1 : 0)
+                }
+                .animation(LegacyMotion.animation(.spring(response: 0.42, dampingFraction: 0.7)), value: pinVisible)
+
+                RoundedRectangle(cornerRadius: LegacyRadius.md, style: .continuous)
+                    .fill(LegacyColor.surface.opacity(0.92))
+                    .frame(width: 150, height: 94)
+                    .overlay {
+                        Rectangle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.75), Color.white.opacity(0.38)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .blur(radius: reveal ? 0 : 8)
+                            .scaleEffect(reveal ? 1 : 0.92)
+                            .opacity(reveal ? 1 : 0.58)
+                            .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.sm, style: .continuous))
+                            .padding(8)
+                    }
+                    .scaleEffect(reveal ? 1 : 0.95)
+                    .animation(LegacyMotion.animation(.easeOut(duration: 0.55)), value: reveal)
+            }
+        }
+        .onAppear {
+            runDemo()
+        }
+    }
+
+    private func runDemo() {
+        guard !LegacyMotion.isReduced else {
+            pinVisible = true
+            warmth = 0.85
+            reveal = true
+            return
+        }
+        pinVisible = false
+        warmth = 0.2
+        reveal = false
+        Task {
+            try? await Task.sleep(for: .milliseconds(250))
+            pinVisible = true
+            try? await Task.sleep(for: .milliseconds(600))
+            warmth = 0.85
+            try? await Task.sleep(for: .milliseconds(450))
+            reveal = true
         }
     }
 }

@@ -180,6 +180,10 @@ public final class MemoryLaneCoordinator {
             unlockMessage = code == "not_in_range"
                 ? "Visit the drop location to view this memory."
                 : message
+        } catch let error as LegacyAPIError where error.isAppAttestFailure {
+            unlockMessage = "Device attestation failed. Reopen Legacy and try again on a real device."
+        } catch LegacyAPIError.unauthorized {
+            unlockMessage = "Session expired. Sign out and sign in again."
         } catch {
             unlockMessage = "Could not open memory. Try again when you have a signal."
         }
@@ -210,8 +214,7 @@ public struct MemoryLaneFeatureRootView: View {
         NavigationStack {
             Group {
                 if coordinator.isLoading && coordinator.items.isEmpty {
-                    ProgressView()
-                        .tint(LegacyColor.accent)
+                    MemoryLaneSkeletonGallery(columns: columns)
                 } else if coordinator.items.isEmpty {
                     emptyState
                 } else {
@@ -416,6 +419,48 @@ private struct MemoryLaneSectionHeader: View {
     }
 }
 
+private struct MemoryLaneSkeletonGallery: View {
+    let columns: [GridItem]
+
+    var body: some View {
+        ScrollView {
+            LegacyChromeCard(glow: Color(red: 0.80, green: 0.62, blue: 0.95)) {
+                HStack {
+                    RoundedRectangle(cornerRadius: LegacyRadius.sm, style: .continuous)
+                        .fill(LegacyColor.surface.opacity(0.7))
+                        .frame(width: 140, height: 16)
+                    Spacer()
+                    Circle()
+                        .fill(LegacyColor.surface.opacity(0.7))
+                        .frame(width: 24, height: 24)
+                }
+                .legacyShimmer()
+            }
+            .padding(.horizontal, LegacySpacing.lg)
+            .padding(.top, LegacySpacing.sm)
+
+            LazyVGrid(columns: columns, spacing: LegacySpacing.md) {
+                ForEach(0..<6, id: \.self) { _ in
+                    VStack(alignment: .leading, spacing: LegacySpacing.sm) {
+                        RoundedRectangle(cornerRadius: LegacyRadius.sm, style: .continuous)
+                            .fill(LegacyColor.surface.opacity(0.75))
+                            .aspectRatio(1, contentMode: .fit)
+                        RoundedRectangle(cornerRadius: LegacyRadius.sm, style: .continuous)
+                            .fill(LegacyColor.surface.opacity(0.7))
+                            .frame(height: 12)
+                        RoundedRectangle(cornerRadius: LegacyRadius.sm, style: .continuous)
+                            .fill(LegacyColor.surface.opacity(0.5))
+                            .frame(width: 90, height: 10)
+                    }
+                    .legacyShimmer()
+                }
+            }
+            .padding(.horizontal, LegacySpacing.lg)
+            .padding(.vertical, LegacySpacing.lg)
+        }
+    }
+}
+
 #if os(iOS)
 /// "On this day" resurfacing strip — a horizontal carousel of memories from
 /// today's date in previous years. Taps open the same detail destination.
@@ -531,7 +576,9 @@ private struct MemoryLaneCard: View {
                                 .font(.title2)
                                 .foregroundStyle(LegacyColor.textSecondary)
                         default:
-                            ProgressView().tint(LegacyColor.accent)
+                            RoundedRectangle(cornerRadius: LegacyRadius.sm, style: .continuous)
+                                .fill(LegacyColor.surface.opacity(0.7))
+                                .legacyShimmer()
                         }
                     }
                     .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.sm))

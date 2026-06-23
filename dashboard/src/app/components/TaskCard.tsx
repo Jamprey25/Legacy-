@@ -46,7 +46,7 @@ function Badge({ label, color }: { label: string; color: string }) {
 }
 
 export default function TaskCard({ task, allTasks }: { task: Task; allTasks: Task[] }) {
-  const blockers = task.blockedBy
+  const blockers = (task.blockedBy ?? [])
     .map((id) => allTasks.find((t) => t.id === id))
     .filter(Boolean) as Task[];
   const isBlocked = blockers.some((b) => b.status !== "done");

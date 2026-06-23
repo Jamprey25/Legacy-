@@ -29,6 +29,18 @@ public struct ImportRegion: Sendable, Equatable, Hashable {
     public static let unknown = ImportRegion(country: "Unknown location", admin: "", city: "")
 }
 
+public struct ImportScanProgress: Sendable, Equatable {
+    public let scanned: Int
+    public let total: Int
+    public let found: Int
+
+    public init(scanned: Int, total: Int, found: Int) {
+        self.scanned = scanned
+        self.total = total
+        self.found = found
+    }
+}
+
 @MainActor
 @Observable
 public final class ImportCoordinator {
@@ -58,6 +70,16 @@ public final class ImportCoordinator {
     /// absent from this map is still "Locating…". Drives the import location drill-down.
     public private(set) var clusterRegions: [String: ImportRegion] = [:]
     public private(set) var isResolvingRegions = false
+    public private(set) var scanProgress: ImportScanProgress?
+
+    private let initialRegionResolveLimit = 50
+    private var inFlightRegionClusterIDs: Set<String> = []
+
+    /// Longest-edge cap (pixels) for uploaded photos. Downsampling to this size at decode time is
+    /// what keeps the import loop's memory flat no matter how many photos a visit has — without it
+    /// a large visit decodes full-resolution bitmaps in a tight loop and the app gets jetsam-killed.
+    /// See `EXIFStripper.downsampledStrippedJPEG`.
+    private static let maxUploadPixelSize = 3000
 
     public private(set) var pendingCelebrationPins: [CachedOwnPin] = []
 
@@ -83,33 +105,55 @@ public final class ImportCoordinator {
         clusters = []
         clusterRegions = [:]
         geoSamples = []
+        geoSampleCount = 0
+        scanProgress = ImportScanProgress(scanned: 0, total: PHAssetMetadataFetcher.maxAssetsToScan, found: 0)
 
         do {
-            let samples = try await PHAssetMetadataFetcher.fetchGeoSamples()
+            let samples = try await PHAssetMetadataFetcher.fetchGeoSamples { [weak self] scanned, total, found in
+                self?.scanProgress = ImportScanProgress(scanned: scanned, total: total, found: found)
+            }
             geoSamples = samples
             geoSampleCount = samples.count
             clusters = PhotoClusterEngine.cluster(samples: samples)
             phase = clusters.isEmpty ? .failed("No geotagged photos found in your library.") : .ready
+            scanProgress = nil
             if !clusters.isEmpty {
-                // Sort visits into Country/State/City in the background so the list is
-                // usable immediately; rows move out of "Locating…" as they resolve.
+                // Prime the top-ranked clusters quickly, then resolve additional rows lazily
+                // as the user drills down and scrolls.
                 Task { await resolveRegions() }
             }
         } catch PHAssetMetadataError.unauthorized {
+            scanProgress = nil
             phase = .failed("Photo access is off. Enable it in Settings to import.")
         } catch {
+            scanProgress = nil
             phase = .failed("Could not scan your library. Try again.")
         }
     }
 
-    /// Reverse-geocode every cluster centroid into a Country/State/City. Serialized through
-    /// the resolver's actor (and its ~1.1 km bucket cache), so visits in the same area share
-    /// a single geocoder request and we stay clear of CLGeocoder's rate limit.
+    /// Prime only the highest-value visits first so the browser is usable quickly.
     public func resolveRegions() async {
-        let pending = clusters.filter { clusterRegions[$0.id] == nil }
+        let prioritized = clusters.sorted { $0.score > $1.score }
+        let initialIDs = prioritized.prefix(initialRegionResolveLimit).map(\.id)
+        await resolveRegions(for: initialIDs)
+    }
+
+    /// Lazily geocode a subset of clusters (e.g. the rows currently visible on screen).
+    public func resolveRegions(for clusterIDs: [String]) async {
+        let wantedIDs = Set(clusterIDs)
+        let pending = clusters.filter {
+            wantedIDs.contains($0.id) &&
+                clusterRegions[$0.id] == nil &&
+                !inFlightRegionClusterIDs.contains($0.id)
+        }
         guard !pending.isEmpty else { return }
+
         isResolvingRegions = true
-        defer { isResolvingRegions = false }
+        pending.forEach { inFlightRegionClusterIDs.insert($0.id) }
+        defer {
+            pending.forEach { inFlightRegionClusterIDs.remove($0.id) }
+            isResolvingRegions = !inFlightRegionClusterIDs.isEmpty
+        }
 
         for cluster in pending {
             let region = await PlaceNameResolver.shared.region(
@@ -118,6 +162,13 @@ public final class ImportCoordinator {
             ) ?? .unknown
             clusterRegions[cluster.id] = region
         }
+    }
+
+    public func placeName(for clusterID: String) -> String? {
+        guard let region = clusterRegions[clusterID] else { return nil }
+        if !region.city.isEmpty { return region.city }
+        if !region.admin.isEmpty { return region.admin }
+        return region.country.isEmpty ? nil : region.country
     }
 
     public func selectClusters(_ ids: [String]) {
@@ -178,17 +229,29 @@ public final class ImportCoordinator {
                 let assetIDs = Array(cluster.sampleIDs.prefix(item.mediaCount))
                 guard let heroID = assetIDs.first else { continue }
 
-                // Hero (position 0) must succeed — it drives discovery, the thumbnail, and
-                // the celebration pin. A throw here fails this memory.
-                let heroRaw = try await PHAssetImageFetcher.loadJPEGData(assetID: heroID)
-                let heroStripped = try EXIFStripper.stripMetadata(from: heroRaw)
-                try await mediaUploader.upload(
-                    memoryID: item.memoryID,
-                    data: heroStripped,
-                    contentType: "image/jpeg",
-                    signedPutURL: item.upload?.signedPutURL,
-                    position: 0
-                )
+                // Hero (position 0) drives discovery, the thumbnail, and the celebration pin.
+                // If it can't be prepared or uploaded (corrupt/unavailable asset, transient
+                // network), skip just this memory rather than aborting the entire import — one
+                // bad photo shouldn't sink the whole batch. Advance the bar past this visit's
+                // photos so progress still completes.
+                do {
+                    let heroRaw = try await PHAssetImageFetcher.loadImageData(assetID: heroID)
+                    let heroStripped = try EXIFStripper.downsampledStrippedJPEG(
+                        from: heroRaw,
+                        maxPixelSize: Self.maxUploadPixelSize
+                    )
+                    try await mediaUploader.upload(
+                        memoryID: item.memoryID,
+                        data: heroStripped,
+                        contentType: "image/jpeg",
+                        signedPutURL: item.upload?.signedPutURL,
+                        position: 0
+                    )
+                } catch {
+                    uploadedPhotos += assetIDs.count
+                    phase = .importing(current: uploadedPhotos, total: totalPhotos)
+                    continue
+                }
                 uploadedPhotos += 1
                 phase = .importing(current: uploadedPhotos, total: totalPhotos)
 
@@ -198,8 +261,11 @@ public final class ImportCoordinator {
                 // extra never sinks the memory, and progress still advances so the bar finishes.
                 for (position, assetID) in assetIDs.enumerated().dropFirst() {
                     do {
-                        let raw = try await PHAssetImageFetcher.loadJPEGData(assetID: assetID)
-                        let stripped = try EXIFStripper.stripMetadata(from: raw)
+                        let raw = try await PHAssetImageFetcher.loadImageData(assetID: assetID)
+                        let stripped = try EXIFStripper.downsampledStrippedJPEG(
+                            from: raw,
+                            maxPixelSize: Self.maxUploadPixelSize
+                        )
                         let request = try apiClient.directUploadRequest(
                             memoryID: item.memoryID,
                             contentType: "image/jpeg",
@@ -241,6 +307,9 @@ public final class ImportCoordinator {
         geoSamples = []
         geoSampleCount = 0
         selectedClusterIDs = []
+        clusterRegions = [:]
+        scanProgress = nil
+        inFlightRegionClusterIDs = []
     }
 
     static nonisolated func idempotencyKey(for clusters: [PhotoCluster]) -> String {

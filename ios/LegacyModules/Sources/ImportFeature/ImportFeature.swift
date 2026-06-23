@@ -24,7 +24,7 @@ public struct ImportFeatureRootView: View {
             ZStack {
                 content
             }
-            .legacyFeatureBackground(glow: Color(red: 0.56, green: 0.76, blue: 0.96))
+            .legacyFeatureBackground(glow: LegacyColor.accent)
             .navigationTitle("Import")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -38,8 +38,7 @@ public struct ImportFeatureRootView: View {
         case .idle:
             idleView
         case .scanning:
-            ProgressView("Scanning photo library…")
-                .tint(LegacyColor.accent)
+            scanningView
         case .ready, .importing:
             clusterExplorer
         case .completed(let count):
@@ -51,15 +50,15 @@ public struct ImportFeatureRootView: View {
 
     private var idleView: some View {
         VStack(spacing: LegacySpacing.lg) {
-            LegacyChromeCard(glow: Color(red: 0.56, green: 0.76, blue: 0.96)) {
+            LegacyChromeCard(glow: LegacyColor.accent) {
                 VStack(spacing: LegacySpacing.sm) {
                     Image(systemName: "square.stack.3d.up")
                         .font(.system(size: 32, weight: .semibold))
                         .foregroundStyle(LegacyColor.accent)
-                    Text("Import memories")
+                    Text("Build your memory atlas")
                         .font(LegacyFont.title2)
                         .foregroundStyle(LegacyColor.textPrimary)
-                    Text("Find geotagged photos and import each visit as a separate memory.")
+                    Text("We will scan your photo library for geotagged moments and group each visit into one memory.")
                         .font(LegacyFont.callout)
                         .foregroundStyle(LegacyColor.textSecondary)
                         .multilineTextAlignment(.center)
@@ -68,7 +67,7 @@ public struct ImportFeatureRootView: View {
             }
             .padding(.horizontal, LegacySpacing.lg)
             #if os(iOS)
-            Button("Scan photo library") {
+            Button("Start memory scan") {
                 Task { await coordinator.scanPhotoLibrary() }
             }
             .buttonStyle(.legacyPrimary)
@@ -81,10 +80,10 @@ public struct ImportFeatureRootView: View {
 
     private var clusterExplorer: some View {
         VStack(spacing: 0) {
-            LegacyChromeCard(glow: Color(red: 0.56, green: 0.76, blue: 0.96)) {
+            LegacyChromeCard(glow: LegacyColor.accent) {
                 HStack(spacing: LegacySpacing.md) {
                     VStack(alignment: .leading, spacing: LegacySpacing.xxs) {
-                        Text("Archive Scanner")
+                        Text("Memory Atlas")
                             .font(LegacyFont.headline)
                             .foregroundStyle(LegacyColor.textPrimary)
                         Text("\(coordinator.geoSampleCount) geotagged photos · \(coordinator.clusters.count) visits")
@@ -195,6 +194,33 @@ public struct ImportFeatureRootView: View {
                 .buttonStyle(.legacySecondary)
         }
     }
+
+    private var scanningView: some View {
+        VStack(spacing: LegacySpacing.lg) {
+            LegacyChromeCard(glow: LegacyColor.accent) {
+                VStack(spacing: LegacySpacing.sm) {
+                    Image(systemName: "sparkles.rectangle.stack")
+                        .font(.system(size: 30, weight: .semibold))
+                        .foregroundStyle(LegacyColor.accent)
+                    Text("Finding your memory places…")
+                        .font(LegacyFont.title2)
+                        .foregroundStyle(LegacyColor.textPrimary)
+                    if let progress = coordinator.scanProgress {
+                        ProgressView(value: Double(progress.scanned), total: Double(max(progress.total, 1)))
+                            .tint(LegacyColor.accent)
+                        Text("Scanning \(progress.scanned) of \(progress.total) — \(progress.found) geotagged")
+                            .font(LegacyFont.caption)
+                            .foregroundStyle(LegacyColor.textSecondary)
+                    } else {
+                        ProgressView()
+                            .tint(LegacyColor.accent)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .padding(.horizontal, LegacySpacing.lg)
+        }
+    }
 }
 
 // MARK: - Cluster row
@@ -202,10 +228,10 @@ public struct ImportFeatureRootView: View {
 struct ImportClusterRow: View {
     let cluster: PhotoCluster
     let isSelected: Bool
+    let placeName: String?
     let onToggle: () -> Void
 
     @Environment(\.displayScale) private var displayScale
-    @State private var placeName: String?
 
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -238,15 +264,6 @@ struct ImportClusterRow: View {
             }
         }
         .buttonStyle(.plain)
-        .task(id: cluster.id) {
-            #if os(iOS)
-            guard placeName == nil else { return }
-            placeName = await PlaceNameResolver.shared.placeName(
-                lat: cluster.centroidLat,
-                lng: cluster.centroidLng
-            )
-            #endif
-        }
     }
 
     /// Photo count, prefixed with the date once the place name has claimed the lead line.

@@ -138,7 +138,7 @@ export default function Dashboard() {
   const blockedCount = tasks.filter(
     (t) =>
       t.status !== "done" &&
-      t.blockedBy.some((id) => {
+      (t.blockedBy ?? []).some((id) => {
         const dep = tasks.find((x) => x.id === id);
         return dep && dep.status !== "done";
       })
@@ -147,7 +147,7 @@ export default function Dashboard() {
   const readyTasks = tasks.filter(
     (t) =>
       t.status === "todo" &&
-      t.blockedBy.every((id) => {
+      (t.blockedBy ?? []).every((id) => {
         const dep = tasks.find((x) => x.id === id);
         return !dep || dep.status === "done";
       })

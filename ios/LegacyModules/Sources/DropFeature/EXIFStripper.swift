@@ -36,6 +36,65 @@ public enum EXIFStripper {
         return output as Data
     }
 
+    /// Decodes `data` directly to a bounded size and re-encodes as a metadata-free JPEG, in a
+    /// **single** ImageIO pass. Used on the import hot path where a tight loop over a whole visit
+    /// would otherwise allocate a full-resolution bitmap per photo and get the app jetsam-killed.
+    ///
+    /// Why this is memory-safe: `CGImageSourceCreateThumbnailAtIndex` with a max-pixel-size
+    /// downsamples *while decoding* — the full-resolution bitmap is never allocated (the standard
+    /// low-memory decode from "Image and Graphics Best Practices"). The whole rewrite runs inside
+    /// an `autoreleasepool` so each photo's transient buffers are reclaimed immediately rather than
+    /// accumulating across the caller's `await`s.
+    ///
+    /// Privacy: the output is built from raw pixels with only a compression-quality property — no
+    /// EXIF/GPS/TIFF dictionaries are carried over, so this strips metadata by construction (same
+    /// SEC-MED guarantee as `stripMetadata`). Orientation is baked into the pixels, so the image
+    /// stays upright without an orientation tag.
+    ///
+    /// - Parameters:
+    ///   - maxPixelSize: cap on the longest edge in pixels. Images smaller than this are not upscaled.
+    ///   - quality: JPEG compression quality (0...1).
+    public static func downsampledStrippedJPEG(
+        from data: Data,
+        maxPixelSize: Int,
+        quality: CGFloat = 0.9
+    ) throws -> Data {
+        try autoreleasepool {
+            guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
+                throw EXIFStripError.invalidImage
+            }
+
+            let options: [CFString: Any] = [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+                // Bake EXIF orientation into the pixels so we can drop the metadata safely.
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceShouldCacheImmediately: true,
+            ]
+
+            guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+                throw EXIFStripError.invalidImage
+            }
+
+            let output = NSMutableData()
+            guard let destination = CGImageDestinationCreateWithData(
+                output, UTType.jpeg.identifier as CFString, 1, nil
+            ) else {
+                throw EXIFStripError.encodeFailed
+            }
+
+            // Only a compression-quality property — no metadata dictionaries are written.
+            let properties: [CFString: Any] = [kCGImageDestinationLossyCompressionQuality: quality]
+            CGImageDestinationAddImage(destination, image, properties as CFDictionary)
+
+            guard CGImageDestinationFinalize(destination) else {
+                throw EXIFStripError.encodeFailed
+            }
+
+            return output as Data
+        }
+    }
+
     /// True when GPS or other location-bearing metadata is present (privacy-critical check).
     public static func hasLocationMetadata(in data: Data) -> Bool {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return false }

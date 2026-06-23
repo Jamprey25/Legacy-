@@ -217,6 +217,10 @@ public final class WanderCoordinator {
             default:
                 statusMessage = message
             }
+        } catch let error as LegacyAPIError where error.isAppAttestFailure {
+            statusMessage = "Device attestation failed. Reopen Legacy and try again on a real device."
+        } catch LegacyAPIError.unauthorized {
+            statusMessage = "Session expired. Sign out and sign in again."
         } catch let error as LegacyAPIError where error.isConnectivityFailure {
             statusMessage = "You need a signal to open this."
         } catch {
@@ -292,14 +296,17 @@ public final class WanderCoordinator {
 public struct WanderFeatureRootView: View {
     public init(
         coordinator: WanderCoordinator,
-        pinCelebration: PinDropCelebrationCoordinator? = nil
+        pinCelebration: PinDropCelebrationCoordinator? = nil,
+        onStartDropping: (() -> Void)? = nil
     ) {
         self.coordinator = coordinator
         self.pinCelebration = pinCelebration
+        self.onStartDropping = onStartDropping
     }
 
     @Bindable private var coordinator: WanderCoordinator
     private var pinCelebration: PinDropCelebrationCoordinator?
+    private let onStartDropping: (() -> Void)?
     @State private var showsWalkHint = true
     @State private var trayExpanded = true
     /// Once the user taps "Got it" the walk hint never auto-returns. Persisted so it
@@ -327,6 +334,9 @@ public struct WanderFeatureRootView: View {
                     zoneGlows: coordinator.zoneGlows
                 )
                 .ignoresSafeArea()
+            } else {
+                WanderMapSkeleton()
+                    .ignoresSafeArea()
             }
             #endif
 
@@ -345,7 +355,9 @@ public struct WanderFeatureRootView: View {
                 .padding(.top, LegacySpacing.sm)
 
                 if showsDiscoveryHint {
-                    WanderEmptyState(onDismiss: {
+                    WanderEmptyState(
+                        onStartDropping: onStartDropping,
+                        onDismiss: {
                         withAnimation(.easeOut(duration: 0.3)) {
                             hasDismissedWalkHint = true
                             showsWalkHint = false
@@ -522,6 +534,7 @@ private struct WarmthBadge: View {
 }
 
 private struct WanderEmptyState: View {
+    let onStartDropping: (() -> Void)?
     let onDismiss: () -> Void
 
     var body: some View {
@@ -537,6 +550,12 @@ private struct WanderEmptyState: View {
                 .foregroundStyle(LegacyColor.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, LegacySpacing.xl)
+
+            if let onStartDropping {
+                Button("Drop your first memory", action: onStartDropping)
+                    .buttonStyle(.legacyPrimary)
+                    .padding(.horizontal, LegacySpacing.xl)
+            }
 
             Button("Got it", action: onDismiss)
                 .font(LegacyFont.callout.weight(.semibold))
@@ -601,7 +620,7 @@ private struct WanderTeaserTray: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .background(LegacyColor.surface.opacity(0.97))
+        .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.lg))
         .overlay(
             RoundedRectangle(cornerRadius: LegacyRadius.lg)
@@ -728,6 +747,7 @@ private struct UnlockedMemorySheet: View {
     let caption: String?
 
     @Environment(\.dismiss) private var dismiss
+    @State private var revealProgress = false
 
     var body: some View {
         NavigationStack {
@@ -740,6 +760,9 @@ private struct UnlockedMemorySheet: View {
                                 .resizable()
                                 .scaledToFit()
                                 .frame(maxWidth: .infinity)
+                                .blur(radius: revealProgress ? 0 : 12)
+                                .scaleEffect(revealProgress ? 1 : 0.94)
+                                .animation(LegacyMotion.animation(.easeOut(duration: 0.55)), value: revealProgress)
                                 .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.md))
                         case .failure:
                             ContentUnavailableView("Could not load", systemImage: "photo")
@@ -758,7 +781,13 @@ private struct UnlockedMemorySheet: View {
                 }
                 .padding(LegacySpacing.lg)
             }
-            .background(LegacyColor.background)
+            .background(
+                LinearGradient(
+                    colors: [LegacyColor.background, LegacyColor.surface.opacity(0.75)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
             .navigationTitle("Memory")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -769,6 +798,35 @@ private struct UnlockedMemorySheet: View {
                 }
             }
             .presentationDragIndicator(.visible)
+        }
+        .onAppear {
+            if LegacyMotion.isReduced {
+                revealProgress = true
+            } else {
+                revealProgress = false
+                withAnimation(.easeOut(duration: 0.55)) { revealProgress = true }
+            }
+        }
+    }
+}
+
+private struct WanderMapSkeleton: View {
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [LegacyColor.background, LegacyColor.surface.opacity(0.65)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            VStack(spacing: LegacySpacing.md) {
+                RoundedRectangle(cornerRadius: LegacyRadius.md, style: .continuous)
+                    .fill(LegacyColor.surface.opacity(0.65))
+                    .frame(width: 220, height: 18)
+                RoundedRectangle(cornerRadius: LegacyRadius.md, style: .continuous)
+                    .fill(LegacyColor.surface.opacity(0.65))
+                    .frame(width: 180, height: 14)
+            }
+            .legacyShimmer()
         }
     }
 }
@@ -827,7 +885,7 @@ private struct WanderUserMap: View {
         }
         .mapStyle(.standard(elevation: .realistic))
         .onAppear {
-            syncVisiblePins(animated: false)
+            syncVisiblePins(animated: true)
             fitCamera()
         }
         .onChange(of: ownPins.map(\.memoryID)) { oldIDs, newIDs in
@@ -945,6 +1003,10 @@ private struct PinDropMarker: View {
             .scaleEffect(isVisible ? 1.0 : 0.01)
             .offset(y: isVisible ? 0 : -24)
             .opacity(isVisible ? 1 : 0)
+            .animation(
+                LegacyMotion.animation(.spring(response: 0.38, dampingFraction: 0.72)),
+                value: isVisible
+            )
     }
 }
 #endif

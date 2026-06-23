@@ -16,37 +16,63 @@ public enum PHAssetMetadataFetcher {
     /// guard below), so the effective memory yield is a fraction of this.
     public static let maxAssetsToScan = 20_000
 
-    public static func fetchGeoSamples() async throws -> [PhotoGeoSample] {
+    public static func fetchGeoSamples(
+        progress: (@MainActor (_ scanned: Int, _ total: Int, _ found: Int) -> Void)? = nil
+    ) async throws -> [PhotoGeoSample] {
         let status = await requestAuthorization()
         guard status == .authorized || status == .limited else {
             throw PHAssetMetadataError.unauthorized
         }
 
         return await withCheckedContinuation { continuation in
-            var samples: [PhotoGeoSample] = []
+            DispatchQueue.global(qos: .userInitiated).async {
+                var samples: [PhotoGeoSample] = []
 
-            let options = PHFetchOptions()
-            options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-            options.fetchLimit = maxAssetsToScan
+                let options = PHFetchOptions()
+                options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+                options.fetchLimit = maxAssetsToScan
 
-            let assets = PHAsset.fetchAssets(with: .image, options: options)
-            assets.enumerateObjects { asset, _, _ in
-                guard let location = asset.location else { return }
-                let coordinate = location.coordinate
-                guard CLLocationCoordinate2DIsValid(coordinate) else { return }
+                let assets = PHAsset.fetchAssets(with: .image, options: options)
+                let totalToScan = min(maxAssetsToScan, assets.count)
+                var scannedCount = 0
 
-                let capturedAt = asset.creationDate ?? Date()
-                samples.append(
-                    PhotoGeoSample(
-                        id: asset.localIdentifier,
-                        lat: coordinate.latitude,
-                        lng: coordinate.longitude,
-                        capturedAt: capturedAt
-                    )
-                )
+                if let progress {
+                    Task { @MainActor in
+                        progress(0, totalToScan, 0)
+                    }
+                }
+
+                assets.enumerateObjects { asset, _, _ in
+                    scannedCount += 1
+
+                    if let location = asset.location {
+                        let coordinate = location.coordinate
+                        if CLLocationCoordinate2DIsValid(coordinate) {
+                            let capturedAt = asset.creationDate ?? Date()
+                            samples.append(
+                                PhotoGeoSample(
+                                    id: asset.localIdentifier,
+                                    lat: coordinate.latitude,
+                                    lng: coordinate.longitude,
+                                    capturedAt: capturedAt
+                                )
+                            )
+                        }
+                    }
+
+                    // Keep UI responsive on large libraries without flooding updates.
+                    if scannedCount % 200 == 0 || scannedCount == totalToScan {
+                        let foundCount = samples.count
+                        if let progress {
+                            Task { @MainActor in
+                                progress(scannedCount, totalToScan, foundCount)
+                            }
+                        }
+                    }
+                }
+
+                continuation.resume(returning: samples)
             }
-
-            continuation.resume(returning: samples)
         }
     }
 
