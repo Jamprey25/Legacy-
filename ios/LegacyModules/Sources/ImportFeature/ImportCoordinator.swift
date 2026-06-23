@@ -81,6 +81,12 @@ public final class ImportCoordinator {
     /// See `EXIFStripper.downsampledStrippedJPEG`.
     private static let maxUploadPixelSize = 3000
 
+    /// How many memory upload pipelines run at once during import. Bounded so the CPU can decode
+    /// the next hero while the network uploads the current one, *without* firing every decode
+    /// simultaneously — the cap limits both concurrent decodes (memory) and in-flight sockets.
+    /// 3 keeps peak transient memory ~3×50 MB even on older devices. Tunable.
+    private static let maxConcurrentMemoryUploads = 3
+
     public private(set) var pendingCelebrationPins: [CachedOwnPin] = []
 
     public func consumeCelebrationPins() -> [CachedOwnPin] {
@@ -213,86 +219,79 @@ public final class ImportCoordinator {
             )
 
             let response = try await apiClient.importMemories(request)
-            var uploaded = 0
             let sortedItems = response.memories.sorted { $0.clusterIndex < $1.clusterIndex }
             let totalPhotos = max(1, sortedItems.reduce(0) { $0 + max(1, $1.mediaCount) })
-            var uploadedPhotos = 0
+            var uploaded = 0
             phase = .importing(current: 0, total: totalPhotos)
 
-            for item in sortedItems {
-                guard item.clusterIndex < chosen.count else { continue }
+            #if os(iOS)
+            let maxPixel = Self.maxUploadPixelSize
 
+            // Build the work list on the main actor (reads `chosen` + `geoSamples`). Each job carries
+            // only Sendable values, so it can be processed entirely off the main actor in a child task.
+            let jobs: [ImportJob] = sortedItems.compactMap { item in
+                guard item.clusterIndex < chosen.count else { return nil }
                 let cluster = chosen[item.clusterIndex]
-                #if os(iOS)
-                // Upload every photo of the visit. mediaCount is the server-accepted count
-                // (clamped); positions 0..mediaCount-1 map to memory_media slots.
-                let assetIDs = Array(cluster.sampleIDs.prefix(item.mediaCount))
-                guard let heroID = assetIDs.first else { continue }
-
-                // Hero (position 0) drives discovery, the thumbnail, and the celebration pin.
-                // If it can't be prepared or uploaded (corrupt/unavailable asset, transient
-                // network), skip just this memory rather than aborting the entire import — one
-                // bad photo shouldn't sink the whole batch. Advance the bar past this visit's
-                // photos so progress still completes.
-                do {
-                    let heroRaw = try await PHAssetImageFetcher.loadImageData(assetID: heroID)
-                    let heroStripped = try EXIFStripper.downsampledStrippedJPEG(
-                        from: heroRaw,
-                        maxPixelSize: Self.maxUploadPixelSize
-                    )
-                    try await mediaUploader.upload(
-                        memoryID: item.memoryID,
-                        data: heroStripped,
-                        contentType: "image/jpeg",
-                        signedPutURL: item.upload?.signedPutURL,
-                        position: 0
-                    )
-                } catch {
-                    uploadedPhotos += assetIDs.count
-                    phase = .importing(current: uploadedPhotos, total: totalPhotos)
-                    continue
-                }
-                uploadedPhotos += 1
-                phase = .importing(current: uploadedPhotos, total: totalPhotos)
-
-                // Extras stream up via the background URLSession: handed to the OS and counted
-                // as soon as they're enqueued, so they keep uploading after this screen is gone
-                // and survive app suspension instead of blocking here. Best-effort — a failed
-                // extra never sinks the memory, and progress still advances so the bar finishes.
-                for (position, assetID) in assetIDs.enumerated().dropFirst() {
-                    do {
-                        let raw = try await PHAssetImageFetcher.loadImageData(assetID: assetID)
-                        let stripped = try EXIFStripper.downsampledStrippedJPEG(
-                            from: raw,
-                            maxPixelSize: Self.maxUploadPixelSize
-                        )
-                        let request = try apiClient.directUploadRequest(
-                            memoryID: item.memoryID,
-                            contentType: "image/jpeg",
-                            position: position
-                        )
-                        try BackgroundMediaUploader.shared.enqueue(request: request, data: stripped)
-                    } catch {
-                        // skip this photo; still advance progress below
-                    }
-                    uploadedPhotos += 1
-                    phase = .importing(current: uploadedPhotos, total: totalPhotos)
-                }
-                let pin = CachedOwnPin(
+                return ImportJob(
+                    clusterIndex: item.clusterIndex,
                     memoryID: item.memoryID,
+                    mediaCount: item.mediaCount,
+                    signedPutURL: item.upload?.signedPutURL,
+                    sampleIDs: cluster.sampleIDs,
                     lat: cluster.centroidLat,
                     lng: cluster.centroidLng,
-                    dropDate: Self.capturedAtISO(for: cluster, samples: geoSamples).prefix(10).description,
-                    thumbnailURL: nil,
-                    cachedAt: Date()
+                    dropDate: String(Self.capturedAtISO(for: cluster, samples: geoSamples).prefix(10))
                 )
-                OwnMemoryPinCache.save(pin)
-                pendingCelebrationPins.append(pin)
-                uploaded += 1
-                #else
-                uploaded += 1
-                #endif
             }
+
+            // Bounded concurrency: keep up to `maxConcurrentMemoryUploads` memory pipelines in flight
+            // so the CPU decodes the next hero while the network uploads the current one. Memories
+            // finish out of order; progress is photo-counted (not byte-tracked) and committed on the
+            // main actor as each pipeline returns, so the bar stays monotonic and the pin/cache writes
+            // stay serialized on the main actor.
+            var uploadedPhotos = 0
+            var completedPins: [(clusterIndex: Int, pin: CachedOwnPin)] = []
+            await withTaskGroup(of: ImportJobResult.self) { group in
+                var submitted = 0
+                let maxConcurrent = min(Self.maxConcurrentMemoryUploads, jobs.count)
+                while submitted < maxConcurrent {
+                    let job = jobs[submitted]
+                    submitted += 1
+                    group.addTask { [apiClient, mediaUploader] in
+                        await Self.processImportJob(job, maxPixel: maxPixel, apiClient: apiClient, mediaUploader: mediaUploader)
+                    }
+                }
+                while let result = await group.next() {
+                    uploadedPhotos += result.photosCounted
+                    phase = .importing(current: min(uploadedPhotos, totalPhotos), total: totalPhotos)
+                    if result.succeeded {
+                        let pin = CachedOwnPin(
+                            memoryID: result.memoryID,
+                            lat: result.lat,
+                            lng: result.lng,
+                            dropDate: result.dropDate,
+                            thumbnailURL: nil,
+                            cachedAt: Date()
+                        )
+                        OwnMemoryPinCache.save(pin)
+                        completedPins.append((clusterIndex: result.clusterIndex, pin: pin))
+                        uploaded += 1
+                    }
+                    if submitted < jobs.count {
+                        let job = jobs[submitted]
+                        submitted += 1
+                        group.addTask { [apiClient, mediaUploader] in
+                            await Self.processImportJob(job, maxPixel: maxPixel, apiClient: apiClient, mediaUploader: mediaUploader)
+                        }
+                    }
+                }
+            }
+            pendingCelebrationPins = completedPins
+                .sorted { $0.clusterIndex < $1.clusterIndex }
+                .map(\.pin)
+            #else
+            uploaded = sortedItems.count
+            #endif
 
             phase = .completed(importedCount: uploaded)
             selectedClusterIDs = []
@@ -300,6 +299,96 @@ public final class ImportCoordinator {
             phase = .failed("Import failed. Check connectivity and try again.")
         }
     }
+
+    #if os(iOS)
+    /// Self-contained, Sendable description of one memory's upload work. Built on the main actor;
+    /// processed entirely off it. Flattened to primitives so no MainActor state crosses the boundary.
+    private struct ImportJob: Sendable {
+        let clusterIndex: Int
+        let memoryID: String
+        let mediaCount: Int
+        let signedPutURL: String?
+        let sampleIDs: [String]
+        let lat: Double
+        let lng: Double
+        let dropDate: String
+    }
+
+    /// Result of one memory pipeline, applied back on the main actor (progress + pin/cache writes).
+    private struct ImportJobResult: Sendable {
+        let clusterIndex: Int
+        let photosCounted: Int
+        let succeeded: Bool
+        let memoryID: String
+        let lat: Double
+        let lng: Double
+        let dropDate: String
+    }
+
+    /// Runs a single memory's upload pipeline **off the main actor** (it's `nonisolated`, so it
+    /// executes on the global executor). Loads → downsamples/strips → uploads the hero, then streams
+    /// the extras through the background `URLSession`. Never throws out: a failed hero skips just this
+    /// memory (still counts its photos so the bar completes); a failed extra is best-effort.
+    private nonisolated static func processImportJob(
+        _ job: ImportJob,
+        maxPixel: Int,
+        apiClient: LegacyAPIClient,
+        mediaUploader: MemoryMediaUploader
+    ) async -> ImportJobResult {
+        // mediaCount is the server-accepted count (clamped); positions 0..mediaCount-1 map to slots.
+        let assetIDs = Array(job.sampleIDs.prefix(job.mediaCount))
+        let counted = assetIDs.count
+        func result(succeeded: Bool) -> ImportJobResult {
+            ImportJobResult(
+                clusterIndex: job.clusterIndex,
+                photosCounted: counted,
+                succeeded: succeeded,
+                memoryID: job.memoryID,
+                lat: job.lat,
+                lng: job.lng,
+                dropDate: job.dropDate
+            )
+        }
+
+        guard let heroID = assetIDs.first else { return result(succeeded: false) }
+
+        // Hero (position 0) drives discovery, the thumbnail, and the celebration pin. If it can't
+        // be prepared or uploaded, skip just this memory rather than sinking the whole batch.
+        do {
+            let heroRaw = try await PHAssetImageFetcher.loadImageData(assetID: heroID)
+            let heroStripped = try EXIFStripper.downsampledStrippedJPEG(from: heroRaw, maxPixelSize: maxPixel)
+            try await mediaUploader.upload(
+                memoryID: job.memoryID,
+                data: heroStripped,
+                contentType: "image/jpeg",
+                signedPutURL: job.signedPutURL,
+                position: 0
+            )
+        } catch {
+            return result(succeeded: false)
+        }
+
+        // Extras stream up via the background URLSession: handed to the OS so they keep uploading
+        // after this screen is gone and survive app suspension. Best-effort — a failed extra never
+        // sinks the memory.
+        for (position, assetID) in assetIDs.enumerated().dropFirst() {
+            do {
+                let raw = try await PHAssetImageFetcher.loadImageData(assetID: assetID)
+                let stripped = try EXIFStripper.downsampledStrippedJPEG(from: raw, maxPixelSize: maxPixel)
+                let request = try apiClient.directUploadRequest(
+                    memoryID: job.memoryID,
+                    contentType: "image/jpeg",
+                    position: position
+                )
+                try BackgroundMediaUploader.shared.enqueue(request: request, data: stripped)
+            } catch {
+                // skip this photo
+            }
+        }
+
+        return result(succeeded: true)
+    }
+    #endif
 
     public func reset() {
         phase = .idle

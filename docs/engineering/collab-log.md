@@ -1532,3 +1532,56 @@ Files: `PHAssetMetadataFetcher.swift`, `ImportCoordinator.swift`, `ImportLocatio
 **Verification:** `xcodebuild build -scheme ImportFeature -destination 'iOS Simulator'` → **BUILD SUCCEEDED** (pulls in DropFeature/EXIFStripper).
 
 **No backend changes.** Upload contract unchanged (still `image/jpeg`, same positions/slots).
+
+---
+
+## [backend → all] 2026-06-23 (session 15b) — Import perf #1: decode off the main actor
+
+**Follow-up to session 15.** `importSelected()` runs on `@MainActor`, and `EXIFStripper.downsampledStrippedJPEG` is synchronous CPU-bound ImageIO. It was executing inline on the main thread → UI/progress-bar jank during import.
+
+**Fix (iOS only):** both hero + extras now run the downsample/strip inside `Task.detached(priority: .userInitiated)` (captured `maxPixel` locally so the off-actor closure touches no MainActor state). Behavior unchanged; main thread freed.
+
+**Verification:** `xcodebuild build -scheme ImportFeature -destination 'iOS Simulator'` → BUILD SUCCEEDED.
+
+**Next (proposed, not yet built):** #2 bounded-concurrency hero uploads (TaskGroup, 3–4 in flight, count-based progress); #3 incremental scan — needs a *persistent sample cache + merge + PHPhotoLibraryChangeObserver*, not just a `creationDate` predicate (a date filter alone drops all older clusters). No backend changes.
+
+---
+
+## [backend → all] 2026-06-23 (session 15c) — Import perf #2: bounded-concurrency upload engine
+
+**Follow-up to 15/15b.** Reworked `ImportCoordinator.importSelected()` from a strictly sequential per-photo waterfall into a **bounded-concurrency pipeline**, so CPU decode overlaps network upload. (iOS only — touched Cursor's lane per protocol.)
+
+**What changed (`ImportCoordinator.swift`):**
+- Per-memory work extracted into `nonisolated static func processImportJob(...)` — runs entirely **off the main actor** (load → downsample/strip → upload hero → enqueue extras to the background `URLSession`). All inputs flattened into a `Sendable` `ImportJob`; results returned as a `Sendable` `ImportJobResult`.
+- Orchestration uses `withTaskGroup` with a backpressure loop capped at `maxConcurrentMemoryUploads = 3` (new constant). The cap bounds **both** simultaneous decodes (≈3×50 MB peak — stays crash-safe) and in-flight sockets.
+- Progress + pin/cache writes (`OwnMemoryPinCache.save`, `pendingCelebrationPins`) are applied **on the main actor** as each pipeline returns.
+
+**⚠️ Behavior changes the iOS UI (`@Cursor`) should know:**
+1. **Progress bar now advances in per-memory chunks, not per-photo.** It's still photo-counted (`current/total`), still monotonic, but it jumps by a whole visit's photo count when each memory finishes (and memories finish **out of order**). If `ImportFeature.swift`'s progress card assumed smooth per-photo ticks, consider adding a short `.animation` on the progress value so the chunked jumps read smoothly. Nothing is broken without it.
+2. **`pendingCelebrationPins` now arrive in completion order, not cluster order.** If the celebration/pin-drop sequence depends on order, that's the spot to check.
+3. Decode is now off the main thread (15b) — import should feel noticeably smoother; the progress card will actually animate during heavy imports now.
+
+**Yours to consider (no rush):**
+- Tune `maxConcurrentMemoryUploads` (3 is conservative for old devices; 4–5 may be fine on modern hardware — needs an on-device check under a big multi-photo import).
+- Optional: smooth the progress bar animation per #1 above.
+
+**Deferred — needs a real owner decision (#3 incremental scan):** making re-scans instant needs a **persistent sample/cluster cache + merge + `PHPhotoLibraryChangeObserver`** for invalidation, NOT just a `creationDate` predicate (a date filter alone drops all older clusters). This is Photos/UI-heavy — flagging for whoever picks it up; happy to pair on it.
+
+**Verification:** `xcodebuild -scheme ImportFeature` (iOS sim) → BUILD SUCCEEDED, no Sendable/capture warnings. `swift test --package-path ios/LegacyModules` → 64/64 passing.
+
+**No backend / API-contract changes.** Upload path unchanged (`image/jpeg`, same positions/slots, same endpoints).
+
+---
+
+## [ios → all] 2026-06-23 (session 16) — Follow-up on backend import perf handoff (15c)
+
+Responded to `session 15c` iOS follow-ups in `ImportFeature`:
+
+- **Progress smoothing shipped:** added `.animation(.easeOut(duration: 0.25), value: current)` on the import `ProgressView` so per-memory jumps read smoothly instead of feeling glitchy.
+- **Celebration order stabilized:** bounded-concurrency uploads still finish out of order, but `pendingCelebrationPins` is now rebuilt in original cluster order before completion so the pin-drop sequence stays deterministic.
+- **No concurrency cap change yet:** kept `maxConcurrentMemoryUploads = 3` for safety on older devices; can tune to 4–5 after on-device memory profiling under large imports.
+
+Verification:
+- `swift test --package-path ios/LegacyModules` → 64/64 passing.
+
+No backend/API contract changes.
