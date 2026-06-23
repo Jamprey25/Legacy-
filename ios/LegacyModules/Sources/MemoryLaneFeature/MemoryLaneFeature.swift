@@ -216,6 +216,25 @@ public struct MemoryLaneFeatureRootView: View {
                     emptyState
                 } else {
                     ScrollView {
+                        LegacyChromeCard(glow: Color(red: 0.80, green: 0.62, blue: 0.95)) {
+                            HStack(spacing: LegacySpacing.md) {
+                                VStack(alignment: .leading, spacing: LegacySpacing.xxs) {
+                                    Text("Memory Vault")
+                                        .font(LegacyFont.headline)
+                                        .foregroundStyle(LegacyColor.textPrimary)
+                                    Text("\(coordinator.items.count) memories · \(coordinator.sections.count) years")
+                                        .font(LegacyFont.caption)
+                                        .foregroundStyle(LegacyColor.textSecondary)
+                                }
+                                Spacer()
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(LegacyColor.accent)
+                            }
+                        }
+                        .padding(.horizontal, LegacySpacing.lg)
+                        .padding(.top, LegacySpacing.sm)
+
                         #if os(iOS)
                         if !coordinator.onThisDayItems.isEmpty {
                             OnThisDaySection(items: coordinator.onThisDayItems)
@@ -259,7 +278,7 @@ public struct MemoryLaneFeatureRootView: View {
                     }
                 }
             }
-            .background(LegacyColor.background)
+            .legacyFeatureBackground(glow: Color(red: 0.80, green: 0.62, blue: 0.95))
             .navigationTitle("Memory Lane")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
@@ -389,7 +408,11 @@ private struct MemoryLaneSectionHeader: View {
         }
         .padding(.horizontal, LegacySpacing.lg)
         .padding(.vertical, LegacySpacing.sm)
-        .background(LegacyColor.background.opacity(0.96))
+        .background(
+            LegacyColor.background.opacity(0.82),
+            in: RoundedRectangle(cornerRadius: LegacyRadius.md, style: .continuous)
+        )
+        .padding(.horizontal, LegacySpacing.sm)
     }
 }
 
@@ -488,7 +511,13 @@ private struct MemoryLaneCard: View {
         VStack(alignment: .leading, spacing: LegacySpacing.sm) {
             ZStack {
                 RoundedRectangle(cornerRadius: LegacyRadius.sm)
-                    .fill(LegacyColor.surface)
+                    .fill(
+                        LinearGradient(
+                            colors: [LegacyColor.surface, LegacyColor.background.opacity(0.85)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                     .aspectRatio(1, contentMode: .fit)
 
                 if let urlString = item.previewImageURL,
@@ -534,6 +563,10 @@ private struct MemoryLaneCard: View {
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.sm))
+            .overlay(
+                RoundedRectangle(cornerRadius: LegacyRadius.sm)
+                    .stroke(LegacyColor.separator, lineWidth: 1)
+            )
 
             if let label = item.displayLabel {
                 Text(label)

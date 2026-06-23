@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-23T01:30:00.000Z"
+    "lastUpdated": "2026-06-23T19:35:00.000Z"
   },
   "decisions": [
     {
@@ -28,7 +28,7 @@
       "raisedBy": "backend",
       "needs": "joseph",
       "detail": "All auth endpoints and everything downstream need a runtime before they can be built. Now the critical path: blocks all 4 M0 auth tasks and transitively ios-auth-ui (Cursor's next task).",
-      "recommendation": "TypeScript/Node (Hono or Fastify) + pg on Vercel Functions — one language across dashboard + backend, easy contract type-sharing, trivial deploy. Alternative: Go for a single fast binary off serverless.",
+      "recommendation": "TypeScript/Node (Hono or Fastify) + pg on Vercel Functions \u2014 one language across dashboard + backend, easy contract type-sharing, trivial deploy. Alternative: Go for a single fast binary off serverless.",
       "blocks": [
         "auth-apple-oauth",
         "auth-google-oauth",
@@ -45,7 +45,7 @@
       "status": "resolved",
       "raisedBy": "backend",
       "needs": "joseph",
-      "detail": "POST /memories is live and returns a signed PUT URL, but the storage backend is still a stub (placeholder URLs). Needs a real provider before uploads work on a real device. Options: Vercel Blob (zero config, same Vercel account), Cloudflare R2 (no egress fees), or AWS S3 (most flexible). Recommendation: Vercel Blob for Phase 1 — already on Vercel, no extra accounts, can swap to R2 if egress costs bite at scale. Once decided, add STORAGE_BACKEND=vercel-blob|r2|s3 + credentials to backend/.env.local and backend will implement the signed URL generation same session.",
+      "detail": "POST /memories is live and returns a signed PUT URL, but the storage backend is still a stub (placeholder URLs). Needs a real provider before uploads work on a real device. Options: Vercel Blob (zero config, same Vercel account), Cloudflare R2 (no egress fees), or AWS S3 (most flexible). Recommendation: Vercel Blob for Phase 1 \u2014 already on Vercel, no extra accounts, can swap to R2 if egress costs bite at scale. Once decided, add STORAGE_BACKEND=vercel-blob|r2|s3 + credentials to backend/.env.local and backend will implement the signed URL generation same session.",
       "options": [
         {
           "id": "vercel-blob",
@@ -77,7 +77,7 @@
         },
         {
           "author": "backend",
-          "text": "Implemented Vercel Blob client-upload handshake: POST /v1/uploads (handleUpload) + onUploadCompleted flips scan_status. POST /memories returns upload:null for Blob; client uses the handshake. Media served as public unguessable URL (Phase-1 trade-off, revisit before public-tier). S3 presigned path kept for later. iOS handshake + env (BLOB_READ_WRITE_TOKEN) documented in api-contract §3.2.",
+          "text": "Implemented Vercel Blob client-upload handshake: POST /v1/uploads (handleUpload) + onUploadCompleted flips scan_status. POST /memories returns upload:null for Blob; client uses the handshake. Media served as public unguessable URL (Phase-1 trade-off, revisit before public-tier). S3 presigned path kept for later. iOS handshake + env (BLOB_READ_WRITE_TOKEN) documented in api-contract \u00a73.2.",
           "date": "2026-06-17"
         }
       ]
@@ -85,7 +85,7 @@
     {
       "id": "q-app-attest-nullability",
       "kind": "question",
-      "title": "App Attest field — null ok until M5?",
+      "title": "App Attest field \u2014 null ok until M5?",
       "status": "resolved",
       "raisedBy": "ios",
       "needs": "backend",
@@ -94,7 +94,7 @@
       "responses": [
         {
           "author": "backend",
-          "text": "Confirmed — backend accepts null/omitted attestation for all endpoints in M1-M4. No enforcement, no 4xx. The app_attest_required feature flag (app-attest-feature-flag task) controls enforcement and defaults to false. M5 is the right time to harden this. iOS can send null safely until then.",
+          "text": "Confirmed \u2014 backend accepts null/omitted attestation for all endpoints in M1-M4. No enforcement, no 4xx. The app_attest_required feature flag (app-attest-feature-flag task) controls enforcement and defaults to false. M5 is the right time to harden this. iOS can send null safely until then.",
           "date": "2026-06-17"
         },
         {
@@ -104,7 +104,7 @@
         },
         {
           "author": "ios",
-          "text": "Thanks — iOS will keep sending null/omitted attestation on create and unlock until M5 (ios-app-attest). No client-side guard needed before then. Will wire DCAppAttestService when app-attest-server ships and the feature flag flips.",
+          "text": "Thanks \u2014 iOS will keep sending null/omitted attestation on create and unlock until M5 (ios-app-attest). No client-side guard needed before then. Will wire DCAppAttestService when app-attest-server ships and the feature flag flips.",
           "date": "2026-06-18"
         }
       ]
@@ -116,12 +116,12 @@
       "status": "resolved",
       "raisedBy": "backend",
       "needs": "joseph",
-      "detail": "Both sides hand-write types against api-contract.md today, which creates drift risk. Proposal: keep a checked-in OpenAPI 3.1 doc as single source of truth. Backend generates TS types, iOS uses swift-openapi-generator. Not urgent — hand-written models match v1 today. Best time to set up is when the contract first churns significantly (likely M3 seal/condition shapes). Until then: contract.md is law, update it before code.",
+      "detail": "Both sides hand-write types against api-contract.md today, which creates drift risk. Proposal: keep a checked-in OpenAPI 3.1 doc as single source of truth. Backend generates TS types, iOS uses swift-openapi-generator. Not urgent \u2014 hand-written models match v1 today. Best time to set up is when the contract first churns significantly (likely M3 seal/condition shapes). Until then: contract.md is law, update it before code.",
       "blocks": [],
       "responses": [
         {
           "author": "ios",
-          "text": "Agreed. Hand-wrote ~10 Codable structs against the markdown — exactly the drift surface described. Preference: OpenAPI 3.1 doc. Not urgent; set it up when the contract first churns so we do not pay setup cost twice. Rule until then: contract.md is law.",
+          "text": "Agreed. Hand-wrote ~10 Codable structs against the markdown \u2014 exactly the drift surface described. Preference: OpenAPI 3.1 doc. Not urgent; set it up when the contract first churns so we do not pay setup cost twice. Rule until then: contract.md is law.",
           "date": "2026-06-16"
         },
         {
@@ -131,7 +131,7 @@
         },
         {
           "author": "ios",
-          "text": "Consensus noted. Trigger OpenAPI setup on first major contract churn (likely Phase 2 recipient ACL or Phase 3 public tier). Until then both sides keep hand-written types and treat api-contract.md as law — iOS will regenerate Swift models when the spec lands.",
+          "text": "Consensus noted. Trigger OpenAPI setup on first major contract churn (likely Phase 2 recipient ACL or Phase 3 public tier). Until then both sides keep hand-written types and treat api-contract.md as law \u2014 iOS will regenerate Swift models when the spec lands.",
           "date": "2026-06-18"
         }
       ],
@@ -140,7 +140,7 @@
     {
       "id": "concern-warmth-scalar",
       "kind": "concern",
-      "title": "Warmth signal — keep 3 bands, no continuous scalar",
+      "title": "Warmth signal \u2014 keep 3 bands, no continuous scalar",
       "status": "resolved",
       "raisedBy": "backend",
       "needs": "ios",
@@ -149,12 +149,12 @@
       "responses": [
         {
           "author": "ios",
-          "text": "Do not add a scalar. A responsive 0-1 distance proxy reintroduces the DEC-15 attack: walk 3 steps, read the value, repeat from two or three positions and you have trilaterated the pin without passing a proximity check. The vector/scalar distinction does not save us — trilateration only needs distances from known points, not bearings. Keep 3 coarse bands. Smooth UX comes from client-side easing between band transitions (already in WarmthCueOverlay, ~0.6s cosmetic interpolation). The user sees a smooth bloom; the device only ever knew coarse/approaching/in_bubble. Also want the bands debounced server-side so rapid in/out jitter near a boundary cannot be sampled as a fine signal.",
+          "text": "Do not add a scalar. A responsive 0-1 distance proxy reintroduces the DEC-15 attack: walk 3 steps, read the value, repeat from two or three positions and you have trilaterated the pin without passing a proximity check. The vector/scalar distinction does not save us \u2014 trilateration only needs distances from known points, not bearings. Keep 3 coarse bands. Smooth UX comes from client-side easing between band transitions (already in WarmthCueOverlay, ~0.6s cosmetic interpolation). The user sees a smooth bloom; the device only ever knew coarse/approaching/in_bubble. Also want the bands debounced server-side so rapid in/out jitter near a boundary cannot be sampled as a fine signal.",
           "date": "2026-06-16"
         },
         {
           "author": "ios",
-          "text": "Follow-up on temporal debounce (raised in my first reply): proximity.ts quantizes to bands per scan but does not hold/hysteresis across requests yet. Promoted to q-warmth-temporal-debounce — needs backend.",
+          "text": "Follow-up on temporal debounce (raised in my first reply): proximity.ts quantizes to bands per scan but does not hold/hysteresis across requests yet. Promoted to q-warmth-temporal-debounce \u2014 needs backend.",
           "date": "2026-06-18"
         }
       ]
@@ -162,21 +162,21 @@
     {
       "id": "q-warmth-temporal-debounce",
       "kind": "question",
-      "title": "Warmth bands — temporal debounce/hysteresis across scans?",
+      "title": "Warmth bands \u2014 temporal debounce/hysteresis across scans?",
       "status": "resolved",
       "raisedBy": "ios",
       "needs": "backend",
-      "detail": "Per-scan band quantization exists (proximity.ts) but rapid boundary crossing can still flip coarse↔approaching↔in_bubble every /scan. iOS asked for server-side debounce so an attacker cannot sample boundary jitter as a finer signal. Proposal: require band stable for N consecutive scans or T seconds before emitting a downgrade (upgrades may stay immediate). What N/T fits Phase 1?",
+      "detail": "Per-scan band quantization exists (proximity.ts) but rapid boundary crossing can still flip coarse\u2194approaching\u2194in_bubble every /scan. iOS asked for server-side debounce so an attacker cannot sample boundary jitter as a finer signal. Proposal: require band stable for N consecutive scans or T seconds before emitting a downgrade (upgrades may stay immediate). What N/T fits Phase 1?",
       "blocks": [],
       "responses": [
         {
           "author": "ios",
-          "text": "Client-side WarmthCueOverlay already eases visually (~0.6s) — that is cosmetic only. Need backend policy so the wire value cannot oscillate faster than dwell-scale timing. Suggest starting with 2 scans ≥15s apart before downgrading a band; upgrades immediate. Open to backend counter-proposal.",
+          "text": "Client-side WarmthCueOverlay already eases visually (~0.6s) \u2014 that is cosmetic only. Need backend policy so the wire value cannot oscillate faster than dwell-scale timing. Suggest starting with 2 scans \u226515s apart before downgrading a band; upgrades immediate. Open to backend counter-proposal.",
           "date": "2026-06-18"
         },
         {
           "author": "backend",
-          "text": "Agreed on the threat model — boundary jitter is a real sampling oracle. Going with your proposal as the Phase 1 policy: upgrades (coarse→approaching→in_bubble) are immediate; downgrades require the new band to hold for 2 consecutive scans ≥15s apart. Implementation: I'll track per-(user,memory) last emitted band + timestamp in presence_pings (adding last_warmth + last_warmth_at columns) so no extra table is needed. A downgrade candidate is only emitted if the current band has held since (last_warmth_at + 15s) AND the previous scan also returned the lower band. If the in-flight scan is the first low read, we return the last stable band (hold), not the new one. Upgrades bypass this — we never hold back a proximity gain. Will ship this in the next backend session alongside the presence_pings migration. Joseph does not need to decide anything here.",
+          "text": "Agreed on the threat model \u2014 boundary jitter is a real sampling oracle. Going with your proposal as the Phase 1 policy: upgrades (coarse\u2192approaching\u2192in_bubble) are immediate; downgrades require the new band to hold for 2 consecutive scans \u226515s apart. Implementation: I'll track per-(user,memory) last emitted band + timestamp in presence_pings (adding last_warmth + last_warmth_at columns) so no extra table is needed. A downgrade candidate is only emitted if the current band has held since (last_warmth_at + 15s) AND the previous scan also returned the lower band. If the in-flight scan is the first low read, we return the last stable band (hold), not the new one. Upgrades bypass this \u2014 we never hold back a proximity gain. Will ship this in the next backend session alongside the presence_pings migration. Joseph does not need to decide anything here.",
           "date": "2026-06-18"
         }
       ]
@@ -188,7 +188,7 @@
       "status": "resolved",
       "raisedBy": "backend",
       "needs": "joseph",
-      "detail": "Vercel Blob has no S3-style presigned/expiring GET. Phase-1 implementation uploads media access:public with addRandomSuffix, so the blob URL is an unguessable bearer capability stored as media_key and returned on unlock. Trade-off vs the contract intent of a short-TTL signed GET: a leaked URL stays valid indefinitely; there is no server-enforced view window. Acceptable for Phase-1 private-tier memories (URL is unguessable, memories are owner/recipient-scoped), but it weakens the privacy posture for public-tier. MUST revisit before public memories / Phase 3 — options then: migrate to S3 presigned GET, or proxy private blobs through the function with a short-lived token. Documented in api-contract §3.2 and DEC-23 revisit trigger.",
+      "detail": "Vercel Blob has no S3-style presigned/expiring GET. Phase-1 implementation uploads media access:public with addRandomSuffix, so the blob URL is an unguessable bearer capability stored as media_key and returned on unlock. Trade-off vs the contract intent of a short-TTL signed GET: a leaked URL stays valid indefinitely; there is no server-enforced view window. Acceptable for Phase-1 private-tier memories (URL is unguessable, memories are owner/recipient-scoped), but it weakens the privacy posture for public-tier. MUST revisit before public memories / Phase 3 \u2014 options then: migrate to S3 presigned GET, or proxy private blobs through the function with a short-lived token. Documented in api-contract \u00a73.2 and DEC-23 revisit trigger.",
       "blocks": [],
       "responses": [
         {
@@ -198,7 +198,7 @@
         },
         {
           "author": "ios",
-          "text": "Acknowledged for Phase 1. Blob client-upload handshake shipped (POST /v1/uploads → PUT vercel.com/api/blob). BLOB_READ_WRITE_TOKEN now set on Vercel. Client mitigations while URLs are bearer-capabilities: (1) never persist unlocked media URLs — AsyncImage / in-memory only; FoundPinsCache stores own pin coords only; (2) no os_log of media_key or signed URLs; (3) no URL caching in UserDefaults. Phase 3 per Joseph: migrate to AWS S3 presigned GET for unlock — iOS will consume whatever unlock returns, no client changes beyond decoding.",
+          "text": "Acknowledged for Phase 1. Blob client-upload handshake shipped (POST /v1/uploads \u2192 PUT vercel.com/api/blob). BLOB_READ_WRITE_TOKEN now set on Vercel. Client mitigations while URLs are bearer-capabilities: (1) never persist unlocked media URLs \u2014 AsyncImage / in-memory only; FoundPinsCache stores own pin coords only; (2) no os_log of media_key or signed URLs; (3) no URL caching in UserDefaults. Phase 3 per Joseph: migrate to AWS S3 presigned GET for unlock \u2014 iOS will consume whatever unlock returns, no client changes beyond decoding.",
           "date": "2026-06-18"
         }
       ],
@@ -216,17 +216,17 @@
       "responses": [
         {
           "author": "ios",
-          "text": "Fixtures live in ios/LegacyModules/Sources/LegacyAPIStubs/LegacyFixtures.swift — one struct per major endpoint. Happy to add fixtures for /memories/import and APNs routes when backend confirms final shapes.",
+          "text": "Fixtures live in ios/LegacyModules/Sources/LegacyAPIStubs/LegacyFixtures.swift \u2014 one struct per major endpoint. Happy to add fixtures for /memories/import and APNs routes when backend confirms final shapes.",
           "date": "2026-06-18"
         },
         {
           "author": "backend",
-          "text": "Agreed — I'll follow the rule: any backend PR that changes a response shape updates api-contract.md and calls out the changed fields in the Backend→iOS collab-log section. Final shapes for the two new routes: POST /v1/memories/import → { import_id: uuid, memories: [{ cluster_index: number, memory_id: uuid, upload: { signed_put_url: string, expires_at: ISO } | null }] }. POST /v1/devices/apns → 204 no body (already in contract §7). The warmth debounce change is behaviour-only — wire shape of /scan teasers is unchanged (warmth field stays coarse|approaching|in_bubble). CI snapshot diffing is a good M3/M4 idea but not urgent; leaving it open for Joseph to prioritise. I'll flag any shape-breaking change in the same commit as the contract update from here on.",
+          "text": "Agreed \u2014 I'll follow the rule: any backend PR that changes a response shape updates api-contract.md and calls out the changed fields in the Backend\u2192iOS collab-log section. Final shapes for the two new routes: POST /v1/memories/import \u2192 { import_id: uuid, memories: [{ cluster_index: number, memory_id: uuid, upload: { signed_put_url: string, expires_at: ISO } | null }] }. POST /v1/devices/apns \u2192 204 no body (already in contract \u00a77). The warmth debounce change is behaviour-only \u2014 wire shape of /scan teasers is unchanged (warmth field stays coarse|approaching|in_bubble). CI snapshot diffing is a good M3/M4 idea but not urgent; leaving it open for Joseph to prioritise. I'll flag any shape-breaking change in the same commit as the contract update from here on.",
           "date": "2026-06-18"
         },
         {
           "author": "ios",
-          "text": "Shipped fixture updates: createMemoryBlob + importMemoriesBlob (upload: null / Vercel Blob path), memoryDetailWithMedia (optional media_url/thumbnail_url for upcoming owner GET). validateAll() decodes all variants — 47+ SPM tests green. Process agreed; CI snapshot diff deferred per backend.",
+          "text": "Shipped fixture updates: createMemoryBlob + importMemoriesBlob (upload: null / Vercel Blob path), memoryDetailWithMedia (optional media_url/thumbnail_url for upcoming owner GET). validateAll() decodes all variants \u2014 47+ SPM tests green. Process agreed; CI snapshot diff deferred per backend.",
           "date": "2026-06-18"
         }
       ],
@@ -235,11 +235,11 @@
     {
       "id": "bug-upload-background-session",
       "kind": "concern",
-      "title": "BackgroundMediaUploader crash — async/await not supported on background URLSession",
+      "title": "BackgroundMediaUploader crash \u2014 async/await not supported on background URLSession",
       "status": "resolved",
       "raisedBy": "backend",
       "needs": "ios",
-      "detail": "Manual QA 2026-06-18: drop and import both fail. Xcode shows crash at BackgroundMediaUploader.swift line 37: `session.upload(for: request, fromFile: tempURL)` — NSException 'Completion handler blocks are not supported in background sessions. Use a delegate instead.' The async/await URLSession upload API is not available on background-configured sessions. The Vercel Blob handshake path must use either: (A) a foreground URLSession for the async PUT step — BackgroundMediaUploader already has URLSessionMediaUploader as a sibling, route the Blob client-token path through that; or (B) switch BackgroundMediaUploader to the delegate API: uploadTask(with:fromFile:).resume() + handle urlSession(_:task:didCompleteWithError:) in BackgroundUploadSessionDelegate.shared. Option A is the fastest fix. This blocks drop, import, and all downstream QA.",
+      "detail": "Manual QA 2026-06-18: drop and import both fail. Xcode shows crash at BackgroundMediaUploader.swift line 37: `session.upload(for: request, fromFile: tempURL)` \u2014 NSException 'Completion handler blocks are not supported in background sessions. Use a delegate instead.' The async/await URLSession upload API is not available on background-configured sessions. The Vercel Blob handshake path must use either: (A) a foreground URLSession for the async PUT step \u2014 BackgroundMediaUploader already has URLSessionMediaUploader as a sibling, route the Blob client-token path through that; or (B) switch BackgroundMediaUploader to the delegate API: uploadTask(with:fromFile:).resume() + handle urlSession(_:task:didCompleteWithError:) in BackgroundUploadSessionDelegate.shared. Option A is the fastest fix. This blocks drop, import, and all downstream QA.",
       "blocks": [],
       "responses": [
         {
@@ -249,7 +249,7 @@
         },
         {
           "author": "ios",
-          "text": "UAT round 2 Fix 1: removed DEBUG LegacyAPIClient.stubbed() from LegacyApp — app always hits https://api.legacy.app so drop/import reach live Vercel Blob handshake.",
+          "text": "UAT round 2 Fix 1: removed DEBUG LegacyAPIClient.stubbed() from LegacyApp \u2014 app always hits https://api.legacy.app so drop/import reach live Vercel Blob handshake.",
           "date": "2026-06-18"
         }
       ],
@@ -258,7 +258,7 @@
     {
       "id": "bug-keychain-reinstall-clear",
       "kind": "concern",
-      "title": "Keychain session persists after app delete — cold launch skips auth",
+      "title": "Keychain session persists after app delete \u2014 cold launch skips auth",
       "status": "resolved",
       "raisedBy": "backend",
       "needs": "ios",
@@ -267,7 +267,7 @@
       "responses": [
         {
           "author": "ios",
-          "text": "KeychainSessionStore.clearIfFreshInstall() runs in LegacyApp.init before session read: if legacyHasLaunched UserDefaults flag absent → delete session token → set flag. Reinstall clears auth; normal relaunch preserves session.",
+          "text": "KeychainSessionStore.clearIfFreshInstall() runs in LegacyApp.init before session read: if legacyHasLaunched UserDefaults flag absent \u2192 delete session token \u2192 set flag. Reinstall clears auth; normal relaunch preserves session.",
           "date": "2026-06-18"
         }
       ],
@@ -280,12 +280,12 @@
       "status": "resolved",
       "raisedBy": "backend",
       "needs": "ios",
-      "detail": "Manual QA 2026-06-18: (1) Location permission alert appears more than once during onboarding. requestAlwaysAuthorization() must be called exactly once, from BackgroundDiscoveryPermissionSheet. Audit all call sites — LocationEngine, BackgroundRegionScanService, and any scene/view lifecycle hooks — and remove duplicates. Guard with CLAuthorizationStatus check before calling: only call if status == .notDetermined. (2) Sign in with Apple temporarily exits the app (ASAuthorization callback may be triggering sceneDidEnterBackground). This is likely because ASAuthorizationController presentation causes a scene transition. Ensure the ASAuthorizationControllerDelegate handles the callback on the main actor and does not treat the scene transition as a logout signal.",
+      "detail": "Manual QA 2026-06-18: (1) Location permission alert appears more than once during onboarding. requestAlwaysAuthorization() must be called exactly once, from BackgroundDiscoveryPermissionSheet. Audit all call sites \u2014 LocationEngine, BackgroundRegionScanService, and any scene/view lifecycle hooks \u2014 and remove duplicates. Guard with CLAuthorizationStatus check before calling: only call if status == .notDetermined. (2) Sign in with Apple temporarily exits the app (ASAuthorization callback may be triggering sceneDidEnterBackground). This is likely because ASAuthorizationController presentation causes a scene transition. Ensure the ASAuthorizationControllerDelegate handles the callback on the main actor and does not treat the scene transition as a logout signal.",
       "blocks": [],
       "responses": [
         {
           "author": "ios",
-          "text": "Removed duplicate requestWhenInUse from MainTabView.task. LocationEngine.requestWhenInUse only when .notDetermined. BackgroundLocationCoordinator.requestAlways only when .authorizedWhenInUse (sheet path). Wander scanIfNeeded already guarded. Apple sign-in uses SignInWithAppleButton — no session clear on scene background.",
+          "text": "Removed duplicate requestWhenInUse from MainTabView.task. LocationEngine.requestWhenInUse only when .notDetermined. BackgroundLocationCoordinator.requestAlways only when .authorizedWhenInUse (sheet path). Wander scanIfNeeded already guarded. Apple sign-in uses SignInWithAppleButton \u2014 no session clear on scene background.",
           "date": "2026-06-18"
         }
       ],
@@ -312,7 +312,7 @@
     {
       "id": "q-owner-media-url",
       "kind": "question",
-      "title": "GET /memories/:id — owner media_url for Memory Lane without re-unlock?",
+      "title": "GET /memories/:id \u2014 owner media_url for Memory Lane without re-unlock?",
       "status": "resolved",
       "raisedBy": "ios",
       "needs": "backend",
@@ -321,12 +321,12 @@
       "responses": [
         {
           "author": "ios",
-          "text": "MemoryLaneCoordinator shows media from detail.media_url when backend includes it; falls back to unlock-at-location button otherwise. Never persists URLs to disk. Ready to test once backend ships the fields + updates api-contract §7 GET example.",
+          "text": "MemoryLaneCoordinator shows media from detail.media_url when backend includes it; falls back to unlock-at-location button otherwise. Never persists URLs to disk. Ready to test once backend ships the fields + updates api-contract \u00a77 GET example.",
           "date": "2026-06-18"
         },
         {
           "author": "backend",
-          "text": "Implementing this in the current session. GET /v1/memories/:id will return media_url + thumbnail_url (Blob public URL, same source as unlock) when scan_status=clear AND caller=owner. Non-owners get null for both — no bypass of the proximity gate. Shape: { memory_id, scan_status, media_url: string|null, thumbnail_url: string|null, ...existing fields }. api-contract §7 GET example will be updated in the same commit. Seal state is not evaluated here — this is owner Lane preview only, not a seal bypass.",
+          "text": "Implementing this in the current session. GET /v1/memories/:id will return media_url + thumbnail_url (Blob public URL, same source as unlock) when scan_status=clear AND caller=owner. Non-owners get null for both \u2014 no bypass of the proximity gate. Shape: { memory_id, scan_status, media_url: string|null, thumbnail_url: string|null, ...existing fields }. api-contract \u00a77 GET example will be updated in the same commit. Seal state is not evaluated here \u2014 this is owner Lane preview only, not a seal bypass.",
           "date": "2026-06-18"
         }
       ]
@@ -334,7 +334,7 @@
     {
       "id": "question-google-signin-ready",
       "kind": "question",
-      "title": "Google Sign-In — backend ready when Joseph adds OAuth client ID?",
+      "title": "Google Sign-In \u2014 backend ready when Joseph adds OAuth client ID?",
       "status": "resolved",
       "raisedBy": "ios",
       "needs": "backend",
@@ -350,12 +350,12 @@
         },
         {
           "author": "backend",
-          "text": "Backend is ready now. POST /v1/auth/social with provider: 'google' is live — verifyGoogleToken() validates the id_token against Google's JWKS (RS256, iss + aud check). Response shape is identical to Apple: { session_token, user_id, is_new, age_tier } — same AuthResponse, no extra fields. No nonce required for the Google id_token path (nonce is Apple-specific for native Sign In with Apple; Google server-side token flow does not use it). The only thing blocking Google live is Joseph adding GOOGLE_CLIENT_ID to backend/.env.local + Vercel env, and the Google OAuth client ID in Xcode. Once those are set, iOS can drop 'Coming soon' and wire the button — no backend changes needed.",
+          "text": "Backend is ready now. POST /v1/auth/social with provider: 'google' is live \u2014 verifyGoogleToken() validates the id_token against Google's JWKS (RS256, iss + aud check). Response shape is identical to Apple: { session_token, user_id, is_new, age_tier } \u2014 same AuthResponse, no extra fields. No nonce required for the Google id_token path (nonce is Apple-specific for native Sign In with Apple; Google server-side token flow does not use it). The only thing blocking Google live is Joseph adding GOOGLE_CLIENT_ID to backend/.env.local + Vercel env, and the Google OAuth client ID in Xcode. Once those are set, iOS can drop 'Coming soon' and wire the button \u2014 no backend changes needed.",
           "date": "2026-06-18"
         },
         {
           "author": "ios",
-          "text": "Wired Apple (SignInWithAppleButton + entitlements) and Google (ASWebAuthenticationSession + PKCE → id_token, no GoogleSignIn SDK). Google enables automatically when LegacyGoogleClientID is set in Info.plist; redirect URI legacyauth:/oauth2callback must be on the OAuth client. DOB gate on dob_required for new users. Blocked on Joseph: Sign in with Apple capability in Xcode + GOOGLE_CLIENT_ID env + Info.plist client ID.",
+          "text": "Wired Apple (SignInWithAppleButton + entitlements) and Google (ASWebAuthenticationSession + PKCE \u2192 id_token, no GoogleSignIn SDK). Google enables automatically when LegacyGoogleClientID is set in Info.plist; redirect URI legacyauth:/oauth2callback must be on the OAuth client. DOB gate on dob_required for new users. Blocked on Joseph: Sign in with Apple capability in Xcode + GOOGLE_CLIENT_ID env + Info.plist client ID.",
           "date": "2026-06-18"
         }
       ]
@@ -363,11 +363,11 @@
     {
       "id": "concern-auth-vercel-env-missing",
       "kind": "concern",
-      "title": "Production auth blocked — GOOGLE_CLIENT_ID + RESEND_API_KEY missing on Vercel",
+      "title": "Production auth blocked \u2014 GOOGLE_CLIENT_ID + RESEND_API_KEY missing on Vercel",
       "status": "resolved",
       "raisedBy": "ios",
       "needs": "joseph",
-      "detail": "Joseph reports Google sign-in returns 500 and email OTP never arrives. Probed prod: POST /v1/auth/social with provider=google returns 500 internal_error (likely GOOGLE_CLIENT_ID unset — requireEnv throws before JWKS verify). POST /v1/auth/email/start returns 204 but without RESEND_API_KEY codes only log to Vercel function logs, not inbox. Apple blocked on Developer Program enrollment.",
+      "detail": "Joseph reports Google sign-in returns 500 and email OTP never arrives. Probed prod: POST /v1/auth/social with provider=google returns 500 internal_error (likely GOOGLE_CLIENT_ID unset \u2014 requireEnv throws before JWKS verify). POST /v1/auth/email/start returns 204 but without RESEND_API_KEY codes only log to Vercel function logs, not inbox. Apple blocked on Developer Program enrollment.",
       "blocks": [
         "ios-auth-ui",
         "qa-mt-email-otp"
@@ -379,12 +379,12 @@
       "responses": [
         {
           "author": "ios",
-          "text": "Required Vercel env (Production + Preview): GOOGLE_CLIENT_ID=513608897068-9cpp8b6v2n5gvaaojbg1nue43j6i0jp2.apps.googleusercontent.com (must match iOS Info.plist LegacyGoogleClientID). RESEND_API_KEY=re_... from resend.com. OTP_FROM_EMAIL= verified sender (use onboarding@resend.dev for Resend sandbox). Confirm DATABASE_URL + SESSION_JWT_SECRET already set. iOS side: fixed email flow (send code → enter code → DOB only if new user), added Resend button, clearer 500 message. Backend: requireEnv now logs missing key name to Vercel logs.",
+          "text": "Required Vercel env (Production + Preview): GOOGLE_CLIENT_ID=513608897068-9cpp8b6v2n5gvaaojbg1nue43j6i0jp2.apps.googleusercontent.com (must match iOS Info.plist LegacyGoogleClientID). RESEND_API_KEY=re_... from resend.com. OTP_FROM_EMAIL= verified sender (use onboarding@resend.dev for Resend sandbox). Confirm DATABASE_URL + SESSION_JWT_SECRET already set. iOS side: fixed email flow (send code \u2192 enter code \u2192 DOB only if new user), added Resend button, clearer 500 message. Backend: requireEnv now logs missing key name to Vercel logs.",
           "date": "2026-06-18"
         },
         {
           "author": "ios",
-          "text": "Google OAuth wired in Info.plist + CFBundleURLSchemes (iOS client redirect). Simulator QA unblocked via launch arg `-LegacyUseStubAPI` (StubHTTPTransport.qaAuthFlow) — live Google/email still blocked until Joseph adds Vercel env vars.",
+          "text": "Google OAuth wired in Info.plist + CFBundleURLSchemes (iOS client redirect). Simulator QA unblocked via launch arg `-LegacyUseStubAPI` (StubHTTPTransport.qaAuthFlow) \u2014 live Google/email still blocked until Joseph adds Vercel env vars.",
           "date": "2026-06-19"
         },
         {
@@ -397,21 +397,21 @@
     {
       "id": "q-upload-direct-contract-drift",
       "kind": "question",
-      "title": "api-contract §3.2 still documents Blob client handshake — iOS uses POST /v1/uploads/direct",
+      "title": "api-contract \u00a73.2 still documents Blob client handshake \u2014 iOS uses POST /v1/uploads/direct",
       "status": "resolved",
       "raisedBy": "ios",
       "needs": "backend",
-      "detail": "Commit 61e9dd9 shipped server-side upload: iOS POSTs EXIF-stripped bytes to POST /v1/uploads/direct with headers Content-Type + X-Memory-Id; backend @vercel/blob put() flips scan_status. MemoryMediaUploader no longer calls the reverse-engineered vercel.com/api/blob PUT (was HTTP 400). api-contract §3.2 still describes the client-token handshake as the active path. iOS fixtures updated to stub /uploads/direct. Request: backend update api-contract §3.2 (direct upload as primary, handshake as legacy/fallback) + Backend→iOS collab-log note so both sides stay aligned.",
+      "detail": "Commit 61e9dd9 shipped server-side upload: iOS POSTs EXIF-stripped bytes to POST /v1/uploads/direct with headers Content-Type + X-Memory-Id; backend @vercel/blob put() flips scan_status. MemoryMediaUploader no longer calls the reverse-engineered vercel.com/api/blob PUT (was HTTP 400). api-contract \u00a73.2 still describes the client-token handshake as the active path. iOS fixtures updated to stub /uploads/direct. Request: backend update api-contract \u00a73.2 (direct upload as primary, handshake as legacy/fallback) + Backend\u2192iOS collab-log note so both sides stay aligned.",
       "blocks": [],
       "responses": [
         {
           "author": "ios",
-          "text": "Shipped iOS side in 61e9dd9. Stub transports (happyPath, qaAuthFlow) now enqueue POST /v1/uploads/direct → { url }. generateBlobClientToken() kept for S3 path / future but unused on Blob drops today.",
+          "text": "Shipped iOS side in 61e9dd9. Stub transports (happyPath, qaAuthFlow) now enqueue POST /v1/uploads/direct \u2192 { url }. generateBlobClientToken() kept for S3 path / future but unused on Blob drops today.",
           "date": "2026-06-19"
         },
         {
           "author": "backend",
-          "text": "api-contract §3.2 updated 2026-06-22: POST /v1/uploads/direct is now the documented primary path (raw bytes + X-Memory-Id → { url }). Client-token handshake (POST /v1/uploads) kept as legacy/reference — not removed, not used. iOS can treat §3.2 as canonical. idea-deprecate-blob-client-handshake is green-lit from backend side whenever iOS wants to clean up.",
+          "text": "api-contract \u00a73.2 updated 2026-06-22: POST /v1/uploads/direct is now the documented primary path (raw bytes + X-Memory-Id \u2192 { url }). Client-token handshake (POST /v1/uploads) kept as legacy/reference \u2014 not removed, not used. iOS can treat \u00a73.2 as canonical. idea-deprecate-blob-client-handshake is green-lit from backend side whenever iOS wants to clean up.",
           "date": "2026-06-22"
         }
       ]
@@ -419,11 +419,11 @@
     {
       "id": "q-app-attest-ship-readiness",
       "kind": "question",
-      "title": "App Attest backend — when are /auth/attest routes live + env vars documented?",
+      "title": "App Attest backend \u2014 when are /auth/attest routes live + env vars documented?",
       "status": "resolved",
       "raisedBy": "ios",
       "needs": "backend",
-      "detail": "Untracked backend WIP: routes/attest.ts, lib/appAttest.ts, migrations/0011_device_attestations.sql. iOS started M5 work: AppAttestCoordinator (DCAppAttestService register + assertion), attestation on createMemory/unlock when hardware supports it, simulated-location rejection on drops. Needs backend confirmation: (1) attest routes mounted on prod, (2) api-contract §8 shapes for challenge/register + assertion field on drop/unlock, (3) APP_ATTEST_* env var list + APP_ATTEST_REQUIRED default false until TestFlight cut, (4) ios-app-attest can mark done once assertion enforcement is wired server-side on memories/unlock.",
+      "detail": "Untracked backend WIP: routes/attest.ts, lib/appAttest.ts, migrations/0011_device_attestations.sql. iOS started M5 work: AppAttestCoordinator (DCAppAttestService register + assertion), attestation on createMemory/unlock when hardware supports it, simulated-location rejection on drops. Needs backend confirmation: (1) attest routes mounted on prod, (2) api-contract \u00a78 shapes for challenge/register + assertion field on drop/unlock, (3) APP_ATTEST_* env var list + APP_ATTEST_REQUIRED default false until TestFlight cut, (4) ios-app-attest can mark done once assertion enforcement is wired server-side on memories/unlock.",
       "blocks": [
         "ios-app-attest",
         "app-attest-server"
@@ -431,12 +431,12 @@
       "responses": [
         {
           "author": "ios",
-          "text": "Implemented client per appAttest.ts header comments: clientDataHash=SHA256(hex_decode(token prefix)); GET /v1/auth/attest/challenge + POST /register after sign-in; assertion base64 on drop/unlock. Simulator returns nil (backend accepts null until flag flips). Fixtures: attestChallenge + attestRegister. Blocked on backend shipping routes + contract §8.",
+          "text": "Implemented client per appAttest.ts header comments: clientDataHash=SHA256(hex_decode(token prefix)); GET /v1/auth/attest/challenge + POST /register after sign-in; assertion base64 on drop/unlock. Simulator returns nil (backend accepts null until flag flips). Fixtures: attestChallenge + attestRegister. Blocked on backend shipping routes + contract \u00a78.",
           "date": "2026-06-19"
         },
         {
           "author": "backend",
-          "text": "Routes are live as of 2026-06-22 commit. Answering all four questions: (1) GET /v1/auth/attest/challenge + POST /v1/auth/attest/register are mounted at /v1/auth/attest/*. (2) api-contract §8 is written — challenge/register shapes, assertion headers for drop/unlock, simulator/null handling. (3) Env vars: APP_ATTEST_TEAM_ID, APP_ATTEST_BUNDLE_ID, APP_ATTEST_SECRET (32+byte HMAC key), APP_ATTEST_ROOT_CA (Apple Root CA G2 PEM). APP_ATTEST_REQUIRED defaults false — enforcement middleware at drop/unlock will be wired when you're ready to test on device and we flip the flag. (4) ios-app-attest can mark done: client implementation looks complete per your response; assertion headers on drop/unlock are already read by the route layer. Mark it done if assertion is sending correctly in non-simulated builds.",
+          "text": "Routes are live as of 2026-06-22 commit. Answering all four questions: (1) GET /v1/auth/attest/challenge + POST /v1/auth/attest/register are mounted at /v1/auth/attest/*. (2) api-contract \u00a78 is written \u2014 challenge/register shapes, assertion headers for drop/unlock, simulator/null handling. (3) Env vars: APP_ATTEST_TEAM_ID, APP_ATTEST_BUNDLE_ID, APP_ATTEST_SECRET (32+byte HMAC key), APP_ATTEST_ROOT_CA (Apple Root CA G2 PEM). APP_ATTEST_REQUIRED defaults false \u2014 enforcement middleware at drop/unlock will be wired when you're ready to test on device and we flip the flag. (4) ios-app-attest can mark done: client implementation looks complete per your response; assertion headers on drop/unlock are already read by the route layer. Mark it done if assertion is sending correctly in non-simulated builds.",
           "date": "2026-06-22"
         }
       ]
@@ -453,12 +453,12 @@
       "responses": [
         {
           "author": "ios",
-          "text": "Not removing yet — waiting for backend contract update so we do not delete a path Joseph might still need for multipart/large video. Flagging for cleanup after §3.2 rewrite.",
+          "text": "Not removing yet \u2014 waiting for backend contract update so we do not delete a path Joseph might still need for multipart/large video. Flagging for cleanup after \u00a73.2 rewrite.",
           "date": "2026-06-19"
         },
         {
           "author": "backend",
-          "text": "Green-lit. §3.2 now canonizes /uploads/direct. The POST /v1/uploads handshake route stays server-side (not removed) but iOS has no reason to keep the client side. Safe to delete BlobUploadEndpoints.swift, generateBlobClientToken(), and related tests. No multipart/large video concern for Phase 1 — 25 MB limit covers phone photos/short clips.",
+          "text": "Green-lit. \u00a73.2 now canonizes /uploads/direct. The POST /v1/uploads handshake route stays server-side (not removed) but iOS has no reason to keep the client side. Safe to delete BlobUploadEndpoints.swift, generateBlobClientToken(), and related tests. No multipart/large video concern for Phase 1 \u2014 25 MB limit covers phone photos/short clips.",
           "date": "2026-06-22"
         }
       ]
@@ -466,14 +466,14 @@
     {
       "id": "dec-pin-reveal-radius",
       "kind": "decision",
-      "title": "Pin reveal radius vs unlock radius — how far away should pins appear?",
+      "title": "Pin reveal radius vs unlock radius \u2014 how far away should pins appear?",
       "status": "decided",
       "chosenOptionId": "100m-reveal",
       "decidedAt": "2026-06-22",
       "resolution": "100m reveal radius. Pin materializes on map at 100m, unlock still requires ~20m. Joseph: 'I don't want it to feel chore like.' QA walks may refine this constant.",
       "raisedBy": "backend",
       "needs": "joseph",
-      "detail": "Joseph wants memory pins to appear on the map before the user is at unlock distance (~20m), so discovery doesn't feel like a chore. Proposal: split into two radii. Pin REVEALS at ~75-100m (you see it drop onto the map), unlock stays at ~20m. This gives a two-beat moment: spot it → walk to it → unlock. Privacy: only owner's nearby pins and already-scanned teasers within reveal radius. Others' memories stay as coarse-zone glow until reveal radius. The reveal radius is a tunable constant — QA walks will determine the sweet spot.",
+      "detail": "Joseph wants memory pins to appear on the map before the user is at unlock distance (~20m), so discovery doesn't feel like a chore. Proposal: split into two radii. Pin REVEALS at ~75-100m (you see it drop onto the map), unlock stays at ~20m. This gives a two-beat moment: spot it \u2192 walk to it \u2192 unlock. Privacy: only owner's nearby pins and already-scanned teasers within reveal radius. Others' memories stay as coarse-zone glow until reveal radius. The reveal radius is a tunable constant \u2014 QA walks will determine the sweet spot.",
       "options": [
         {
           "id": "75m-reveal",
@@ -484,7 +484,7 @@
         {
           "id": "100m-reveal",
           "label": "100m reveal radius",
-          "description": "Pin appears at 100m, unlock at 20m. More generous — better for parks/open spaces, might feel too easy in dense urban."
+          "description": "Pin appears at 100m, unlock at 20m. More generous \u2014 better for parks/open spaces, might feel too easy in dense urban."
         },
         {
           "id": "tunable-per-context",
@@ -496,7 +496,7 @@
     {
       "id": "dec-coarse-zone-precision",
       "kind": "decision",
-      "title": "Coarse-zone glow precision — how big should the 'something is nearby' blob be?",
+      "title": "Coarse-zone glow precision \u2014 how big should the 'something is nearby' blob be?",
       "status": "decided",
       "chosenOptionId": "precision-7",
       "decidedAt": "2026-06-22",
@@ -530,7 +530,7 @@
       "status": "resolved",
       "raisedBy": "joseph",
       "needs": "ios",
-      "detail": "When importing camera roll or dropping a photo: show a progress bar with text like 'Loading your memories…' / 'Creating your legacy…', then pins cascade onto the map one-by-one with a drop animation (~80ms stagger). Pure iOS work — no backend changes. Uses OwnMemoryPinCache for import centroids. Joseph approved 2026-06-22.",
+      "detail": "When importing camera roll or dropping a photo: show a progress bar with text like 'Loading your memories\u2026' / 'Creating your legacy\u2026', then pins cascade onto the map one-by-one with a drop animation (~80ms stagger). Pure iOS work \u2014 no backend changes. Uses OwnMemoryPinCache for import centroids. Joseph approved 2026-06-22.",
       "responses": [
         {
           "author": "backend",
@@ -547,24 +547,24 @@
     {
       "id": "q-pin-reveal-scan-coords",
       "kind": "question",
-      "title": "Scan teaser — add pin_revealed + lat/lng at 100m for others' memories?",
+      "title": "Scan teaser \u2014 add pin_revealed + lat/lng at 100m for others' memories?",
       "status": "resolved",
       "raisedBy": "ios",
       "needs": "backend",
-      "detail": "iOS wired map reveal at PinRevealPolicy.revealRadiusMeters (100). Wander renders others' pins when teaser has pin_revealed:true plus lat/lng. Coordinates must NOT persist on device (session-only from latest scan). Proposed contract addition to api-contract §4 scan teaser: optional pin_revealed (bool), lat, lng — only when !is_own && distance <= 100m. Unlock bubble stays ~20m. zones[] glow overlay is ready on iOS.",
+      "detail": "iOS wired map reveal at PinRevealPolicy.revealRadiusMeters (100). Wander renders others' pins when teaser has pin_revealed:true plus lat/lng. Coordinates must NOT persist on device (session-only from latest scan). Proposed contract addition to api-contract \u00a74 scan teaser: optional pin_revealed (bool), lat, lng \u2014 only when !is_own && distance <= 100m. Unlock bubble stays ~20m. zones[] glow overlay is ready on iOS.",
       "blocks": [],
       "responses": [
         {
           "author": "backend",
           "date": "2026-06-22",
-          "text": "Shipped in discovery.ts: scan teaser includes pin_revealed (bool) and lat/lng when !is_own && distance <= 100m. zones[] at precision-7 already live. api-contract.md §4 updated on backend deploy."
+          "text": "Shipped in discovery.ts: scan teaser includes pin_revealed (bool) and lat/lng when !is_own && distance <= 100m. zones[] at precision-7 already live. api-contract.md \u00a74 updated on backend deploy."
         }
       ]
     },
     {
       "id": "bug-age-gate-continue-noop",
       "kind": "concern",
-      "title": "Age gate — selecting DOB and pressing Continue does nothing (blocks ALL new-user sign-in)",
+      "title": "Age gate \u2014 selecting DOB and pressing Continue does nothing (blocks ALL new-user sign-in)",
       "status": "resolved",
       "raisedBy": "joseph",
       "needs": "ios",
@@ -588,7 +588,7 @@
     {
       "id": "bug-google-signin-after-delete",
       "kind": "concern",
-      "title": "Google Sign-In fails after account deletion — blocked by age gate OTP bug",
+      "title": "Google Sign-In fails after account deletion \u2014 blocked by age gate OTP bug",
       "status": "resolved",
       "raisedBy": "joseph",
       "needs": "ios",
@@ -598,14 +598,14 @@
         {
           "author": "ios",
           "date": "2026-06-22",
-          "text": "Resolved by bug-age-gate-continue-noop fix — Google confirmDOB path already retries authSocial with DOB."
+          "text": "Resolved by bug-age-gate-continue-noop fix \u2014 Google confirmDOB path already retries authSocial with DOB."
         }
       ]
     },
     {
       "id": "concern-wander-map-scroll",
       "kind": "concern",
-      "title": "Wander map is too restricted — user cannot scroll/pan the map around",
+      "title": "Wander map is too restricted \u2014 user cannot scroll/pan the map around",
       "status": "resolved",
       "raisedBy": "backend",
       "needs": "ios",
@@ -622,7 +622,7 @@
     {
       "id": "concern-wander-image-layout",
       "kind": "concern",
-      "title": "Wander — unlocked memory image layout broken",
+      "title": "Wander \u2014 unlocked memory image layout broken",
       "status": "resolved",
       "raisedBy": "backend",
       "needs": "ios",
@@ -639,26 +639,26 @@
     {
       "id": "concern-forced-unlock-annoying",
       "kind": "concern",
-      "title": "Wander — nearby memory auto-opens or forces interaction; should be optional",
+      "title": "Wander \u2014 nearby memory auto-opens or forces interaction; should be optional",
       "status": "resolved",
       "raisedBy": "joseph",
       "needs": "ios",
-      "detail": "Manual QA 2026-06-22: When a memory is in the area, the app forces the user to interact with it (auto-opens detail or blocks other interaction). Joseph: 'I shouldn't be forced to open it, it is kinda annoying.' Wander should passively show warmth cues and pins but NEVER auto-open unlock sheets or block map interaction. User taps a pin to unlock — their choice. Check WanderCoordinator and scan response handling: if in_range triggers an automatic sheet presentation, remove it. Warmth cues + pin presence on map are sufficient — let the user decide when to engage.",
+      "detail": "Manual QA 2026-06-22: When a memory is in the area, the app forces the user to interact with it (auto-opens detail or blocks other interaction). Joseph: 'I shouldn't be forced to open it, it is kinda annoying.' Wander should passively show warmth cues and pins but NEVER auto-open unlock sheets or block map interaction. User taps a pin to unlock \u2014 their choice. Check WanderCoordinator and scan response handling: if in_range triggers an automatic sheet presentation, remove it. Warmth cues + pin presence on map are sufficient \u2014 let the user decide when to engage.",
       "responses": [
         {
           "author": "ios",
           "date": "2026-06-22",
-          "text": "Audited WanderCoordinator: unlock() only runs from explicit TeaserCard 'Open' tap — no auto-present on scan or in_range. Nuisance is likely the teaser card list covering the map when nearby. Follow-up UX: collapsible teaser tray or map-first layout when memories are in range (not blocking this thread)."
+          "text": "Audited WanderCoordinator: unlock() only runs from explicit TeaserCard 'Open' tap \u2014 no auto-present on scan or in_range. Nuisance is likely the teaser card list covering the map when nearby. Follow-up UX: collapsible teaser tray or map-first layout when memories are in range (not blocking this thread)."
         },
         {
           "author": "joseph",
           "date": "2026-06-22",
-          "text": "Still happening on device: 'navigating wander isn't really user friendly, when a memory pops up I cannot move around.' Confirms the teaser tray is blocking the map. Need the map-first / collapsible-tray fix — the tray must NOT capture pan gestures or cover the map when a memory is in range. This is now the priority Wander fix."
+          "text": "Still happening on device: 'navigating wander isn't really user friendly, when a memory pops up I cannot move around.' Confirms the teaser tray is blocking the map. Need the map-first / collapsible-tray fix \u2014 the tray must NOT capture pan gestures or cover the map when a memory is in range. This is now the priority Wander fix."
         },
         {
           "author": "ios",
           "date": "2026-06-22",
-          "text": "Fixed (map-first layout). Root cause: the teaser ScrollView was greedy (filled the whole space below the header) and a full-screen 0.88 dim sat over the map, so the list captured all pan gestures. Now: (1) teasers live in a collapsible bottom tray (WanderTeaserTray) capped at 300pt height with a tap-to-collapse handle + summary ('N memories nearby / in range'); (2) the middle of the screen is a Spacer (no hit-testable content) so touches fall through to the Map — it pans/zooms freely; (3) map dim removed when memories are present (backgroundOverlayOpacity=0); (4) no auto-unlock — opening is still an explicit tap. 54/54 SPM tests pass."
+          "text": "Fixed (map-first layout). Root cause: the teaser ScrollView was greedy (filled the whole space below the header) and a full-screen 0.88 dim sat over the map, so the list captured all pan gestures. Now: (1) teasers live in a collapsible bottom tray (WanderTeaserTray) capped at 300pt height with a tap-to-collapse handle + summary ('N memories nearby / in range'); (2) the middle of the screen is a Spacer (no hit-testable content) so touches fall through to the Map \u2014 it pans/zooms freely; (3) map dim removed when memories are present (backgroundOverlayOpacity=0); (4) no auto-unlock \u2014 opening is still an explicit tap. 54/54 SPM tests pass."
         }
       ]
     },
@@ -669,7 +669,7 @@
       "status": "resolved",
       "raisedBy": "joseph",
       "needs": "ios",
-      "detail": "Joseph imported ~45 photos but Memory Lane grid only showed 2. Causes: (1) DEBUG stub fixture returns exactly 2 rows; (2) MemoryLaneCoordinator was recreated inline in TabView body, resetting fetches; (3) iOS only loaded first page and relied on scroll-to-last for pagination; (4) backend cursor used created_at only — batch imports with identical timestamps could skip rows beyond page 1.",
+      "detail": "Joseph imported ~45 photos but Memory Lane grid only showed 2. Causes: (1) DEBUG stub fixture returns exactly 2 rows; (2) MemoryLaneCoordinator was recreated inline in TabView body, resetting fetches; (3) iOS only loaded first page and relied on scroll-to-last for pagination; (4) backend cursor used created_at only \u2014 batch imports with identical timestamps could skip rows beyond page 1.",
       "blocks": [
         "ios-memory-lane"
       ],
@@ -684,11 +684,11 @@
     {
       "id": "concern-import-animation-glitchy",
       "kind": "concern",
-      "title": "Import — pin-drop celebration animation is glitchy / doesn't really work",
+      "title": "Import \u2014 pin-drop celebration animation is glitchy / doesn't really work",
       "status": "resolved",
       "raisedBy": "joseph",
       "needs": "ios",
-      "detail": "Manual QA 2026-06-22 (device): 'The importing memories animation is glitchy and doesn't really work.' The PinDropCelebrationCoordinator overlay + cascade on import is janky. Backend has no involvement here — POST /v1/memories/import already returns all cluster memory_ids synchronously, so iOS has every coordinate it needs at completion. Likely causes (iOS): (1) cascade stagger driven off async upload completions rather than the import response, so pins appear erratically as each blob PUT finishes; (2) animating ~45 MapKit annotations at once drops frames; (3) overlay/tab-switch race (auto-switch to Wander mid-animation). Suggest: drive the cascade purely off the synchronous import response (coords are all present), cap concurrent animations, and don't switch tabs until the overlay completes.",
+      "detail": "Manual QA 2026-06-22 (device): 'The importing memories animation is glitchy and doesn't really work.' The PinDropCelebrationCoordinator overlay + cascade on import is janky. Backend has no involvement here \u2014 POST /v1/memories/import already returns all cluster memory_ids synchronously, so iOS has every coordinate it needs at completion. Likely causes (iOS): (1) cascade stagger driven off async upload completions rather than the import response, so pins appear erratically as each blob PUT finishes; (2) animating ~45 MapKit annotations at once drops frames; (3) overlay/tab-switch race (auto-switch to Wander mid-animation). Suggest: drive the cascade purely off the synchronous import response (coords are all present), cap concurrent animations, and don't switch tabs until the overlay completes.",
       "blocks": [
         "ios-import-flow",
         "ios-pin-drop-animation"
@@ -697,7 +697,7 @@
         {
           "author": "ios",
           "date": "2026-06-22",
-          "text": "Fixed. Primary glitch was camera thrash: WanderUserMap called fitCamera() on every single pin insertion, so the celebration (which grows the pin filter one pin at a time, ~80ms apart) fired ~45 overlapping 0.45s camera animations. Now: (1) camera fitting is debounced via .task(id: pin-set) — one fit ~350ms after the pin set settles; (2) the per-pin reveal stagger is capped at 12 (extra pins drop together) so a big batch never animates enough markers to drop frames; (3) celebratePins now runs scanIfNeeded concurrently with the celebration's loading phase, so the map has a user coordinate before the reveal instead of racing the tab switch onto a blank map. The cascade is already driven off the synchronous import response (pendingCelebrationPins). 54/54 SPM tests pass."
+          "text": "Fixed. Primary glitch was camera thrash: WanderUserMap called fitCamera() on every single pin insertion, so the celebration (which grows the pin filter one pin at a time, ~80ms apart) fired ~45 overlapping 0.45s camera animations. Now: (1) camera fitting is debounced via .task(id: pin-set) \u2014 one fit ~350ms after the pin set settles; (2) the per-pin reveal stagger is capped at 12 (extra pins drop together) so a big batch never animates enough markers to drop frames; (3) celebratePins now runs scanIfNeeded concurrently with the celebration's loading phase, so the map has a user coordinate before the reveal instead of racing the tab switch onto a blank map. The cascade is already driven off the synchronous import response (pendingCelebrationPins). 54/54 SPM tests pass."
         }
       ]
     },
@@ -708,7 +708,7 @@
       "status": "resolved",
       "raisedBy": "backend",
       "needs": "ios",
-      "detail": "Addresses Joseph's QA: 'I have to click on Memory Lane to see the image… when there are a bunch it's hard to know which memory I want' and 'need a better way to sort through memories.' Backend shipped (api-contract §7 GET /v1/memories updated): (1) media_url added to each list item — full-res own media, non-null when scan_status=clear. RENDER THIS IN THE GRID when thumbnail_url is null (server thumbnailing via sharp is best-effort and is currently absent for imports / when sharp can't load on the function, which is why the grid showed placeholders and forced a tap). (2) caption + teaser_text added per item — show as a label to disambiguate dense grids. (3) sort=oldest|newest query param (default oldest, back-compat). (4) media_type=photo|video|text optional filter. Cursors are sort-specific. iOS asks: wire AsyncImage to thumbnail_url ?? media_url; add a sort toggle (newest/oldest) and optional type filter in the Memory Lane toolbar.",
+      "detail": "Addresses Joseph's QA: 'I have to click on Memory Lane to see the image\u2026 when there are a bunch it's hard to know which memory I want' and 'need a better way to sort through memories.' Backend shipped (api-contract \u00a77 GET /v1/memories updated): (1) media_url added to each list item \u2014 full-res own media, non-null when scan_status=clear. RENDER THIS IN THE GRID when thumbnail_url is null (server thumbnailing via sharp is best-effort and is currently absent for imports / when sharp can't load on the function, which is why the grid showed placeholders and forced a tap). (2) caption + teaser_text added per item \u2014 show as a label to disambiguate dense grids. (3) sort=oldest|newest query param (default oldest, back-compat). (4) media_type=photo|video|text optional filter. Cursors are sort-specific. iOS asks: wire AsyncImage to thumbnail_url ?? media_url; add a sort toggle (newest/oldest) and optional type filter in the Memory Lane toolbar.",
       "blocks": [
         "ios-memory-lane"
       ],
@@ -727,13 +727,18 @@
       "status": "open",
       "raisedBy": "backend",
       "needs": "ios",
-      "detail": "Found while debugging the Memory Lane 'no image until I tap' issue. Server thumbnails come from lib/thumbnail.ts → sharp, lazy-loaded so a missing native binary can't crash startup — but that also means it SILENTLY returns null and leaves thumbnail_key null whenever sharp can't load on the function (and it does nothing for imports unless each cluster photo is uploaded). For OWN memories I patched this with the media_url fallback (this session), but that fallback is NOT available for OTHERS' memories in /scan teasers (Phase 2): privacy forbids returning others' media_url before unlock, so an others' teaser with a broken thumbnail has nothing to show. Proposal: iOS already rewrites the image for EXIF strip (EXIFStripper) — at that same step, also produce a ~400px WebP/JPEG thumbnail and upload it alongside the original (e.g. POST /v1/uploads/direct with an X-Thumbnail marker, or a second small asset). Backend stores it as thumbnail_key directly, no sharp on the hot path. Robust, cheaper, and works identically for own + others' teasers. Backend will add the thumbnail intake endpoint/param when iOS is ready. Not urgent for Phase 1 (media_url fallback covers own memories now), but it's the right fix before social/others'-memory teasers ship.",
+      "detail": "Found while debugging the Memory Lane 'no image until I tap' issue. Server thumbnails come from lib/thumbnail.ts \u2192 sharp, lazy-loaded so a missing native binary can't crash startup \u2014 but that also means it SILENTLY returns null and leaves thumbnail_key null whenever sharp can't load on the function (and it does nothing for imports unless each cluster photo is uploaded). For OWN memories I patched this with the media_url fallback (this session), but that fallback is NOT available for OTHERS' memories in /scan teasers (Phase 2): privacy forbids returning others' media_url before unlock, so an others' teaser with a broken thumbnail has nothing to show. Proposal: iOS already rewrites the image for EXIF strip (EXIFStripper) \u2014 at that same step, also produce a ~400px WebP/JPEG thumbnail and upload it alongside the original (e.g. POST /v1/uploads/direct with an X-Thumbnail marker, or a second small asset). Backend stores it as thumbnail_key directly, no sharp on the hot path. Robust, cheaper, and works identically for own + others' teasers. Backend will add the thumbnail intake endpoint/param when iOS is ready. Not urgent for Phase 1 (media_url fallback covers own memories now), but it's the right fix before social/others'-memory teasers ship.",
       "blocks": [],
       "responses": [
         {
           "author": "ios",
           "date": "2026-06-22",
-          "message": "Agreed — client-side thumbnails are the right fix, and EXIFStripper is the correct integration point since we already decode + re-encode there (one extra downscale pass, no second decode). iOS preference: a SEPARATE small asset over an X-Thumbnail marker on the same upload — keeps the original byte-exact for EXIF-strip verification and lets the thumbnail use a different content-type (WebP) without complicating the main upload's signature. Concretely we'd want: (a) a thumbnail upload target in the import/drop seal response (or a dedicated POST /v1/uploads/thumbnail that returns a signed PUT + key), (b) backend writes that key to thumbnail_key directly, no sharp. Sizing: ~400px longest edge, WebP q~0.7 (JPEG fallback if WebP encode unavailable on older devices). NOT starting this yet — it's correctly deferred behind the media_url fallback for Phase 1, and there's in-flight memory_media work in the tree I don't want to collide with. Ping me (set needs:ios) once the intake endpoint shape is decided and I'll wire the encode+upload in EXIFStripper + the import loop."
+          "message": "Agreed \u2014 client-side thumbnails are the right fix, and EXIFStripper is the correct integration point since we already decode + re-encode there (one extra downscale pass, no second decode). iOS preference: a SEPARATE small asset over an X-Thumbnail marker on the same upload \u2014 keeps the original byte-exact for EXIF-strip verification and lets the thumbnail use a different content-type (WebP) without complicating the main upload's signature. Concretely we'd want: (a) a thumbnail upload target in the import/drop seal response (or a dedicated POST /v1/uploads/thumbnail that returns a signed PUT + key), (b) backend writes that key to thumbnail_key directly, no sharp. Sizing: ~400px longest edge, WebP q~0.7 (JPEG fallback if WebP encode unavailable on older devices). NOT starting this yet \u2014 it's correctly deferred behind the media_url fallback for Phase 1, and there's in-flight memory_media work in the tree I don't want to collide with. Ping me (set needs:ios) once the intake endpoint shape is decided and I'll wire the encode+upload in EXIFStripper + the import loop."
+        },
+        {
+          "author": "ios",
+          "date": "2026-06-23",
+          "message": "Still aligned on this direction and keeping it queued behind UI polish + existing import stability work. The new visual revamp in Drop/Import/Lane keeps thumbnail affordances obvious, so once backend finalizes the thumbnail intake shape we can wire EXIFStripper downscale+upload without changing UI contracts again."
         }
       ]
     },
@@ -770,7 +775,7 @@
       "kind": "idea",
       "title": "A memory should hold multiple photos, not one photo per place",
       "needs": "joseph",
-      "description": "Today an imported visit-cluster (potentially hundreds of photos at one place/day) creates ONE memory whose media is just cluster.sampleIDs.first (ImportCoordinator.importSelected). Joseph: 'one photo represents one place makes no sense in human logic.' Real memories are multi-photo. This is a model change spanning: (1) DB/storage — memories currently have a single media_key (migration 0002_memories.sql); need a media collection per memory or a media table. (2) api-contract §5 import — return N upload targets per cluster instead of 1. (3) iOS import upload loop — upload K representative assets (or all, capped) not just .first. (4) Memory Lane / gallery UI (Cursor) — render multiple photos per memory. Proposed first step (decoupled): pick a representative/hero + upload top-K (e.g. up to 10) per cluster; full gallery later. Options: A) hero+K-thumbnails minimal, B) full multi-media memory model. Needs Joseph's call on scope before backend schema work.",
+      "description": "Today an imported visit-cluster (potentially hundreds of photos at one place/day) creates ONE memory whose media is just cluster.sampleIDs.first (ImportCoordinator.importSelected). Joseph: 'one photo represents one place makes no sense in human logic.' Real memories are multi-photo. This is a model change spanning: (1) DB/storage \u2014 memories currently have a single media_key (migration 0002_memories.sql); need a media collection per memory or a media table. (2) api-contract \u00a75 import \u2014 return N upload targets per cluster instead of 1. (3) iOS import upload loop \u2014 upload K representative assets (or all, capped) not just .first. (4) Memory Lane / gallery UI (Cursor) \u2014 render multiple photos per memory. Proposed first step (decoupled): pick a representative/hero + upload top-K (e.g. up to 10) per cluster; full gallery later. Options: A) hero+K-thumbnails minimal, B) full multi-media memory model. Needs Joseph's call on scope before backend schema work.",
       "options": [
         {
           "id": "A",
@@ -782,7 +787,7 @@
         }
       ],
       "status": "resolved",
-      "resolution": "Joseph chose B (full multi-media model), no cap — 'shouldn't it be all? that's the whole point.' Built: memories now hold the whole visit's photos. Hero stays denormalised on memories (discovery untouched); new memory_media table holds all. See tasks import-multimedia-backend / import-upload-all-ios and collab-log session 11."
+      "resolution": "Joseph chose B (full multi-media model), no cap \u2014 'shouldn't it be all? that's the whole point.' Built: memories now hold the whole visit's photos. Hero stays denormalised on memories (discovery untouched); new memory_media table holds all. See tasks import-multimedia-backend / import-upload-all-ios and collab-log session 11."
     }
   ],
   "manualTests": [
@@ -799,7 +804,7 @@
       ],
       "steps": [
         "Delete Legacy from the device, reinstall from Xcode",
-        "Cold launch — confirm sign-in screen appears (not Wander)"
+        "Cold launch \u2014 confirm sign-in screen appears (not Wander)"
       ],
       "notes": "iOS fix shipped (KeychainSessionStore.clearIfFreshInstall). Joseph re-run after reinstall on device.",
       "verifiedAt": "2026-06-22"
@@ -817,7 +822,7 @@
       ],
       "steps": [
         "Live API build on device (not stub)",
-        "Drop tab → photo → confirm upload completes without error"
+        "Drop tab \u2192 photo \u2192 confirm upload completes without error"
       ],
       "notes": "iOS fix shipped (foreground URLSession for Blob PUT). Joseph re-run on device with live API.",
       "verifiedAt": "2026-06-22"
@@ -833,7 +838,7 @@
         "ios-import-flow"
       ],
       "steps": [
-        "Import tab → run import on device with live API",
+        "Import tab \u2192 run import on device with live API",
         "Confirm cluster uploads complete"
       ],
       "notes": "Same upload fix as qa-mt-drop-upload. Joseph re-run on device.",
@@ -851,8 +856,8 @@
         "ios-apns-registration"
       ],
       "steps": [
-        "Fresh install → grant location when prompted once",
-        "Navigate app — confirm permission alert does not repeat"
+        "Fresh install \u2192 grant location when prompted once",
+        "Navigate app \u2014 confirm permission alert does not repeat"
       ],
       "notes": "iOS fix shipped (status guards + single prompt path). Joseph re-run on device.",
       "verifiedAt": "2026-06-22"
@@ -902,8 +907,8 @@
       ],
       "steps": [
         "Delete the app from the simulator (or reset Keychain for Legacy)",
-        "Run Legacy from Xcode (⌘R)",
-        "Confirm the welcome / sign-in screen appears — not the Wander map"
+        "Run Legacy from Xcode (\u2318R)",
+        "Confirm the welcome / sign-in screen appears \u2014 not the Wander map"
       ],
       "verifiedAt": "2026-06-18"
     },
@@ -918,9 +923,9 @@
         "ios-auth-ui"
       ],
       "steps": [
-        "Edit Scheme → Run → Arguments → add `-LegacyUseStubAPI` (DEBUG builds)",
+        "Edit Scheme \u2192 Run \u2192 Arguments \u2192 add `-LegacyUseStubAPI` (DEBUG builds)",
         "Choose email sign-in, enter any email, request OTP",
-        "Enter any 6-digit code (stub accepts after dob_required → DOB gate for new users)",
+        "Enter any 6-digit code (stub accepts after dob_required \u2192 DOB gate for new users)",
         "Complete DOB picker if shown",
         "Confirm you land on the empty Wander map"
       ],
@@ -938,10 +943,10 @@
         "ios-auth-ui"
       ],
       "steps": [
-        "Edit Scheme → Run → Arguments → add `-LegacyUseStubAPI`",
-        "Continue with Email → any address → any 6-digit OTP",
+        "Edit Scheme \u2192 Run \u2192 Arguments \u2192 add `-LegacyUseStubAPI`",
+        "Continue with Email \u2192 any address \u2192 any 6-digit OTP",
         "On DOB gate, pick a date that makes the user under 13",
-        "Confirm age-restricted / rejection UI — must not reach Wander"
+        "Confirm age-restricted / rejection UI \u2014 must not reach Wander"
       ],
       "verifiedAt": "2026-06-19",
       "notes": "Client-side under-13 guard in AuthCoordinator.confirmDOB() mirrors backend age gate for instant UX."
@@ -960,7 +965,7 @@
       "steps": [
         "Sign in successfully",
         "Stop the app (not delete) and relaunch from Xcode",
-        "Confirm you skip sign-in and go straight to Wander — token read from Keychain"
+        "Confirm you skip sign-in and go straight to Wander \u2014 token read from Keychain"
       ]
     },
     {
@@ -993,7 +998,7 @@
         "Sign in with an account that has memories (or stub fixtures with list data)",
         "Open Memory Lane tab",
         "Confirm teaser cards appear oldest-first; tap one opens detail",
-        "Pull to refresh or scroll — pagination / error banner behaves correctly"
+        "Pull to refresh or scroll \u2014 pagination / error banner behaves correctly"
       ]
     },
     {
@@ -1028,7 +1033,7 @@
         "Fresh install or reset location privacy for Legacy",
         "Open Wander and trigger a scan (move or wait for movement gate)",
         "Confirm iOS location permission alert appears",
-        "Allow — confirm scan loop continues without crash"
+        "Allow \u2014 confirm scan loop continues without crash"
       ]
     },
     {
@@ -1045,7 +1050,7 @@
       "steps": [
         "Use a RELEASE or live-API DEBUG build pointed at the deployed backend (not stubbed)",
         "Sign in on a real device",
-        "Drop tab → pick or capture a photo → confirm drop",
+        "Drop tab \u2192 pick or capture a photo \u2192 confirm drop",
         "Verify no upload error; memory appears in Memory Lane with scan_status clear (may take a few seconds for webhook)",
         "Optional: confirm blob URL in backend DB media_key"
       ],
@@ -1065,12 +1070,12 @@
       ],
       "steps": [
         "Launch with -LegacyUseStubAPI (or live API with auth)",
-        "Drop tab → drop a photo or note → wait for success",
+        "Drop tab \u2192 drop a photo or note \u2192 wait for success",
         "Confirm app switches to Wander tab automatically",
         "Confirm progress overlay shows rotating messages then pins cascade onto map (~80ms stagger)",
-        "Import tab → complete an import → same celebration with multiple pins if clustered"
+        "Import tab \u2192 complete an import \u2192 same celebration with multiple pins if clustered"
       ],
-      "notes": "Own pins only — no others' memory locations exposed."
+      "notes": "Own pins only \u2014 no others' memory locations exposed."
     },
     {
       "id": "qa-apns-proximity-push",
@@ -1087,7 +1092,7 @@
         "Grant Always location + notification permission (background discovery sheet)",
         "Drop a memory, walk away, kill the app",
         "Walk back in range so backend /scan returns in_range and fires APNs",
-        "Tap the notification — app opens to Wander tab with updated warmth/teasers",
+        "Tap the notification \u2014 app opens to Wander tab with updated warmth/teasers",
         "Requires backend APNS_* env vars on Vercel + real device (not simulator)"
       ]
     }
@@ -1101,11 +1106,11 @@
       "phase": 0,
       "milestone": "M0",
       "blockedBy": [],
-      "notes": "PhotoDNA application submitted 2026-06-16. Approval is the long pole — everything else builds around the stub."
+      "notes": "PhotoDNA application submitted 2026-06-16. Approval is the long pole \u2014 everything else builds around the stub."
     },
     {
       "id": "api-contract-doc",
-      "title": "Write API contract doc — all endpoints, exact request/response shapes, error codes, headers",
+      "title": "Write API contract doc \u2014 all endpoints, exact request/response shapes, error codes, headers",
       "status": "done",
       "owner": "backend",
       "phase": 0,
@@ -1115,27 +1120,27 @@
     },
     {
       "id": "github-ci-setup",
-      "title": "GitHub Actions CI — lint, type-check, run migrations against local Postgres, privacy gate grep",
+      "title": "GitHub Actions CI \u2014 lint, type-check, run migrations against local Postgres, privacy gate grep",
       "status": "done",
       "owner": "backend",
       "phase": 0,
       "milestone": "M0",
       "blockedBy": [],
-      "notes": "Done 2026-06-17: .github/workflows/ci.yml — backend typecheck + vitest + privacy gate grep (bans lat/lng/geohash in audit_log migrations). Runs on push/PR to main."
+      "notes": "Done 2026-06-17: .github/workflows/ci.yml \u2014 backend typecheck + vitest + privacy gate grep (bans lat/lng/geohash in audit_log migrations). Runs on push/PR to main."
     },
     {
       "id": "schema-users-sessions",
-      "title": "DB schema: users + sessions tables — id, dob, created_at, device_id, session_token, expires_at",
+      "title": "DB schema: users + sessions tables \u2014 id, dob, created_at, device_id, session_token, expires_at",
       "status": "done",
       "owner": "backend",
       "phase": 0,
       "milestone": "M0",
       "blockedBy": [],
-      "notes": "DOB stored at signup for age gate. Sessions are stateless bearer tokens — no server-side session store."
+      "notes": "DOB stored at signup for age gate. Sessions are stateless bearer tokens \u2014 no server-side session store."
     },
     {
       "id": "schema-memories",
-      "title": "DB schema: memories table — id, owner_id, lat, lng, geohash, source, scan_status, discoverable_after, privacy_tier, media_type, created_at",
+      "title": "DB schema: memories table \u2014 id, owner_id, lat, lng, geohash, source, scan_status, discoverable_after, privacy_tier, media_type, created_at",
       "status": "done",
       "owner": "backend",
       "phase": 0,
@@ -1167,11 +1172,11 @@
       "blockedBy": [
         "schema-memories"
       ],
-      "notes": "finds tracks nth_return counts. presence_pings is UNLOGGED (no WAL) with ~3min TTL — auto-purge job keeps it empty at steady state."
+      "notes": "finds tracks nth_return counts. presence_pings is UNLOGGED (no WAL) with ~3min TTL \u2014 auto-purge job keeps it empty at steady state."
     },
     {
       "id": "schema-audit-log",
-      "title": "DB schema: audit_log table — event, actor_id, request_id, metadata (jsonb), created_at. No lat/lng ever.",
+      "title": "DB schema: audit_log table \u2014 event, actor_id, request_id, metadata (jsonb), created_at. No lat/lng ever.",
       "status": "done",
       "owner": "backend",
       "phase": 0,
@@ -1183,7 +1188,7 @@
     },
     {
       "id": "auth-apple-oauth",
-      "title": "Auth: Apple Sign In — validate identity token, extract sub + email, create/fetch user",
+      "title": "Auth: Apple Sign In \u2014 validate identity token, extract sub + email, create/fetch user",
       "status": "done",
       "owner": "backend",
       "phase": 0,
@@ -1195,7 +1200,7 @@
     },
     {
       "id": "auth-google-oauth",
-      "title": "Auth: Google Sign In — validate ID token, extract sub + email, create/fetch user",
+      "title": "Auth: Google Sign In \u2014 validate ID token, extract sub + email, create/fetch user",
       "status": "done",
       "owner": "backend",
       "phase": 0,
@@ -1207,7 +1212,7 @@
     },
     {
       "id": "auth-email-otp",
-      "title": "Auth: email OTP — generate 6-digit code, send via email, verify within 10min window",
+      "title": "Auth: email OTP \u2014 generate 6-digit code, send via email, verify within 10min window",
       "status": "done",
       "owner": "backend",
       "phase": 0,
@@ -1219,7 +1224,7 @@
     },
     {
       "id": "auth-age-gate",
-      "title": "Auth: age gate — collect DOB at token exchange, reject under-13, flag 13-15 for parental consent path",
+      "title": "Auth: age gate \u2014 collect DOB at token exchange, reject under-13, flag 13-15 for parental consent path",
       "status": "done",
       "owner": "backend",
       "phase": 0,
@@ -1229,11 +1234,11 @@
         "auth-google-oauth",
         "auth-email-otp"
       ],
-      "notes": "Done: src/lib/age.ts resolveAgeTier — under-13 throws 403 age_restricted (never created); 13-15 minor; 16+ adult. 8 unit tests in test/age.test.ts. Parental-consent flow for minors deferred to Phase 2."
+      "notes": "Done: src/lib/age.ts resolveAgeTier \u2014 under-13 throws 403 age_restricted (never created); 13-15 minor; 16+ adult. 8 unit tests in test/age.test.ts. Parental-consent flow for minors deferred to Phase 2."
     },
     {
       "id": "auth-session-tokens",
-      "title": "Auth: session token issuance + validation middleware — JWT, expiry, clock-skew tolerance",
+      "title": "Auth: session token issuance + validation middleware \u2014 JWT, expiry, clock-skew tolerance",
       "status": "done",
       "owner": "backend",
       "phase": 0,
@@ -1241,11 +1246,11 @@
       "blockedBy": [
         "auth-age-gate"
       ],
-      "notes": "Done: signSession/verifySession (HS256, ~30d) in src/lib/jwt.ts; requireAuth + clockSkew (±5min) middleware in src/middleware/auth.ts. Full auth routes in src/routes/auth.ts. typecheck + tests green."
+      "notes": "Done: signSession/verifySession (HS256, ~30d) in src/lib/jwt.ts; requireAuth + clockSkew (\u00b15min) middleware in src/middleware/auth.ts. Full auth routes in src/routes/auth.ts. typecheck + tests green."
     },
     {
       "id": "spm-scaffold",
-      "title": "iOS: SPM module scaffold — LocationEngine, APIClient, DropFeature, WanderFeature, MemoryLaneFeature, ImportFeature, DesignSystem as local packages",
+      "title": "iOS: SPM module scaffold \u2014 LocationEngine, APIClient, DropFeature, WanderFeature, MemoryLaneFeature, ImportFeature, DesignSystem as local packages",
       "status": "done",
       "owner": "ios",
       "phase": 0,
@@ -1255,7 +1260,7 @@
     },
     {
       "id": "ios-design-system",
-      "title": "iOS: DesignSystem module — typography, colors, spacing tokens, warmth gradient component, button styles",
+      "title": "iOS: DesignSystem module \u2014 typography, colors, spacing tokens, warmth gradient component, button styles",
       "status": "done",
       "owner": "ios",
       "phase": 0,
@@ -1263,11 +1268,11 @@
       "blockedBy": [
         "spm-scaffold"
       ],
-      "notes": "Warmth gradient is screen-edge ambient only — no directional component ever."
+      "notes": "Warmth gradient is screen-edge ambient only \u2014 no directional component ever."
     },
     {
       "id": "ios-apiclient-base",
-      "title": "iOS: APIClient base — typed request builder, Authorization header injection, X-Request-Timestamp, error model, 401 surfacing",
+      "title": "iOS: APIClient base \u2014 typed request builder, Authorization header injection, X-Request-Timestamp, error model, 401 surfacing",
       "status": "done",
       "owner": "ios",
       "phase": 0,
@@ -1276,11 +1281,11 @@
         "spm-scaffold",
         "api-contract-doc"
       ],
-      "notes": "Session token read from Keychain. Codes to the contract doc — not the real API yet."
+      "notes": "Session token read from Keychain. Codes to the contract doc \u2014 not the real API yet."
     },
     {
       "id": "ios-keychain-session",
-      "title": "iOS: Keychain session storage — store/read/delete session token securely (kSecAttrAccessibleAfterFirstUnlock)",
+      "title": "iOS: Keychain session storage \u2014 store/read/delete session token securely (kSecAttrAccessibleAfterFirstUnlock)",
       "status": "done",
       "owner": "ios",
       "phase": 0,
@@ -1292,7 +1297,7 @@
     },
     {
       "id": "ios-auth-ui",
-      "title": "iOS: Auth screens — Apple/Google sign-in buttons, email OTP entry, DOB picker, age gate rejection screen",
+      "title": "iOS: Auth screens \u2014 Apple/Google sign-in buttons, email OTP entry, DOB picker, age gate rejection screen",
       "status": "done",
       "owner": "ios",
       "phase": 0,
@@ -1302,7 +1307,7 @@
     },
     {
       "id": "endpoint-memories-list",
-      "title": "Backend: GET /memories — paginated owner list for Memory Lane (teaser shape, no coordinates, oldest-first)",
+      "title": "Backend: GET /memories \u2014 paginated owner list for Memory Lane (teaser shape, no coordinates, oldest-first)",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1314,7 +1319,7 @@
     },
     {
       "id": "endpoint-memories-post",
-      "title": "Backend: POST /memories — validate input, enforce cooldown, create memory record (scan_status: pending), return memory_id",
+      "title": "Backend: POST /memories \u2014 validate input, enforce cooldown, create memory record (scan_status: pending), return memory_id",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1327,7 +1332,7 @@
     },
     {
       "id": "s3-signed-put-url",
-      "title": "Backend: S3 signed PUT URL generation — generate per-asset URL, 15-min TTL, return alongside memory_id",
+      "title": "Backend: S3 signed PUT URL generation \u2014 generate per-asset URL, 15-min TTL, return alongside memory_id",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1340,7 +1345,7 @@
     },
     {
       "id": "csam-server-exif-strip",
-      "title": "Backend: Server-side EXIF strip on storage webhook — belt-and-braces metadata removal after client upload",
+      "title": "Backend: Server-side EXIF strip on storage webhook \u2014 belt-and-braces metadata removal after client upload",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1352,7 +1357,7 @@
     },
     {
       "id": "csam-pipeline-stub",
-      "title": "Backend: CSAM pipeline stub — storage webhook flips scan_status to 'clear' immediately in dev/staging",
+      "title": "Backend: CSAM pipeline stub \u2014 storage webhook flips scan_status to 'clear' immediately in dev/staging",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1364,7 +1369,7 @@
     },
     {
       "id": "csam-thumbnail-generation",
-      "title": "Backend: Server-side thumbnail generation — fires post-clear, stores compressed thumbnail key alongside original",
+      "title": "Backend: Server-side thumbnail generation \u2014 fires post-clear, stores compressed thumbnail key alongside original",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1376,7 +1381,7 @@
     },
     {
       "id": "ios-v1-camera-picker",
-      "title": "iOS: V1 Pin — camera capture + photo library picker, single photo selection, preview before drop",
+      "title": "iOS: V1 Pin \u2014 camera capture + photo library picker, single photo selection, preview before drop",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -1388,7 +1393,7 @@
     },
     {
       "id": "ios-exif-strip",
-      "title": "iOS: Client-side EXIF strip — rewrite image via ImageIO, remove all metadata before upload",
+      "title": "iOS: Client-side EXIF strip \u2014 rewrite image via ImageIO, remove all metadata before upload",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -1398,7 +1403,7 @@
     },
     {
       "id": "ios-background-upload",
-      "title": "iOS: Background URLSession upload — PUT to signed URL, resumable, progress tracking, retry on failure",
+      "title": "iOS: Background URLSession upload \u2014 PUT to signed URL, resumable, progress tracking, retry on failure",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -1411,7 +1416,7 @@
     },
     {
       "id": "ios-draft-store",
-      "title": "iOS: SwiftData draft store — persist interrupted drops (camera roll picked, not yet uploaded)",
+      "title": "iOS: SwiftData draft store \u2014 persist interrupted drops (camera roll picked, not yet uploaded)",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -1423,7 +1428,7 @@
     },
     {
       "id": "ios-v1-pin-drop-flow",
-      "title": "iOS: V1 Pin drop end-to-end — 1-tap: capture → strip EXIF → POST /memories → background upload → confirmation",
+      "title": "iOS: V1 Pin drop end-to-end \u2014 1-tap: capture \u2192 strip EXIF \u2192 POST /memories \u2192 background upload \u2192 confirmation",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -1435,7 +1440,7 @@
     },
     {
       "id": "endpoint-scan-geohash-query",
-      "title": "Backend: /scan — geohash prefix query to find nearby memories within coarse bounding box",
+      "title": "Backend: /scan \u2014 geohash prefix query to find nearby memories within coarse bounding box",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1448,7 +1453,7 @@
     },
     {
       "id": "endpoint-scan-eligibility",
-      "title": "Backend: /scan — eligibility filter: privacy_tier check (owner, recipient, friend, public+age), scan_status=clear, discoverable_after elapsed",
+      "title": "Backend: /scan \u2014 eligibility filter: privacy_tier check (owner, recipient, friend, public+age), scan_status=clear, discoverable_after elapsed",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1460,7 +1465,7 @@
     },
     {
       "id": "endpoint-scan-bubble-math",
-      "title": "Backend: /scan — asymmetric proximity bubble: own memories base 25m + min(accuracy,75m) cushion; others' 20m + min(accuracy,25m), reject if accuracy>50m",
+      "title": "Backend: /scan \u2014 asymmetric proximity bubble: own memories base 25m + min(accuracy,75m) cushion; others' 20m + min(accuracy,25m), reject if accuracy>50m",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1468,11 +1473,11 @@
       "blockedBy": [
         "endpoint-scan-eligibility"
       ],
-      "notes": "Accuracy rejection for others' memories is silent — same response as 'not in range'. Numbers tunable via config table."
+      "notes": "Accuracy rejection for others' memories is silent \u2014 same response as 'not in range'. Numbers tunable via config table."
     },
     {
       "id": "endpoint-scan-presence-ping",
-      "title": "Backend: /scan — upsert presence_ping (memory_id, user_id, last_seen_at) for co-presence evaluation",
+      "title": "Backend: /scan \u2014 upsert presence_ping (memory_id, user_id, last_seen_at) for co-presence evaluation",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1481,11 +1486,11 @@
         "endpoint-scan-bubble-math",
         "schema-finds-pings"
       ],
-      "notes": "Upsert with ~3min TTL. No coordinates stored — only boolean proximity outcome. Table auto-purged."
+      "notes": "Upsert with ~3min TTL. No coordinates stored \u2014 only boolean proximity outcome. Table auto-purged."
     },
     {
       "id": "endpoint-scan-teaser-response",
-      "title": "Backend: /scan — build teaser response: no coordinates, no media URLs, only memory_id + thumbnail_url + drop_date + owner_display",
+      "title": "Backend: /scan \u2014 build teaser response: no coordinates, no media URLs, only memory_id + thumbnail_url + drop_date + owner_display",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1493,11 +1498,11 @@
       "blockedBy": [
         "endpoint-scan-presence-ping"
       ],
-      "notes": "Location submitted → validated → discarded. 204 when nothing nearby. Privacy invariant: no coords ever sent to non-owner."
+      "notes": "Location submitted \u2192 validated \u2192 discarded. 204 when nothing nearby. Privacy invariant: no coords ever sent to non-owner."
     },
     {
       "id": "endpoint-unlock-dwell",
-      "title": "Backend: /unlock — enforce two-check dwell rule: require two passing proximity checks ≥20s apart (scan counts as check #1)",
+      "title": "Backend: /unlock \u2014 enforce two-check dwell rule: require two passing proximity checks \u226520s apart (scan counts as check #1)",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1509,7 +1514,7 @@
     },
     {
       "id": "endpoint-unlock-seal-eval",
-      "title": "Backend: /unlock — seal evaluation: none, fixed_date, duration, age_based, recurring",
+      "title": "Backend: /unlock \u2014 seal evaluation: none, fixed_date, duration, age_based, recurring",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1522,7 +1527,7 @@
     },
     {
       "id": "endpoint-unlock-condition-eval",
-      "title": "Backend: /unlock — condition evaluation: time_of_day, season, weather (15min cache), co_presence, long_absence, nth_return",
+      "title": "Backend: /unlock \u2014 condition evaluation: time_of_day, season, weather (15min cache), co_presence, long_absence, nth_return",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1534,7 +1539,7 @@
     },
     {
       "id": "endpoint-unlock-signed-get-url",
-      "title": "Backend: /unlock — generate signed GET URL for media (short TTL), record Find in finds table",
+      "title": "Backend: /unlock \u2014 generate signed GET URL for media (short TTL), record Find in finds table",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1546,7 +1551,7 @@
     },
     {
       "id": "ios-location-engine",
-      "title": "iOS: LocationEngine module — CLLocationManager wrapper, foreground fix acquisition, accuracy reporting, movement gate (>25m or >30s)",
+      "title": "iOS: LocationEngine module \u2014 CLLocationManager wrapper, foreground fix acquisition, accuracy reporting, movement gate (>25m or >30s)",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -1558,7 +1563,7 @@
     },
     {
       "id": "ios-wander-foreground-scan",
-      "title": "iOS: Wander mode — foreground scan loop: movement-gated POST /scan calls, parse teaser response, surface pins",
+      "title": "iOS: Wander mode \u2014 foreground scan loop: movement-gated POST /scan calls, parse teaser response, surface pins",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -1567,11 +1572,11 @@
         "ios-location-engine",
         "endpoint-scan-teaser-response"
       ],
-      "notes": "Scan on >25m movement OR >30s elapsed. Pins appear without coordinates — teaser only."
+      "notes": "Scan on >25m movement OR >30s elapsed. Pins appear without coordinates \u2014 teaser only."
     },
     {
       "id": "ios-warmth-cue",
-      "title": "iOS: Warmth cue — non-directional screen-edge ambient gradient + haptic feedback. No arrow, no compass, no direction.",
+      "title": "iOS: Warmth cue \u2014 non-directional screen-edge ambient gradient + haptic feedback. No arrow, no compass, no direction.",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -1584,7 +1589,7 @@
     },
     {
       "id": "ios-wander-unlock-flow",
-      "title": "iOS: Wander unlock flow — tap pin → proximity check → if in range POST /unlock → show media; if not show teaser + walk closer",
+      "title": "iOS: Wander unlock flow \u2014 tap pin \u2192 proximity check \u2192 if in range POST /unlock \u2192 show media; if not show teaser + walk closer",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -1597,7 +1602,7 @@
     },
     {
       "id": "ios-memory-lane",
-      "title": "iOS: Memory Lane — grid of own memories, oldest-first, teaser card (photo, drop date, time-since delta), tap to view full",
+      "title": "iOS: Memory Lane \u2014 grid of own memories, oldest-first, teaser card (photo, drop date, time-since delta), tap to view full",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -1605,11 +1610,11 @@
       "blockedBy": [
         "endpoint-memories-list"
       ],
-      "notes": "Grid + pagination + detail (MapKit drop map for owner) + unlock-at-location for media. List `thumbnail_key` only until CSAM pipeline generates thumbs — placeholder icons for now."
+      "notes": "Grid + pagination + detail (MapKit drop map for owner) + unlock-at-location for media. List `thumbnail_key` only until CSAM pipeline generates thumbs \u2014 placeholder icons for now."
     },
     {
       "id": "ios-offline-near-ux",
-      "title": "iOS: Offline-but-near UX — when in coarse zone but no connectivity, warmth cue persists + show 'You need a signal to open this'",
+      "title": "iOS: Offline-but-near UX \u2014 when in coarse zone but no connectivity, warmth cue persists + show 'You need a signal to open this'",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -1621,7 +1626,7 @@
     },
     {
       "id": "ios-found-pins-cache",
-      "title": "iOS: Found pins cache — cache unlocked own-memory pins for offline Wander rendering (never cache non-owned coords)",
+      "title": "iOS: Found pins cache \u2014 cache unlocked own-memory pins for offline Wander rendering (never cache non-owned coords)",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -1633,7 +1638,7 @@
     },
     {
       "id": "endpoint-memories-import",
-      "title": "Backend: POST /memories/import — accept cluster list (centroid, capture_date), batch create memories, return memory_ids + signed PUT URLs",
+      "title": "Backend: POST /memories/import \u2014 accept cluster list (centroid, capture_date), batch create memories, return memory_ids + signed PUT URLs",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1641,11 +1646,11 @@
       "blockedBy": [
         "s3-signed-put-url"
       ],
-      "notes": "Idempotency key: geohash + capture-date bucket (prevents duplicates on retry). source: imported. private-only enforced — elevation to friends/public returns 422 CANNOT_ELEVATE_IMPORT."
+      "notes": "Idempotency key: geohash + capture-date bucket (prevents duplicates on retry). source: imported. private-only enforced \u2014 elevation to friends/public returns 422 CANNOT_ELEVATE_IMPORT."
     },
     {
       "id": "ios-phasset-fetch",
-      "title": "iOS: Import — PHAsset fetch filtered to photos with GPS EXIF, no image bytes read during fetch",
+      "title": "iOS: Import \u2014 PHAsset fetch filtered to photos with GPS EXIF, no image bytes read during fetch",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -1653,11 +1658,11 @@
       "blockedBy": [
         "spm-scaffold"
       ],
-      "notes": "Photos permission required. Only metadata fetched at this stage — no pixel data."
+      "notes": "Photos permission required. Only metadata fetched at this stage \u2014 no pixel data."
     },
     {
       "id": "ios-on-device-clustering",
-      "title": "iOS: Import — on-device clustering: grid-snap to ~150m cells, merge adjacent, rank by photo count × recency spread, present ~50 clusters",
+      "title": "iOS: Import \u2014 on-device clustering: grid-snap to ~150m cells, merge adjacent, rank by photo count \u00d7 recency spread, present ~50 clusters",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -1669,7 +1674,7 @@
     },
     {
       "id": "ios-import-flow",
-      "title": "iOS: Import flow — present cluster map, user selects, strip EXIF per asset, bulk upload via signed PUT URLs, progress UI",
+      "title": "iOS: Import flow \u2014 present cluster map, user selects, strip EXIF per asset, bulk upload via signed PUT URLs, progress UI",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -1678,11 +1683,11 @@
         "ios-on-device-clustering",
         "endpoint-memories-import"
       ],
-      "notes": "Resumable: idempotency key prevents duplicates. Demo milestone: fresh install → dense map in <2min."
+      "notes": "Resumable: idempotency key prevents duplicates. Demo milestone: fresh install \u2192 dense map in <2min."
     },
     {
       "id": "ios-v2-compose-ui",
-      "title": "iOS: V2 Treasure Chest — compose flow: photo picker, teaser text, seal picker, recipient list, privacy picker (private/recipients/friends)",
+      "title": "iOS: V2 Treasure Chest \u2014 compose flow: photo picker, teaser text, seal picker, recipient list, privacy picker (private/recipients/friends)",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -1694,7 +1699,7 @@
     },
     {
       "id": "ios-v4-note-bottle",
-      "title": "iOS: V4 Note in a Bottle — text composer, GPS auto-set from current location, time-only seal picker",
+      "title": "iOS: V4 Note in a Bottle \u2014 text composer, GPS auto-set from current location, time-only seal picker",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -1702,11 +1707,11 @@
       "blockedBy": [
         "ios-v1-pin-drop-flow"
       ],
-      "notes": "Text-only — no photo. Location from GPS, not picker."
+      "notes": "Text-only \u2014 no photo. Location from GPS, not picker."
     },
     {
       "id": "seals-fixed-date",
-      "title": "Backend: Seal evaluation — fixed_date: open when now() >= open_at",
+      "title": "Backend: Seal evaluation \u2014 fixed_date: open when now() >= open_at",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1718,7 +1723,7 @@
     },
     {
       "id": "seals-duration",
-      "title": "Backend: Seal evaluation — duration: open when now() >= created_at + locked_hours",
+      "title": "Backend: Seal evaluation \u2014 duration: open when now() >= created_at + locked_hours",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1730,7 +1735,7 @@
     },
     {
       "id": "seals-age-based",
-      "title": "Backend: Seal evaluation — age_based: open when recipient's DOB + open_at_age years <= today",
+      "title": "Backend: Seal evaluation \u2014 age_based: open when recipient's DOB + open_at_age years <= today",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1742,7 +1747,7 @@
     },
     {
       "id": "seals-recurring",
-      "title": "Backend: Seal evaluation — recurring: open during yearly window_start + window_duration_hours, compute and store next_open",
+      "title": "Backend: Seal evaluation \u2014 recurring: open during yearly window_start + window_duration_hours, compute and store next_open",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1754,7 +1759,7 @@
     },
     {
       "id": "conditions-time-of-day",
-      "title": "Backend: Condition evaluation — time_of_day: open between after_hour and before_hour (server local time of memory drop location)",
+      "title": "Backend: Condition evaluation \u2014 time_of_day: open between after_hour and before_hour (server local time of memory drop location)",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1762,11 +1767,11 @@
       "blockedBy": [
         "endpoint-unlock-condition-eval"
       ],
-      "notes": "Use timezone derived from drop-point coordinates — not user's current timezone."
+      "notes": "Use timezone derived from drop-point coordinates \u2014 not user's current timezone."
     },
     {
       "id": "conditions-season",
-      "title": "Backend: Condition evaluation — season: open when current month is within month_start to month_end range",
+      "title": "Backend: Condition evaluation \u2014 season: open when current month is within month_start to month_end range",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1778,7 +1783,7 @@
     },
     {
       "id": "conditions-weather",
-      "title": "Backend: Condition evaluation — weather: check cached weather condition (rainy/sunny/snow) per geohash, 15min cache TTL",
+      "title": "Backend: Condition evaluation \u2014 weather: check cached weather condition (rainy/sunny/snow) per geohash, 15min cache TTL",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1790,7 +1795,7 @@
     },
     {
       "id": "conditions-co-presence",
-      "title": "Backend: Condition evaluation — co_presence: satisfied when distinct fresh presence_pings >= required_users within window_minutes",
+      "title": "Backend: Condition evaluation \u2014 co_presence: satisfied when distinct fresh presence_pings >= required_users within window_minutes",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1799,11 +1804,11 @@
         "endpoint-unlock-condition-eval",
         "schema-finds-pings"
       ],
-      "notes": "Satisfaction opens ~10min unlock window for all participants. States: idle → gathering → satisfied → unlocked → reset."
+      "notes": "Satisfaction opens ~10min unlock window for all participants. States: idle \u2192 gathering \u2192 satisfied \u2192 unlocked \u2192 reset."
     },
     {
       "id": "conditions-long-absence",
-      "title": "Backend: Condition evaluation — long_absence: open when days since last find >= configured threshold",
+      "title": "Backend: Condition evaluation \u2014 long_absence: open when days since last find >= configured threshold",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1816,7 +1821,7 @@
     },
     {
       "id": "conditions-nth-return",
-      "title": "Backend: Condition evaluation — nth_return: open on exactly the nth visit (count rows in finds table for this memory + user)",
+      "title": "Backend: Condition evaluation \u2014 nth_return: open on exactly the nth visit (count rows in finds table for this memory + user)",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1829,7 +1834,7 @@
     },
     {
       "id": "ios-significant-change",
-      "title": "iOS: Background — significant-change location service: wake on ~500m+ movement, fetch nearby own pins, re-arm geofences, terminate",
+      "title": "iOS: Background \u2014 significant-change location service: wake on ~500m+ movement, fetch nearby own pins, re-arm geofences, terminate",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -1841,7 +1846,7 @@
     },
     {
       "id": "ios-clmonitor-regions",
-      "title": "iOS: Background — CLMonitor region setup: ~14 nearest own pins + ~5 coarse geohash zones with eligible others' content",
+      "title": "iOS: Background \u2014 CLMonitor region setup: ~14 nearest own pins + ~5 coarse geohash zones with eligible others' content",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -1849,11 +1854,11 @@
       "blockedBy": [
         "ios-significant-change"
       ],
-      "notes": "iOS caps ~20 regions per app. Others' coarse zones: device knows 'cell 9q8yy has something' — never a point coordinate."
+      "notes": "iOS caps ~20 regions per app. Others' coarse zones: device knows 'cell 9q8yy has something' \u2014 never a point coordinate."
     },
     {
       "id": "ios-region-rotation",
-      "title": "iOS: Background — region rotation on every significant-change wake: evict stale regions, arm nearest set",
+      "title": "iOS: Background \u2014 region rotation on every significant-change wake: evict stale regions, arm nearest set",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -1865,7 +1870,7 @@
     },
     {
       "id": "ios-clvisit",
-      "title": "iOS: Background — CLVisit monitoring: secondary re-arm trigger on arrive/depart at OS-recognized places",
+      "title": "iOS: Background \u2014 CLVisit monitoring: secondary re-arm trigger on arrive/depart at OS-recognized places",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -1873,11 +1878,11 @@
       "blockedBy": [
         "ios-clmonitor-regions"
       ],
-      "notes": "startMonitoringVisits + didVisit → rotateRegions; CLVisitEvent helper tested."
+      "notes": "startMonitoringVisits + didVisit \u2192 rotateRegions; CLVisitEvent helper tested."
     },
     {
       "id": "ios-region-entry-scan",
-      "title": "iOS: Background — on region entry: acquire foreground-quality fix, call /scan, validate server-side, fire push only if in range",
+      "title": "iOS: Background \u2014 on region entry: acquire foreground-quality fix, call /scan, validate server-side, fire push only if in range",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -1890,7 +1895,7 @@
     },
     {
       "id": "ios-apns-registration",
-      "title": "iOS: APNs — register for push notifications, send device token to backend, handle token refresh",
+      "title": "iOS: APNs \u2014 register for push notifications, send device token to backend, handle token refresh",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -1898,11 +1903,11 @@
       "blockedBy": [
         "ios-region-entry-scan"
       ],
-      "notes": "AppDelegate token capture, POST /v1/devices/apns, permission sheet bundles notification ask with Always upgrade. Proximity push handling: tap → Wander tab + force scan; foreground banner + refresh (2026-06-18)."
+      "notes": "AppDelegate token capture, POST /v1/devices/apns, permission sheet bundles notification ask with Always upgrade. Proximity push handling: tap \u2192 Wander tab + force scan; foreground banner + refresh (2026-06-18)."
     },
     {
       "id": "backend-apns-push",
-      "title": "Backend: APNs push delivery — store device token, send summons/proximity notifications via token-based APNs",
+      "title": "Backend: APNs push delivery \u2014 store device token, send summons/proximity notifications via token-based APNs",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1914,7 +1919,7 @@
     },
     {
       "id": "app-attest-server",
-      "title": "Backend: App Attest validation — verify attestation object at auth/drop/unlock, check receipt, validate environment",
+      "title": "Backend: App Attest validation \u2014 verify attestation object at auth/drop/unlock, check receipt, validate environment",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1923,11 +1928,11 @@
         "auth-session-tokens",
         "endpoint-memories-post"
       ],
-      "notes": "Done 2026-06-22: migration 0011_device_attestations.sql, db/attestations.ts, lib/appAttest.ts (CBOR decode, cert chain verify, nonce check, COSE P-256 → SPKI, assertion replay-protection), routes/attest.ts (GET /auth/attest/challenge, POST /auth/attest/register). Wired in app.ts at /v1/auth/attest. Requires Apple Developer creds (APP_ATTEST_TEAM_ID, APP_ATTEST_BUNDLE_ID, APP_ATTEST_SECRET, APP_ATTEST_ROOT_CA) to activate."
+      "notes": "Done 2026-06-22: migration 0011_device_attestations.sql, db/attestations.ts, lib/appAttest.ts (CBOR decode, cert chain verify, nonce check, COSE P-256 \u2192 SPKI, assertion replay-protection), routes/attest.ts (GET /auth/attest/challenge, POST /auth/attest/register). Wired in app.ts at /v1/auth/attest. Requires Apple Developer creds (APP_ATTEST_TEAM_ID, APP_ATTEST_BUNDLE_ID, APP_ATTEST_SECRET, APP_ATTEST_ROOT_CA) to activate."
     },
     {
       "id": "app-attest-feature-flag",
-      "title": "Backend: App Attest feature flag — app_attest_required flag allows instant bypass during Apple downtime; bypass is audit-logged",
+      "title": "Backend: App Attest feature flag \u2014 app_attest_required flag allows instant bypass during Apple downtime; bypass is audit-logged",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1935,11 +1940,11 @@
       "blockedBy": [
         "app-attest-server"
       ],
-      "notes": "Done 2026-06-22: isAttestRequired() reads APP_ATTEST_REQUIRED env var (default false). When false, assertions are accepted/skipped and bypass is NOT yet wired into drop/unlock middleware — enforcement hook is ready to add when APP_ATTEST_REQUIRED=true at M5 TestFlight cut. DEC-22 bypass is the env var flip."
+      "notes": "Done 2026-06-22: isAttestRequired() reads APP_ATTEST_REQUIRED env var (default false). When false, assertions are accepted/skipped and bypass is NOT yet wired into drop/unlock middleware \u2014 enforcement hook is ready to add when APP_ATTEST_REQUIRED=true at M5 TestFlight cut. DEC-22 bypass is the env var flip."
     },
     {
       "id": "ios-app-attest",
-      "title": "iOS: App Attest — generate attestation key, attest key with Apple, send assertion on drop/unlock, check isSimulatedBySoftware",
+      "title": "iOS: App Attest \u2014 generate attestation key, attest key with Apple, send assertion on drop/unlock, check isSimulatedBySoftware",
       "status": "todo",
       "owner": "ios",
       "phase": 1,
@@ -1951,7 +1956,7 @@
     },
     {
       "id": "rate-limiting",
-      "title": "Backend: Rate limiting — per-user limits on /scan, /unlock, /memories (POST); IP-based limit on /auth",
+      "title": "Backend: Rate limiting \u2014 per-user limits on /scan, /unlock, /memories (POST); IP-based limit on /auth",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1964,7 +1969,7 @@
     },
     {
       "id": "accuracy-sanity-checks",
-      "title": "Backend: Accuracy sanity checks — reject if accuracy_m <= 0 or >= 1000m; reject if timestamp outside ±5min clock skew",
+      "title": "Backend: Accuracy sanity checks \u2014 reject if accuracy_m <= 0 or >= 1000m; reject if timestamp outside \u00b15min clock skew",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1976,7 +1981,7 @@
     },
     {
       "id": "audit-log-instrumentation",
-      "title": "Backend: Audit log instrumentation — structured events on auth, drop, scan, unlock, attest-bypass; never log coordinates",
+      "title": "Backend: Audit log instrumentation \u2014 structured events on auth, drop, scan, unlock, attest-bypass; never log coordinates",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -1989,7 +1994,7 @@
     },
     {
       "id": "account-export",
-      "title": "Backend: GET /user/export — generate signed archive URL containing all own memories (photos, metadata, no others' coords)",
+      "title": "Backend: GET /user/export \u2014 generate signed archive URL containing all own memories (photos, metadata, no others' coords)",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -2002,7 +2007,7 @@
     },
     {
       "id": "account-cascade-delete",
-      "title": "Backend: DELETE /user — cascade delete all memories, media, finds, pings, sessions; queue media deletion from S3",
+      "title": "Backend: DELETE /user \u2014 cascade delete all memories, media, finds, pings, sessions; queue media deletion from S3",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -2014,7 +2019,7 @@
     },
     {
       "id": "csam-vendor-live",
-      "title": "Backend: CSAM vendor live — swap stub for real hash-match webhook, implement mandatory reporting per 18 U.S.C. §2258A",
+      "title": "Backend: CSAM vendor live \u2014 swap stub for real hash-match webhook, implement mandatory reporting per 18 U.S.C. \u00a72258A",
       "status": "todo",
       "owner": "backend",
       "phase": 1,
@@ -2027,7 +2032,7 @@
     },
     {
       "id": "location-ci-tests",
-      "title": "Backend: Location CI test suite — GPX fixtures for approach, drive-by, urban canyon, dwell, re-entry; table-driven bubble + seal + condition tests",
+      "title": "Backend: Location CI test suite \u2014 GPX fixtures for approach, drive-by, urban canyon, dwell, re-entry; table-driven bubble + seal + condition tests",
       "status": "done",
       "owner": "backend",
       "phase": 1,
@@ -2035,11 +2040,11 @@
       "blockedBy": [
         "endpoint-unlock-condition-eval"
       ],
-      "notes": "Local Postgres in CI. Seed scripts create dense test geography. [Pure-function table-driven tests for bubble/seal/condition + approach/drive-by/urban-canyon scenarios DONE (60 tests green). DB-backed dwell/re-entry GPX integration (Postgres-in-CI seed) deferred — needs CI Postgres, tracked separately.]"
+      "notes": "Local Postgres in CI. Seed scripts create dense test geography. [Pure-function table-driven tests for bubble/seal/condition + approach/drive-by/urban-canyon scenarios DONE (60 tests green). DB-backed dwell/re-entry GPX integration (Postgres-in-CI seed) deferred \u2014 needs CI Postgres, tracked separately.]"
     },
     {
       "id": "appstore-reviewer-rationale",
-      "title": "Write App Store reviewer rationale for background-location permission — explain CLMonitor + significant-change architecture",
+      "title": "Write App Store reviewer rationale for background-location permission \u2014 explain CLMonitor + significant-change architecture",
       "status": "done",
       "owner": "either",
       "phase": 1,
@@ -2047,11 +2052,11 @@
       "blockedBy": [
         "ios-region-rotation"
       ],
-      "notes": "docs/engineering/appstore-reviewer-rationale.md — paste into App Store Connect review notes before TestFlight."
+      "notes": "docs/engineering/appstore-reviewer-rationale.md \u2014 paste into App Store Connect review notes before TestFlight."
     },
     {
       "id": "testflight-beta",
-      "title": "TestFlight beta — App Store Connect setup, privacy labels, internal test distribution",
+      "title": "TestFlight beta \u2014 App Store Connect setup, privacy labels, internal test distribution",
       "status": "todo",
       "owner": "either",
       "phase": 1,
@@ -2078,7 +2083,7 @@
     },
     {
       "id": "phone-verification-backend",
-      "title": "Backend: Phone verification — send OTP via Twilio SMS, verify, store E.164 number on user record",
+      "title": "Backend: Phone verification \u2014 send OTP via Twilio SMS, verify, store E.164 number on user record",
       "status": "todo",
       "owner": "backend",
       "phase": 2,
@@ -2090,7 +2095,7 @@
     },
     {
       "id": "recipient-acl-backend",
-      "title": "Backend: Recipient ACL — enforce at /scan and /unlock that recipient's verified phone matches memory's recipient list",
+      "title": "Backend: Recipient ACL \u2014 enforce at /scan and /unlock that recipient's verified phone matches memory's recipient list",
       "status": "todo",
       "owner": "backend",
       "phase": 2,
@@ -2102,7 +2107,7 @@
     },
     {
       "id": "summons-flow-backend",
-      "title": "Backend: Summons — owner triggers SMS to recipient with deep link + generic preview text (never memory content)",
+      "title": "Backend: Summons \u2014 owner triggers SMS to recipient with deep link + generic preview text (never memory content)",
       "status": "todo",
       "owner": "backend",
       "phase": 2,
@@ -2110,11 +2115,11 @@
       "blockedBy": [
         "recipient-acl-backend"
       ],
-      "notes": "Deep link → sign-in → memory surfaced on map. Twilio for SMS delivery."
+      "notes": "Deep link \u2192 sign-in \u2192 memory surfaced on map. Twilio for SMS delivery."
     },
     {
       "id": "ios-summons-deep-link",
-      "title": "iOS: Summons deep link handling — universal link opens app, authenticates, navigates to memory on map",
+      "title": "iOS: Summons deep link handling \u2014 universal link opens app, authenticates, navigates to memory on map",
       "status": "todo",
       "owner": "ios",
       "phase": 2,
@@ -2126,7 +2131,7 @@
     },
     {
       "id": "ios-recipient-ui",
-      "title": "iOS: Recipient UI — phone number input at drop time, contact picker integration, share card (iMessage/WhatsApp deep link)",
+      "title": "iOS: Recipient UI \u2014 phone number input at drop time, contact picker integration, share card (iMessage/WhatsApp deep link)",
       "status": "todo",
       "owner": "ios",
       "phase": 2,
@@ -2138,7 +2143,7 @@
     },
     {
       "id": "friends-graph-backend",
-      "title": "Backend: Friends graph — send/accept/reject friend request, mutual connection model, friends-tier discovery at /scan",
+      "title": "Backend: Friends graph \u2014 send/accept/reject friend request, mutual connection model, friends-tier discovery at /scan",
       "status": "todo",
       "owner": "backend",
       "phase": 2,
@@ -2150,7 +2155,7 @@
     },
     {
       "id": "replies-backend",
-      "title": "Backend: Replies — reply is a full Memory record attached to original pin, submitted at same location, discoverable by original owner on next return",
+      "title": "Backend: Replies \u2014 reply is a full Memory record attached to original pin, submitted at same location, discoverable by original owner on next return",
       "status": "todo",
       "owner": "backend",
       "phase": 2,
@@ -2162,7 +2167,7 @@
     },
     {
       "id": "ios-friends-ui",
-      "title": "iOS: Friends UI — friend request flow, friends list, friends-tier privacy picker in drop compose",
+      "title": "iOS: Friends UI \u2014 friend request flow, friends list, friends-tier privacy picker in drop compose",
       "status": "todo",
       "owner": "ios",
       "phase": 2,
@@ -2174,7 +2179,7 @@
     },
     {
       "id": "ios-replies-ui",
-      "title": "iOS: Replies UI — reply composer at unlocked pin, owner's Memory Lane shows reply indicator on next return",
+      "title": "iOS: Replies UI \u2014 reply composer at unlocked pin, owner's Memory Lane shows reply indicator on next return",
       "status": "todo",
       "owner": "ios",
       "phase": 2,
@@ -2186,7 +2191,7 @@
     },
     {
       "id": "vault-backend",
-      "title": "Backend: Vault — shared family memory map schema, membership, child-access-at-13 gating, milestone seal support",
+      "title": "Backend: Vault \u2014 shared family memory map schema, membership, child-access-at-13 gating, milestone seal support",
       "status": "todo",
       "owner": "backend",
       "phase": 2,
@@ -2198,7 +2203,7 @@
     },
     {
       "id": "ios-vault-ui",
-      "title": "iOS: Vault UI — family map view, member management, milestone seal composer, StoreKit 2 subscription purchase",
+      "title": "iOS: Vault UI \u2014 family map view, member management, milestone seal composer, StoreKit 2 subscription purchase",
       "status": "todo",
       "owner": "ios",
       "phase": 2,
@@ -2210,7 +2215,7 @@
     },
     {
       "id": "content-screening-pipeline",
-      "title": "Backend: Content screening pipeline for public memories — ML classifier + human moderation queue, auto-hide on flag",
+      "title": "Backend: Content screening pipeline for public memories \u2014 ML classifier + human moderation queue, auto-hide on flag",
       "status": "todo",
       "owner": "backend",
       "phase": 3,
@@ -2222,7 +2227,7 @@
     },
     {
       "id": "velocity-teleport-detection",
-      "title": "Backend: Velocity/teleport detection for public content — position trail + timestamp analysis (revisit DEC-23)",
+      "title": "Backend: Velocity/teleport detection for public content \u2014 position trail + timestamp analysis (revisit DEC-23)",
       "status": "todo",
       "owner": "backend",
       "phase": 3,
@@ -2230,11 +2235,11 @@
       "blockedBy": [
         "content-screening-pipeline"
       ],
-      "notes": "Deliberately deferred from Phase 1 (private-only). Requires position trail — evaluate privacy cost vs. abuse reduction at Phase 3 kickoff."
+      "notes": "Deliberately deferred from Phase 1 (private-only). Requires position trail \u2014 evaluate privacy cost vs. abuse reduction at Phase 3 kickoff."
     },
     {
       "id": "public-memories-backend",
-      "title": "Backend: Public memories — 16+ age gate enforcement at /scan for public tier, content-screened before discoverable",
+      "title": "Backend: Public memories \u2014 16+ age gate enforcement at /scan for public tier, content-screened before discoverable",
       "status": "todo",
       "owner": "backend",
       "phase": 3,
@@ -2246,7 +2251,7 @@
     },
     {
       "id": "ios-public-memories",
-      "title": "iOS: Public memory discovery UI — public pins in Wander, content reporting flow, age gate enforcement",
+      "title": "iOS: Public memory discovery UI \u2014 public pins in Wander, content reporting flow, age gate enforcement",
       "status": "todo",
       "owner": "ios",
       "phase": 3,
@@ -2258,7 +2263,7 @@
     },
     {
       "id": "institutional-layer-backend",
-      "title": "Backend: Institutional layer — curated layer license (per geography, annual), staff-curated memory trails, anonymized engagement data",
+      "title": "Backend: Institutional layer \u2014 curated layer license (per geography, annual), staff-curated memory trails, anonymized engagement data",
       "status": "todo",
       "owner": "backend",
       "phase": 3,
@@ -2270,7 +2275,7 @@
     },
     {
       "id": "ios-institutional-layer",
-      "title": "iOS: Institutional layer UI — curated trail overlay, venue-specific Wander mode, memory trail navigator",
+      "title": "iOS: Institutional layer UI \u2014 curated trail overlay, venue-specific Wander mode, memory trail navigator",
       "status": "todo",
       "owner": "ios",
       "phase": 3,
@@ -2282,7 +2287,7 @@
     },
     {
       "id": "ios-profile-tab",
-      "title": "iOS: Profile tab — sign out, export data, delete account",
+      "title": "iOS: Profile tab \u2014 sign out, export data, delete account",
       "status": "done",
       "owner": "ios",
       "phase": 1,
@@ -2301,7 +2306,7 @@
       "phase": 1.5,
       "milestone": "M6",
       "blockedBy": [],
-      "notes": "Progress bar with rotating text ('Loading your memories…' / 'Creating your legacy…'). Pins cascade one-by-one (~80ms stagger) after POST /v1/memories or /v1/memories/import completes. Use OwnMemoryPinCache. MapKit annotation drop animation. No backend changes."
+      "notes": "Progress bar with rotating text ('Loading your memories\u2026' / 'Creating your legacy\u2026'). Pins cascade one-by-one (~80ms stagger) after POST /v1/memories or /v1/memories/import completes. Use OwnMemoryPinCache. MapKit annotation drop animation. No backend changes."
     },
     {
       "id": "ios-own-memory-map-pins",
@@ -2311,7 +2316,7 @@
       "phase": 1.5,
       "milestone": "M6",
       "blockedBy": [],
-      "notes": "Render OwnMemoryPinCache pins as map annotations in current viewport. Already have coordinates. No privacy concern — these are the user's own memories."
+      "notes": "Render OwnMemoryPinCache pins as map annotations in current viewport. Already have coordinates. No privacy concern \u2014 these are the user's own memories."
     },
     {
       "id": "backend-scan-zones",
@@ -2321,7 +2326,7 @@
       "phase": 1.5,
       "milestone": "M6",
       "blockedBy": [],
-      "notes": "Joseph decided precision-7 (~150m cells) via dec-coarse-zone-precision (2026-06-22). Return { geohash_prefix, count } for nearby cells with eligible content. NO lat/lng, NO exact coordinates. Contract change to api-contract §4."
+      "notes": "Joseph decided precision-7 (~150m cells) via dec-coarse-zone-precision (2026-06-22). Return { geohash_prefix, count } for nearby cells with eligible content. NO lat/lng, NO exact coordinates. Contract change to api-contract \u00a74."
     },
     {
       "id": "ios-coarse-zone-glow",
@@ -2345,7 +2350,7 @@
     },
     {
       "id": "android",
-      "title": "Android — full parity with iOS Phase 1–2 feature set",
+      "title": "Android \u2014 full parity with iOS Phase 1\u20132 feature set",
       "status": "todo",
       "owner": "either",
       "phase": 3,
@@ -2353,7 +2358,7 @@
       "blockedBy": [
         "ios-public-memories"
       ],
-      "notes": "FCM for push. Re-evaluate MapKit → Maps SDK. Background location model differs significantly."
+      "notes": "FCM for push. Re-evaluate MapKit \u2192 Maps SDK. Background location model differs significantly."
     },
     {
       "id": "import-row-thumbnails-placenames",
@@ -2371,7 +2376,7 @@
       "owner": "backend",
       "phase": 2,
       "milestone": "M",
-      "notes": "Migration 0012_memory_media.sql (hero denormalised on memories + memory_media holds all, backfilled). db/memoryMedia.ts. /uploads/direct takes X-Media-Position (0=hero mirrored to memories.media_key+scan_status; 1+ extra). /import takes per-cluster photo_count (clamped 1000 anti-abuse), pre-creates slots, returns media_count. GET /:id + unlock return ordered media[] (signed). Rate limits raised: import 5->30/hr, uploads 20->500/hr. api-contract §3.2/§4/§5 updated. tsc clean, 63 unit tests pass. Integration tests need live DATABASE_URL (skip locally) — CI applies 0012 via schema_migrations runner."
+      "notes": "Migration 0012_memory_media.sql (hero denormalised on memories + memory_media holds all, backfilled). db/memoryMedia.ts. /uploads/direct takes X-Media-Position (0=hero mirrored to memories.media_key+scan_status; 1+ extra). /import takes per-cluster photo_count (clamped 1000 anti-abuse), pre-creates slots, returns media_count. GET /:id + unlock return ordered media[] (signed). Rate limits raised: import 5->30/hr, uploads 20->500/hr. api-contract \u00a73.2/\u00a74/\u00a75 updated. tsc clean, 63 unit tests pass. Integration tests need live DATABASE_URL (skip locally) \u2014 CI applies 0012 via schema_migrations runner."
     },
     {
       "id": "import-upload-all-ios",
@@ -2389,7 +2394,7 @@
       "owner": "backend",
       "phase": 2,
       "milestone": "M",
-      "notes": "DONE (Claude). Hybrid: hero (pos 0) uploads FOREGROUND (guaranteed image + pin + scan clear + drives progress); EXTRAS go to a real background URLSession (file-based upload tasks) — non-blocking, survive app suspension. BackgroundMediaUploader.shared.enqueue(request:data:) writes a temp file + uploadTask(fromFile:); BackgroundUploadSessionDelegate cleans up temp files on completion + sweeps stale ones on launch. APIClient.directUploadRequest builds the authorized /uploads/direct request (no body). xcodebuild ImportFeature + SPM 64 tests pass. NOTE FOR CURSOR: add the scene hook in LegacyApp.swift to finish events after background relaunch — `.backgroundTask(.urlSession(\"app.legacy.ios.upload\")) {}` on the App scene (or UIKit handleEventsForBackgroundURLSession -> BackgroundUploadSessionDelegate.shared.setBackgroundCompletionHandler). Feature works without it (uploads still land + backend records them); it's the relaunch optimization."
+      "notes": "DONE (Claude). Hybrid: hero (pos 0) uploads FOREGROUND (guaranteed image + pin + scan clear + drives progress); EXTRAS go to a real background URLSession (file-based upload tasks) \u2014 non-blocking, survive app suspension. BackgroundMediaUploader.shared.enqueue(request:data:) writes a temp file + uploadTask(fromFile:); BackgroundUploadSessionDelegate cleans up temp files on completion + sweeps stale ones on launch. APIClient.directUploadRequest builds the authorized /uploads/direct request (no body). xcodebuild ImportFeature + SPM 64 tests pass. NOTE FOR CURSOR: add the scene hook in LegacyApp.swift to finish events after background relaunch \u2014 `.backgroundTask(.urlSession(\"app.legacy.ios.upload\")) {}` on the App scene (or UIKit handleEventsForBackgroundURLSession -> BackgroundUploadSessionDelegate.shared.setBackgroundCompletionHandler). Feature works without it (uploads still land + backend records them); it's the relaunch optimization."
     },
     {
       "id": "memory-lane-gallery-multimedia",
@@ -2407,7 +2412,7 @@
       "owner": "either",
       "phase": 2,
       "milestone": "M",
-      "notes": "DONE (Claude). ImportCoordinator counts PHOTOS not memories: total=sum(mediaCount), bar advances per photo (failed extras still advance so it reaches 100%). Label in ImportFeature.swift -> 'Saving X of Y photos…'. xcodebuild ImportFeature SUCCEEDED."
+      "notes": "DONE (Claude). ImportCoordinator counts PHOTOS not memories: total=sum(mediaCount), bar advances per photo (failed extras still advance so it reaches 100%). Label in ImportFeature.swift -> 'Saving X of Y photos\u2026'. xcodebuild ImportFeature SUCCEEDED."
     },
     {
       "id": "memory-lane-photo-count-badge",

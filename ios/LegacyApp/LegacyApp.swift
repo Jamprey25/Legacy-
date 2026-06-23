@@ -268,6 +268,9 @@ private struct MainTabView: View {
             profileTab
         }
         .tint(LegacyColor.accent)
+        .toolbarBackground(LegacyColor.background.opacity(0.96), for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
+        .onAppear { configureTabBarAppearance() }
         .sheet(isPresented: $showBackgroundDiscoveryPrompt) {
             BackgroundDiscoveryPermissionSheet(
                 onEnable: {
@@ -359,6 +362,21 @@ private struct MainTabView: View {
     private func handleProximityPush(openWander: Bool) {
         if openWander { selectedTab = .wander }
         Task { await wanderCoordinator.scanIfNeeded(force: true) }
+    }
+
+    private func configureTabBarAppearance() {
+        #if os(iOS)
+        let appearance = UITabBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = UIColor(LegacyColor.background.opacity(0.98))
+        appearance.shadowColor = UIColor(LegacyColor.separator)
+        appearance.stackedLayoutAppearance.selected.iconColor = UIColor(LegacyColor.accent)
+        appearance.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: UIColor(LegacyColor.accent)]
+        appearance.stackedLayoutAppearance.normal.iconColor = UIColor(LegacyColor.textSecondary)
+        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor(LegacyColor.textSecondary)]
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+        #endif
     }
 
     @ViewBuilder

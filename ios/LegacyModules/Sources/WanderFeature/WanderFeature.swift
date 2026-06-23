@@ -302,9 +302,18 @@ public struct WanderFeatureRootView: View {
     private var pinCelebration: PinDropCelebrationCoordinator?
     @State private var showsWalkHint = true
     @State private var trayExpanded = true
+    /// Once the user taps "Got it" the walk hint never auto-returns. Persisted so it
+    /// stays gone across tab switches and app launches (fixes "it comes over every
+    /// time I go back to Wander").
+    @AppStorage("legacyHasDismissedWalkHint") private var hasDismissedWalkHint = false
 
     private var showsDiscoveryHint: Bool {
-        coordinator.teasers.isEmpty && showsWalkHint
+        coordinator.teasers.isEmpty
+            && showsWalkHint
+            && !hasDismissedWalkHint
+            // Don't cover the screen while a drop celebration is playing — that switch
+            // to Wander is what made the hint "come over" mid-drop.
+            && !(pinCelebration?.isActive ?? false)
     }
 
     public var body: some View {
@@ -336,9 +345,13 @@ public struct WanderFeatureRootView: View {
                 .padding(.top, LegacySpacing.sm)
 
                 if showsDiscoveryHint {
-                    WanderEmptyState()
+                    WanderEmptyState(onDismiss: {
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            hasDismissedWalkHint = true
+                            showsWalkHint = false
+                        }
+                    })
                         .frame(maxHeight: .infinity)
-                        .allowsHitTesting(false)
                         .transition(.opacity)
                 } else {
                     // Map-first: leave the middle open so the map stays pannable.
@@ -403,7 +416,7 @@ public struct WanderFeatureRootView: View {
         }
         .animation(.easeOut(duration: 0.45), value: showsWalkHint)
         .task(id: coordinator.teasers.isEmpty) {
-            guard coordinator.teasers.isEmpty else {
+            guard coordinator.teasers.isEmpty, !hasDismissedWalkHint else {
                 showsWalkHint = false
                 return
             }
@@ -509,6 +522,8 @@ private struct WarmthBadge: View {
 }
 
 private struct WanderEmptyState: View {
+    let onDismiss: () -> Void
+
     var body: some View {
         VStack(spacing: LegacySpacing.lg) {
             Image(systemName: "figure.walk")
@@ -522,6 +537,12 @@ private struct WanderEmptyState: View {
                 .foregroundStyle(LegacyColor.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, LegacySpacing.xl)
+
+            Button("Got it", action: onDismiss)
+                .font(LegacyFont.callout.weight(.semibold))
+                .foregroundStyle(LegacyColor.accent)
+                .padding(.top, LegacySpacing.xs)
+                .accessibilityHint("Hides this tip for good")
         }
     }
 }

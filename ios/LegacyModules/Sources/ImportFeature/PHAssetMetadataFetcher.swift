@@ -10,8 +10,11 @@ public enum PHAssetMetadataError: Error, Sendable {
 
 /// Reads GPS + capture date from the photo library. **Never loads image bytes.**
 public enum PHAssetMetadataFetcher {
-    /// Max assets to scan per import pass (performance guard).
-    public static let maxAssetsToScan = 5_000
+    /// Max assets to scan per import pass (performance guard). Sorted newest-first, so this
+    /// is the most-recent N photos. At 5k a heavy shooter only reached ~1 year back; 20k
+    /// covers several years. Only GPS-tagged photos become memories (see the `asset.location`
+    /// guard below), so the effective memory yield is a fraction of this.
+    public static let maxAssetsToScan = 20_000
 
     public static func fetchGeoSamples() async throws -> [PhotoGeoSample] {
         let status = await requestAuthorization()

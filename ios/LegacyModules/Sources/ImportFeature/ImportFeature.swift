@@ -22,11 +22,9 @@ public struct ImportFeatureRootView: View {
     public var body: some View {
         NavigationStack {
             ZStack {
-                LegacyColor.background
-                    .ignoresSafeArea()
-
                 content
             }
+            .legacyFeatureBackground(glow: Color(red: 0.56, green: 0.76, blue: 0.96))
             .navigationTitle("Import")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -53,11 +51,22 @@ public struct ImportFeatureRootView: View {
 
     private var idleView: some View {
         VStack(spacing: LegacySpacing.lg) {
-            ContentUnavailableView(
-                "Import memories",
-                systemImage: "square.stack.3d.up",
-                description: Text("Find geotagged photos and import each visit as a separate memory.")
-            )
+            LegacyChromeCard(glow: Color(red: 0.56, green: 0.76, blue: 0.96)) {
+                VStack(spacing: LegacySpacing.sm) {
+                    Image(systemName: "square.stack.3d.up")
+                        .font(.system(size: 32, weight: .semibold))
+                        .foregroundStyle(LegacyColor.accent)
+                    Text("Import memories")
+                        .font(LegacyFont.title2)
+                        .foregroundStyle(LegacyColor.textPrimary)
+                    Text("Find geotagged photos and import each visit as a separate memory.")
+                        .font(LegacyFont.callout)
+                        .foregroundStyle(LegacyColor.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .padding(.horizontal, LegacySpacing.lg)
             #if os(iOS)
             Button("Scan photo library") {
                 Task { await coordinator.scanPhotoLibrary() }
@@ -72,6 +81,25 @@ public struct ImportFeatureRootView: View {
 
     private var clusterExplorer: some View {
         VStack(spacing: 0) {
+            LegacyChromeCard(glow: Color(red: 0.56, green: 0.76, blue: 0.96)) {
+                HStack(spacing: LegacySpacing.md) {
+                    VStack(alignment: .leading, spacing: LegacySpacing.xxs) {
+                        Text("Archive Scanner")
+                            .font(LegacyFont.headline)
+                            .foregroundStyle(LegacyColor.textPrimary)
+                        Text("\(coordinator.geoSampleCount) geotagged photos · \(coordinator.clusters.count) visits")
+                            .font(LegacyFont.caption)
+                            .foregroundStyle(LegacyColor.textSecondary)
+                    }
+                    Spacer()
+                    Image(systemName: "sparkles.rectangle.stack")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(LegacyColor.accent)
+                }
+            }
+            .padding(.horizontal, LegacySpacing.lg)
+            .padding(.bottom, LegacySpacing.sm)
+
             if case .importing(let current, let total) = coordinator.phase {
                 ProgressView(
                     "Saving \(current) of \(total) \(total == 1 ? "photo" : "photos")…",
@@ -82,11 +110,6 @@ public struct ImportFeatureRootView: View {
                 .padding(.horizontal, LegacySpacing.lg)
                 .padding(.top, LegacySpacing.sm)
             }
-
-            Text("\(coordinator.geoSampleCount) geotagged photos → \(coordinator.clusters.count) visits")
-                .font(LegacyFont.caption)
-                .foregroundStyle(LegacyColor.textSecondary)
-                .padding(.vertical, LegacySpacing.xs)
 
             #if os(iOS)
             ImportClusterMap(
@@ -99,7 +122,9 @@ public struct ImportFeatureRootView: View {
             .padding(.bottom, LegacySpacing.xs)
             #endif
 
-            clusterList
+            #if os(iOS)
+            ImportLocationBrowser(coordinator: coordinator)
+            #endif
 
             if !coordinator.selectedClusterIDs.isEmpty {
                 Button("Import \(coordinator.selectedClusterIDs.count) \(coordinator.selectedClusterIDs.count == 1 ? "memory" : "memories")") {
@@ -113,83 +138,25 @@ public struct ImportFeatureRootView: View {
         }
     }
 
-    private var clusterList: some View {
-        List {
-            ForEach(clustersByYear, id: \.year) { group in
-                Section {
-                    ForEach(group.clusters) { cluster in
-                        ImportClusterRow(
-                            cluster: cluster,
-                            isSelected: coordinator.selectedClusterIDs.contains(cluster.id)
-                        ) {
-                            coordinator.toggleSelection(cluster)
-                        }
-                    }
-                } header: {
-                    HStack {
-                        Text(String(group.year))
-                            .font(LegacyFont.headline)
-                            .foregroundStyle(LegacyColor.textPrimary)
-                        Spacer()
-                        Button(allSelectedInYear(group) ? "Deselect year" : "Select year") {
-                            toggleYear(group)
-                        }
-                        .font(LegacyFont.caption)
-                        .foregroundStyle(LegacyColor.accent)
-                    }
-                    .padding(.vertical, LegacySpacing.xxs)
-                }
-            }
-        }
-        .scrollContentBackground(.hidden)
-        #if os(iOS)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button(coordinator.selectedClusterIDs.count == coordinator.clusters.count ? "Deselect all" : "Select all") {
-                    if coordinator.selectedClusterIDs.count == coordinator.clusters.count {
-                        coordinator.selectedClusterIDs = []
-                    } else {
-                        coordinator.selectedClusterIDs = Set(coordinator.clusters.map(\.id))
-                    }
-                }
-                .font(LegacyFont.callout)
-            }
-        }
-        #endif
-    }
-
-    // MARK: - Year grouping helpers
-
-    private var clustersByYear: [(year: Int, clusters: [PhotoCluster])] {
-        let grouped = Dictionary(grouping: coordinator.clusters) {
-            Calendar.current.component(.year, from: $0.date)
-        }
-        return grouped
-            .sorted { $0.key > $1.key }
-            .map { (year: $0.key, clusters: $0.value.sorted { $0.date > $1.date }) }
-    }
-
-    private func allSelectedInYear(_ group: (year: Int, clusters: [PhotoCluster])) -> Bool {
-        group.clusters.allSatisfy { coordinator.selectedClusterIDs.contains($0.id) }
-    }
-
-    private func toggleYear(_ group: (year: Int, clusters: [PhotoCluster])) {
-        if allSelectedInYear(group) {
-            group.clusters.forEach { coordinator.selectedClusterIDs.remove($0.id) }
-        } else {
-            group.clusters.forEach { coordinator.selectedClusterIDs.insert($0.id) }
-        }
-    }
-
     // MARK: - Completion / failure
 
     private func completionView(count: Int) -> some View {
         VStack(spacing: LegacySpacing.lg) {
-            ContentUnavailableView(
-                "Imported",
-                systemImage: "checkmark.circle",
-                description: Text("\(count) \(count == 1 ? "memory" : "memories") created. They appear in Memory Lane when processing finishes.")
-            )
+            LegacyChromeCard {
+                VStack(spacing: LegacySpacing.sm) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 34, weight: .semibold))
+                        .foregroundStyle(LegacyColor.accent)
+                    Text("Imported")
+                        .font(LegacyFont.title2)
+                        .foregroundStyle(LegacyColor.textPrimary)
+                    Text("\(count) \(count == 1 ? "memory" : "memories") created. They appear in Memory Lane when processing finishes.")
+                        .font(LegacyFont.callout)
+                        .foregroundStyle(LegacyColor.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .padding(.horizontal, LegacySpacing.lg)
             Button("Import more") { coordinator.reset() }
                 .buttonStyle(.legacySecondary)
         }
@@ -197,11 +164,21 @@ public struct ImportFeatureRootView: View {
 
     private func failedView(message: String) -> some View {
         VStack(spacing: LegacySpacing.lg) {
-            Text(message)
-                .font(LegacyFont.callout)
-                .foregroundStyle(LegacyColor.danger)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, LegacySpacing.lg)
+            LegacyChromeCard(glow: LegacyColor.danger) {
+                VStack(spacing: LegacySpacing.sm) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundStyle(LegacyColor.danger)
+                    Text("Import interrupted")
+                        .font(LegacyFont.title2)
+                        .foregroundStyle(LegacyColor.textPrimary)
+                    Text(message)
+                        .font(LegacyFont.callout)
+                        .foregroundStyle(LegacyColor.danger)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .padding(.horizontal, LegacySpacing.lg)
             #if os(iOS)
             // Permission failures can't be retried in-app — send the user to Settings.
             if message.localizedCaseInsensitiveContains("Settings") {
@@ -222,7 +199,7 @@ public struct ImportFeatureRootView: View {
 
 // MARK: - Cluster row
 
-private struct ImportClusterRow: View {
+struct ImportClusterRow: View {
     let cluster: PhotoCluster
     let isSelected: Bool
     let onToggle: () -> Void

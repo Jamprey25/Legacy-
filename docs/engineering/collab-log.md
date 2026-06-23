@@ -1353,3 +1353,46 @@ Finished the deferred follow-up so "upload all photos" no longer means hundreds 
 `.backgroundTask(.urlSession("app.legacy.ios.upload")) { }` on the `App` scene (or the UIKit `handleEventsForBackgroundURLSession` → `BackgroundUploadSessionDelegate.shared.setBackgroundCompletionHandler`). **The feature works without it** — uploads still complete and the backend records each photo; this only optimizes the relaunch-to-finish-events case and silences the OS warning. I left `LegacyApp.swift` untouched (yours).
 
 That closes every item of the multi-photo memory feature.
+
+
+---
+
+## [ios → all] 2026-06-23 (session 12) — Legacy visual revamp for tab personality
+
+**Context:** Joseph asked for a less default-iOS look across tabs (especially Drop treasure/note) while keeping Profile’s stronger visual direction.
+
+**Shipped (iOS UI/UX only):**
+- Added shared visual chrome in `DesignSystem` (`LegacyFeatureBackground`, `LegacyChromeCard`) so tabs can use atmospheric gradients + elevated legacy-styled cards instead of flat stock surfaces.
+- **Drop tab redesign** (`DropFeature.swift`): replaced segmented control with custom mode chips, added mode-specific hero cards (Quick Pin / Treasure Chest / Note in a Bottle), upgraded treasure media selection styling, and framed Treasure/Note forms in branded chrome so they read as feature rituals rather than default grouped forms.
+- **Import tab refresh** (`ImportFeature.swift`): added an "Archive Scanner" command card, upgraded idle/completion/error states to branded cards, and switched tab background to feature chrome for stronger identity.
+- **Memory Lane polish** (`MemoryLaneFeature.swift`): added "Memory Vault" summary card, moved to the same chrome backdrop, and improved section/card treatment to feel more custom and less system-default.
+- **Tab bar theming** (`LegacyApp.swift`): tuned tab bar background + icon/title appearance to align with Legacy palette and reduce the stock iOS chrome feel.
+
+**Tasks marked done:** none (UI polish request outside tracked task board items).
+
+**Blocked on Joseph / other agent:** none.
+
+**Uncommitted / branch:** `main`, local edits in ios/** + shared docs/tasks sync updates (ready for review).
+
+**Next session picks up:**
+1. Device-level visual QA pass for contrast/readability in bright sunlight and dark mode edge cases.
+2. If desired, extend the same chrome language to Wander tray micro-interactions and Profile action rows for full visual consistency.
+
+
+---
+
+## [backend → all] 2026-06-23 (session 13) — E2E test bug fixes (iOS-side)
+
+**Context:** Joseph ran an end-to-end test and reported 5 issues. I (Claude) fixed 4; one needs a crash log. All edits verified compiling (`swift build` WanderFeature + ImportFeature for both macOS and the iOS-sim SDK).
+
+**Fixed & verified building:**
+- **Import scan limit 5k → 20k** (`PHAssetMetadataFetcher.maxAssetsToScan`). Root cause of "only getting memories from 2024": the newest-5k cap only reached ~1 year back for heavy shooters. The real ceiling is still the GPS-tag filter (`asset.location` guard drops 40–70% of photos) — reverse-geocode fallback for non-GPS photos remains a future enhancement.
+- **Wander "Walk to discover" hint** (`WanderFeature.swift`): added a **"Got it"** dismiss button + `@AppStorage("legacyHasDismissedWalkHint")` so it never auto-returns across tab switches/launches (was re-appearing every visit). Also suppressed it while a pin-drop celebration is active so it stops covering the screen mid-drop.
+- **Import location drill-down** (NEW `ImportLocationBrowser.swift`): replaced the flat/year list with **Country → State → City → visits**, select-all at every level (tri-state checkmark), individual visits at the leaf. Added `ImportRegion` model + `PlaceNameResolver.region(lat:lng:)` (structured reverse-geocode, ~1.1 km bucket cache) + `ImportCoordinator.resolveRegions()` (progressive, runs after scan; rows sit under "Locating…" until resolved). `ImportClusterRow` made internal for reuse.
+
+**FIXED — the "kicked out" crash (from Joseph's device .ips):**
+- **Root cause:** `SIGABRT` from a CoreLocation internal assertion in **`CLMonitor.init`**, called eagerly by `BackgroundLocationCoordinator.startIfAuthorized()` **inside the cold-launch `locationManagerDidChangeAuthorization` callback**. It reproduces on any launch where the device already has **Always** location (Joseph had granted it in earlier testing), so it fired right after sign-in → crash to home screen. Backend auth + age gate were verified correct and were never involved.
+- **Fix** (`BackgroundLocationCoordinator.swift`, LocationEngine): removed the eager `CLMonitor` construction from `startIfAuthorized()`; added `ensureRegionService()` that creates the monitor **lazily on the first real region rotation** (a settled background significant-change/visit wake), off the launch/auth-callback path. Significant-change + visit monitoring (CLLocationManager, crash-free) still start at launch. Verified compiling (iOS-sim SDK). This file was clean (no Cursor edits), so it can be committed independently.
+- **⚠️ CURSOR — please validate on-device:** confirm (a) launch-while-Always no longer crashes, and (b) the first background region rotation doesn't re-trigger the `CLMonitor` assert on iOS 26.x. If it still asserts at lazy creation, `CLMonitor`/background-region monitoring may need to be feature-flagged off on iOS 26 until Apple's fix — foreground Wander/Drop/Import don't depend on it.
+
+**COORDINATION — not committed:** my fixes are layered on top of Cursor's **uncommitted session-12 work** (esp. `ImportFeature.swift`, co-edited). I did **not** commit, to avoid clobbering in-flight changes. My files: `PHAssetMetadataFetcher.swift`, `PlaceNameResolver.swift`, `ImportCoordinator.swift`, `WanderFeature.swift`, `ImportFeature.swift` (shared), NEW `ImportLocationBrowser.swift`. Joseph to coordinate the commit.

@@ -50,6 +50,11 @@ public final class BackgroundLocationCoordinator: NSObject {
     /// is silently dropped. This covers the race between the `.task {}` startup path
     /// and the `locationManagerDidChangeAuthorization` delegate firing on relaunch
     /// after iOS terminates the app to apply "Always Allow" permissions.
+    ///
+    /// Note: this deliberately does NOT construct the `CLMonitor` (see `ensureRegionService`).
+    /// Building it here ran synchronously inside the cold-launch authorization callback and
+    /// CoreLocation aborted with an internal assertion (crash-on-launch for Always-authorized
+    /// users). The monitor is created lazily on the first real region rotation instead.
     public func startIfAuthorized() async {
         guard isAuthorizedForBackground else {
             phase = .idle
@@ -59,16 +64,23 @@ public final class BackgroundLocationCoordinator: NSObject {
         isStartingMonitoring = true
         defer { isStartingMonitoring = false }
 
-        if #available(iOS 17.0, *), regionService == nil {
-            regionService = await CLMonitorRegionService()
-            startEventLoopIfNeeded()
-        }
-
         #if !targetEnvironment(simulator)
         manager.startMonitoringSignificantLocationChanges()
         manager.startMonitoringVisits()
         #endif
         phase = .monitoring
+    }
+
+    /// Lazily create the `CLMonitor`-backed region service the first time we actually have
+    /// a fix to arm regions around. Kept off the launch / authorization-callback path on
+    /// purpose — constructing `CLMonitor` there aborts the process on device.
+    @available(iOS 17.0, *)
+    private func ensureRegionService() async -> CLMonitorRegionService? {
+        if let regionService { return regionService }
+        let service = await CLMonitorRegionService()
+        regionService = service
+        startEventLoopIfNeeded()
+        return service
     }
 
     public func stop() {
@@ -93,7 +105,7 @@ public final class BackgroundLocationCoordinator: NSObject {
             coarseZones: coarse
         )
 
-        if #available(iOS 17.0, *), let regionService {
+        if #available(iOS 17.0, *), let regionService = await ensureRegionService() {
             await regionService.syncRegions(slots)
             armedRegionCount = slots.count
             phase = .monitoring

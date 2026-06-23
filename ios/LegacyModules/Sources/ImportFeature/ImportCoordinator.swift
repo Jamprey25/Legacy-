@@ -12,6 +12,23 @@ public enum ImportPhase: Sendable, Equatable {
     case failed(String)
 }
 
+/// Administrative location for a visit, used by the Country → State → City → visits
+/// import drill-down. Empty components fall back to the nearest known level for display.
+public struct ImportRegion: Sendable, Equatable, Hashable {
+    public let country: String
+    public let admin: String
+    public let city: String
+
+    public init(country: String, admin: String, city: String) {
+        self.country = country
+        self.admin = admin
+        self.city = city
+    }
+
+    /// Resolved but with no usable name (geocoder returned nothing useful).
+    public static let unknown = ImportRegion(country: "Unknown location", admin: "", city: "")
+}
+
 @MainActor
 @Observable
 public final class ImportCoordinator {
@@ -37,6 +54,11 @@ public final class ImportCoordinator {
     public private(set) var geoSampleCount = 0
     public var selectedClusterIDs: Set<String> = []
 
+    /// Resolved location per cluster ID. Fills in progressively after a scan; a cluster
+    /// absent from this map is still "Locating…". Drives the import location drill-down.
+    public private(set) var clusterRegions: [String: ImportRegion] = [:]
+    public private(set) var isResolvingRegions = false
+
     public private(set) var pendingCelebrationPins: [CachedOwnPin] = []
 
     public func consumeCelebrationPins() -> [CachedOwnPin] {
@@ -59,6 +81,7 @@ public final class ImportCoordinator {
         phase = .scanning
         selectedClusterIDs = []
         clusters = []
+        clusterRegions = [:]
         geoSamples = []
 
         do {
@@ -67,11 +90,42 @@ public final class ImportCoordinator {
             geoSampleCount = samples.count
             clusters = PhotoClusterEngine.cluster(samples: samples)
             phase = clusters.isEmpty ? .failed("No geotagged photos found in your library.") : .ready
+            if !clusters.isEmpty {
+                // Sort visits into Country/State/City in the background so the list is
+                // usable immediately; rows move out of "Locating…" as they resolve.
+                Task { await resolveRegions() }
+            }
         } catch PHAssetMetadataError.unauthorized {
             phase = .failed("Photo access is off. Enable it in Settings to import.")
         } catch {
             phase = .failed("Could not scan your library. Try again.")
         }
+    }
+
+    /// Reverse-geocode every cluster centroid into a Country/State/City. Serialized through
+    /// the resolver's actor (and its ~1.1 km bucket cache), so visits in the same area share
+    /// a single geocoder request and we stay clear of CLGeocoder's rate limit.
+    public func resolveRegions() async {
+        let pending = clusters.filter { clusterRegions[$0.id] == nil }
+        guard !pending.isEmpty else { return }
+        isResolvingRegions = true
+        defer { isResolvingRegions = false }
+
+        for cluster in pending {
+            let region = await PlaceNameResolver.shared.region(
+                lat: cluster.centroidLat,
+                lng: cluster.centroidLng
+            ) ?? .unknown
+            clusterRegions[cluster.id] = region
+        }
+    }
+
+    public func selectClusters(_ ids: [String]) {
+        selectedClusterIDs.formUnion(ids)
+    }
+
+    public func deselectClusters(_ ids: [String]) {
+        selectedClusterIDs.subtract(ids)
     }
     #endif
 

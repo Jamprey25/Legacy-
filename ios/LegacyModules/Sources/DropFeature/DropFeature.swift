@@ -34,21 +34,19 @@ public struct DropFeatureRootView: View {
     public var body: some View {
         #if os(iOS)
         NavigationStack {
-            VStack(spacing: LegacySpacing.md) {
-                Picker("Drop mode", selection: $mode) {
-                    ForEach(DropTabMode.allCases) { entry in
-                        Label(entry.label, systemImage: entry.icon).tag(entry)
-                    }
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: LegacySpacing.md) {
+                    modePicker
+                    modeHero
+                    modeContent
+                    statusView
                 }
-                .pickerStyle(.segmented)
                 .padding(.horizontal, LegacySpacing.lg)
                 .padding(.top, LegacySpacing.sm)
-
-                modeContent
-                statusView
+                .padding(.bottom, LegacySpacing.xl)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(LegacyColor.background)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .legacyFeatureBackground(glow: mode.glowColor)
             .navigationTitle("Drop")
             .navigationBarTitleDisplayMode(.inline)
         }
@@ -106,7 +104,7 @@ public struct DropFeatureRootView: View {
         case .pin:
             pinFlow
         case .treasure:
-            VStack(spacing: 0) {
+            VStack(spacing: LegacySpacing.md) {
                 treasurePhotoSection
                 DropComposeViews.TreasureChestForm(
                     compose: $compose,
@@ -114,38 +112,56 @@ public struct DropFeatureRootView: View {
                     isDropping: coordinator.isDropping,
                     onDrop: { Task { await coordinator.confirmTreasureDrop(compose: compose) } }
                 )
+                .frame(minHeight: 540)
+                .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.lg, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: LegacyRadius.lg, style: .continuous)
+                        .stroke(mode.glowColor.opacity(0.35), lineWidth: 1)
+                )
             }
         case .note:
-            DropComposeViews.NoteBottleForm(
-                compose: $compose,
-                isDropping: coordinator.isDropping,
-                onDrop: { Task { await coordinator.dropNoteBottle(compose: compose) } }
-            )
+            VStack(spacing: LegacySpacing.md) {
+                DropComposeViews.NoteBottleForm(
+                    compose: $compose,
+                    isDropping: coordinator.isDropping,
+                    onDrop: { Task { await coordinator.dropNoteBottle(compose: compose) } }
+                )
+                .frame(minHeight: 480)
+                .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.lg, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: LegacyRadius.lg, style: .continuous)
+                        .stroke(mode.glowColor.opacity(0.35), lineWidth: 1)
+                )
+            }
         }
     }
 
     private var treasurePhotoSection: some View {
-        VStack(spacing: LegacySpacing.sm) {
-            if let data = coordinator.selectedPhotoData, let image = UIImage(data: data) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxHeight: 160)
-                    .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.md))
-                    .padding(.horizontal, LegacySpacing.lg)
-            }
-            HStack(spacing: LegacySpacing.md) {
-                Button("Library") { showLibrary = true }
-                if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                    Button("Camera") { showCamera = true }
+        LegacyChromeCard(glow: mode.glowColor) {
+            VStack(spacing: LegacySpacing.sm) {
+                if let data = coordinator.selectedPhotoData, let image = UIImage(data: data) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxHeight: 180)
+                        .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.md))
+                } else {
+                    Label("Select a photo to hide in this chest", systemImage: "shippingbox")
+                        .font(LegacyFont.callout)
+                        .foregroundStyle(LegacyColor.textSecondary)
                 }
-                if coordinator.selectedPhotoData != nil {
-                    Button("Clear") { coordinator.clearSelection() }
+                HStack(spacing: LegacySpacing.md) {
+                    Button("Library") { showLibrary = true }
+                    if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                        Button("Camera") { showCamera = true }
+                    }
+                    if coordinator.selectedPhotoData != nil {
+                        Button("Clear") { coordinator.clearSelection() }
+                    }
                 }
+                .font(LegacyFont.callout)
+                .foregroundStyle(mode.glowColor)
             }
-            .font(LegacyFont.callout)
-            .foregroundStyle(LegacyColor.accent)
-            .padding(.bottom, LegacySpacing.sm)
         }
     }
 
@@ -172,32 +188,33 @@ public struct DropFeatureRootView: View {
     }
 
     private var draftBanner: some View {
-        VStack(alignment: .leading, spacing: LegacySpacing.sm) {
-            Text("Pending uploads")
-                .font(LegacyFont.headline)
-                .foregroundStyle(LegacyColor.textPrimary)
-            ForEach(drafts) { draft in
-                HStack {
-                    VStack(alignment: .leading, spacing: LegacySpacing.xxs) {
-                        Text(String(draft.memoryID.prefix(8)) + "…")
-                            .font(LegacyFont.caption)
-                        Text(draft.uploadState == "failed" ? "Upload failed" : "Waiting to upload")
-                            .font(LegacyFont.caption)
-                            .foregroundStyle(LegacyColor.textSecondary)
+        LegacyChromeCard {
+            VStack(alignment: .leading, spacing: LegacySpacing.sm) {
+                Text("Pending uploads")
+                    .font(LegacyFont.headline)
+                    .foregroundStyle(LegacyColor.textPrimary)
+                ForEach(drafts) { draft in
+                    HStack {
+                        VStack(alignment: .leading, spacing: LegacySpacing.xxs) {
+                            Text(String(draft.memoryID.prefix(8)) + "…")
+                                .font(LegacyFont.caption)
+                            Text(draft.uploadState == "failed" ? "Upload failed" : "Waiting to upload")
+                                .font(LegacyFont.caption)
+                                .foregroundStyle(LegacyColor.textSecondary)
+                        }
+                        Spacer()
+                        Button("Retry") {
+                            Task { await retryDraft(draft) }
+                        }
+                        .buttonStyle(.legacyPrimary)
+                        .frame(maxWidth: 100)
                     }
-                    Spacer()
-                    Button("Retry") {
-                        Task { await retryDraft(draft) }
-                    }
-                    .buttonStyle(.legacyPrimary)
-                    .frame(maxWidth: 100)
+                    .padding(LegacySpacing.md)
+                    .background(LegacyColor.surface.opacity(0.62))
+                    .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.sm))
                 }
-                .padding(LegacySpacing.md)
-                .background(LegacyColor.surface)
-                .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.sm))
             }
         }
-        .padding(.horizontal, LegacySpacing.lg)
     }
 
     private var pickerPrompt: some View {
@@ -251,6 +268,64 @@ public struct DropFeatureRootView: View {
     private func retryDraft(_ draft: DropDraft) async {
         await coordinator.retryDraft(draft, context: modelContext)
     }
+
+    private var modePicker: some View {
+        HStack(spacing: LegacySpacing.sm) {
+            ForEach(DropTabMode.allCases) { entry in
+                Button {
+                    withAnimation(.spring(response: 0.36, dampingFraction: 0.8)) {
+                        mode = entry
+                    }
+                } label: {
+                    VStack(spacing: 2) {
+                        Image(systemName: entry.icon)
+                            .font(.system(size: 13, weight: .semibold))
+                        Text(entry.label)
+                            .font(LegacyFont.caption)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, LegacySpacing.sm)
+                    .foregroundStyle(mode == entry ? LegacyColor.textOnAccent : LegacyColor.textPrimary)
+                    .background(
+                        RoundedRectangle(cornerRadius: LegacyRadius.md, style: .continuous)
+                            .fill(mode == entry ? entry.glowColor : LegacyColor.surface.opacity(0.65))
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(LegacySpacing.xs)
+        .background(LegacyColor.background.opacity(0.45), in: RoundedRectangle(cornerRadius: LegacyRadius.lg))
+        .overlay(
+            RoundedRectangle(cornerRadius: LegacyRadius.lg)
+                .stroke(LegacyColor.separator, lineWidth: 1)
+        )
+    }
+
+    private var modeHero: some View {
+        LegacyChromeCard(glow: mode.glowColor) {
+            HStack(spacing: LegacySpacing.md) {
+                ZStack {
+                    Circle()
+                        .fill(mode.glowColor.opacity(0.18))
+                        .frame(width: 52, height: 52)
+                    Image(systemName: mode.icon)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(mode.glowColor)
+                }
+
+                VStack(alignment: .leading, spacing: LegacySpacing.xxs) {
+                    Text(mode.heroTitle)
+                        .font(LegacyFont.title2)
+                        .foregroundStyle(LegacyColor.textPrimary)
+                    Text(mode.heroSubtitle)
+                        .font(LegacyFont.callout)
+                        .foregroundStyle(LegacyColor.textSecondary)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+    }
     #endif
 
     @ViewBuilder
@@ -275,6 +350,32 @@ public struct DropFeatureRootView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, LegacySpacing.lg)
                 .padding(.bottom, LegacySpacing.sm)
+        }
+    }
+}
+
+private extension DropTabMode {
+    var heroTitle: String {
+        switch self {
+        case .pin: return "Quick Pin"
+        case .treasure: return "Treasure Chest"
+        case .note: return "Note in a Bottle"
+        }
+    }
+
+    var heroSubtitle: String {
+        switch self {
+        case .pin: return "Drop a moment instantly at your current spot."
+        case .treasure: return "Seal a photo with hints, timing, and conditions."
+        case .note: return "Leave a future message for your next return."
+        }
+    }
+
+    var glowColor: Color {
+        switch self {
+        case .pin: return LegacyColor.accent
+        case .treasure: return Color(red: 0.80, green: 0.62, blue: 0.95)
+        case .note: return Color(red: 0.43, green: 0.80, blue: 0.90)
         }
     }
 }

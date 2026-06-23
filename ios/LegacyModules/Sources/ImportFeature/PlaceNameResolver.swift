@@ -11,8 +11,35 @@ public actor PlaceNameResolver {
     public static let shared = PlaceNameResolver()
 
     private var cache: [String: String] = [:]
+    private var regionCache: [String: ImportRegion] = [:]
 
     public init() {}
+
+    /// Structured country / state / city for a centroid, for the import location drill-down.
+    /// Cached by a coarser ~1.1 km bucket (2 decimals) since admin regions are coarse — many
+    /// visits in a city collapse onto one geocoder request.
+    public func region(lat: Double, lng: Double) async -> ImportRegion? {
+        let key = Self.regionCacheKey(lat: lat, lng: lng)
+        if let cached = regionCache[key] { return cached }
+
+        let location = CLLocation(latitude: lat, longitude: lng)
+        guard let placemarks = try? await CLGeocoder().reverseGeocodeLocation(location),
+              let p = placemarks.first else {
+            return nil
+        }
+
+        let region = ImportRegion(
+            country: p.country ?? "",
+            admin: p.administrativeArea ?? "",
+            city: p.locality ?? p.subAdministrativeArea ?? ""
+        )
+        regionCache[key] = region
+        return region
+    }
+
+    private static func regionCacheKey(lat: Double, lng: Double) -> String {
+        String(format: "%.2f,%.2f", lat, lng)
+    }
 
     public func placeName(lat: Double, lng: Double) async -> String? {
         let key = Self.cacheKey(lat: lat, lng: lng)
