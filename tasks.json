@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-24T14:03:36.092Z"
+    "lastUpdated": "2026-06-24T14:58:00.938Z"
   },
   "decisions": [
     {
@@ -1066,7 +1066,7 @@
     {
       "id": "qa-pin-drop-celebration",
       "title": "Pin drop celebration after photo drop or import",
-      "status": "pending",
+      "status": "failed",
       "addedBy": "ios",
       "platform": "simulator",
       "milestone": "M6",
@@ -1081,7 +1081,8 @@
         "Confirm progress overlay shows rotating messages then pins cascade onto map (~80ms stagger)",
         "Import tab → complete an import → same celebration with multiple pins if clustered"
       ],
-      "notes": "Own pins only — no others' memory locations exposed."
+      "notes": "Own pins only — no others' memory locations exposed.",
+      "verifiedAt": "2026-06-24"
     },
     {
       "id": "qa-apns-proximity-push",
