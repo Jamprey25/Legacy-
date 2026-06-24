@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-24T14:03:15.004Z"
+    "lastUpdated": "2026-06-24T14:03:17.215Z"
   },
   "decisions": [
     {
@@ -974,7 +974,7 @@
     {
       "id": "qa-wander-empty-map",
       "title": "Post-auth Wander shows empty map shell",
-      "status": "pending",
+      "status": "passed",
       "addedBy": "ios",
       "platform": "simulator",
       "milestone": "M0",
@@ -985,7 +985,8 @@
         "Sign in (DEBUG stub or live backend)",
         "Confirm Wander tab is default / reachable",
         "Map loads with no foreign-memory pins (M0 demo: empty or own pins only)"
-      ]
+      ],
+      "verifiedAt": "2026-06-24"
     },
     {
       "id": "qa-memory-lane-grid",
