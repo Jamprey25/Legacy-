@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-24T19:51:26.663Z"
+    "lastUpdated": "2026-06-24T19:51:52.560Z"
   },
   "decisions": [
     {
@@ -1174,7 +1174,7 @@
     {
       "id": "qa-mt-display-name-sync",
       "title": "Display name — PATCH /v1/user syncs across devices",
-      "status": "pending",
+      "status": "failed",
       "addedBy": "backend",
       "platform": "device",
       "milestone": "M4",
@@ -1190,7 +1190,8 @@
         "Optional: sign in on a second device with the same account → confirm name syncs via PATCH /v1/user backend store",
         "Enter an empty name or tap 'Clear' → confirm reverts to email-derived name"
       ],
-      "notes": "Requires migrations 0013_user_display_name.sql deployed to Neon + backend live."
+      "notes": "Requires migrations 0013_user_display_name.sql deployed to Neon + backend live.",
+      "verifiedAt": "2026-06-24"
     },
     {
       "id": "qa-mt-muted-zones-create",
