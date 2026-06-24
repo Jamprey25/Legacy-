@@ -107,7 +107,12 @@ public final class DropCoordinator {
         var fixLng = 0.0
 
         do {
-            let stripped = try EXIFStripper.stripMetadata(from: photoData)
+            // Downsample single drops too (1280px / q0.7) — same cap as import so a handful of
+            // full-resolution drops can't fill blob storage. stripMetadata (no resize) remains
+            // available for any caller that needs the original pixels.
+            let stripped = try EXIFStripper.downsampledStrippedJPEG(
+                from: photoData, maxPixelSize: 1280, quality: 0.7
+            )
             strippedData = stripped
             let fix = try await locationEngine.acquireFix()
             fixLat = fix.lat

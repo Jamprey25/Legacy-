@@ -78,8 +78,10 @@ public final class ImportCoordinator {
     /// Longest-edge cap (pixels) for uploaded photos. Downsampling to this size at decode time is
     /// what keeps the import loop's memory flat no matter how many photos a visit has — without it
     /// a large visit decodes full-resolution bitmaps in a tight loop and the app gets jetsam-killed.
+    /// 1280px is plenty for viewing a memory on any phone screen (iPhone screens top out ~1290px
+    /// wide) and keeps each photo ~300KB instead of ~3MB — ~10x more capacity before storage fills.
     /// See `EXIFStripper.downsampledStrippedJPEG`.
-    private static let maxUploadPixelSize = 3000
+    private static let maxUploadPixelSize = 1280
 
     /// How many memory upload pipelines run at once during import. Bounded so the CPU can decode
     /// the next hero while the network uploads the current one, *without* firing every decode
@@ -370,7 +372,7 @@ public final class ImportCoordinator {
 
         // Extras stream up via the background URLSession: handed to the OS so they keep uploading
         // after this screen is gone and survive app suspension. Best-effort — a failed extra never
-        // sinks the memory.
+        // sinks the memory. Yield between extras to prevent memory spikes from loading all images at once.
         for (position, assetID) in assetIDs.enumerated().dropFirst() {
             do {
                 let raw = try await PHAssetImageFetcher.loadImageData(assetID: assetID)
@@ -381,6 +383,7 @@ public final class ImportCoordinator {
                     position: position
                 )
                 try BackgroundMediaUploader.shared.enqueue(request: request, data: stripped)
+                try? await Task.sleep(for: .milliseconds(50))
             } catch {
                 // skip this photo
             }

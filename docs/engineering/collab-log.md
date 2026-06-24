@@ -1737,3 +1737,42 @@ The `AddMutedZoneSheet` currently places the zone at the user's **current device
 
 **Optional:** Add a subtle pulse animation (`scaleEffect` + `.easeInOut` repeat) on a newly added zone's `MapCircle` for 2–3 seconds after creation. The coordinator's `zones` array is `@Observable` so you can track the last-added ID.
 
+---
+
+## [ios → all] 2026-06-24 — Muted zones map-tap placement follow-up
+
+Responded to backend muted-zones handoff with the requested map-placement UX in `MutedZonesView`:
+
+- Added `@State pendingCoordinate` and map tap handling via `MapReader` + `proxy.convert(...)`.
+- Tapping the map now sets the pending coordinate and opens `AddMutedZoneSheet` for that tapped point.
+- `AddMutedZoneSheet` now receives `pendingCoordinate ?? currentLocation` so manual map placement is preferred when present.
+- Added a temporary on-map pending pin annotation while the add sheet is open.
+- Kept the bottom "Add muted zone" button behavior: opens sheet at current location (explicitly clears pending coordinate first).
+- Added cleanup on sheet close (`showAddSheet` false) to clear `pendingCoordinate`.
+
+Verification:
+- `swift test --package-path ios/LegacyModules` → 64/64 passing.
+
+Not included in this pass:
+- Optional new-zone pulse animation (left for a separate polish commit).
+
+
+---
+
+## [backend → all] 2026-06-24 — Photo compression cut (blob quota fix) + dev purge tool
+
+**Root cause of the drop/import 500s:** Vercel Blob hit the **1GB Hobby-plan limit**. Every `POST /v1/uploads/direct` was throwing `Storage quota exceeded` (confirmed in prod runtime logs — 40/40 errors). Memories were created but photos never stored → imports "did nothing", Memory Lane thumbnails blank. (Earlier OIDC theory was a wrong turn from a local-only repro artifact — the prod error was quota all along.)
+
+**Why it filled so fast:** photos were uploaded at **3000px / JPEG q0.9 (~2–4 MB each)**, and imports store every photo in a visit with no cap → one camera-roll import (~340 photos) blew past 1 GB.
+
+**iOS changes shipped (please review, Cursor):**
+- `ImportFeature/ImportCoordinator.swift` — `maxUploadPixelSize` 3000 → **1280**.
+- `DropFeature/EXIFStripper.swift` — `downsampledStrippedJPEG` default `quality` 0.9 → **0.7**.
+- `DropFeature/DropCoordinator.swift` — single drops now use `downsampledStrippedJPEG(maxPixelSize: 1280, quality: 0.7)` instead of `stripMetadata` (which kept full resolution). `stripMetadata` is retained for any caller that needs original pixels.
+- Net effect: ~3 MB → ~300 KB per photo (~10× more capacity). 1280px is still sharp on any phone (screens ≤ ~1290px wide). iOS build green.
+
+**Cursor — please verify after the store is emptied:** import a visit, confirm photos upload + appear in Memory Lane with thumbnails, and that single drops still look good at 1280px. If 1280/0.7 looks too soft on the detail view, bump to 1600/0.75 — both constants are now in one place each.
+
+**Still open (product decision, not blocking):** even at ~300 KB/photo, an unbounded "import the whole camera roll" can still pile up. Worth deciding on a per-visit photo cap and/or moving off the Hobby plan before real users. Tracked for Joseph.
+
+**Dev tooling:** added `backend/scripts/purge-blobs.sh` — empties the blob store via the guarded `POST /v1/internal/purge-blobs` route while testing. Prod needs the prod `WEBHOOK_SECRET` passed inline (`WEBHOOK_SECRET=… ./scripts/purge-blobs.sh`); local dev reads `.env.local`. **Dev only — never cron this; it deletes everything.**

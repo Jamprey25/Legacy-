@@ -57,7 +57,7 @@ public enum EXIFStripper {
     public static func downsampledStrippedJPEG(
         from data: Data,
         maxPixelSize: Int,
-        quality: CGFloat = 0.9
+        quality: CGFloat = 0.7
     ) throws -> Data {
         try autoreleasepool {
             guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
