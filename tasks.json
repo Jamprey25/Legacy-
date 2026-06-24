@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-24T14:03:17.215Z"
+    "lastUpdated": "2026-06-24T14:03:20.563Z"
   },
   "decisions": [
     {
@@ -1025,7 +1025,7 @@
     {
       "id": "qa-location-permission",
       "title": "Location permission prompt on first Wander use",
-      "status": "pending",
+      "status": "passed",
       "addedBy": "ios",
       "platform": "simulator",
       "milestone": "M2",
@@ -1038,7 +1038,8 @@
         "Open Wander and trigger a scan (move or wait for movement gate)",
         "Confirm iOS location permission alert appears",
         "Allow — confirm scan loop continues without crash"
-      ]
+      ],
+      "verifiedAt": "2026-06-24"
     },
     {
       "id": "qa-blob-live-upload",
