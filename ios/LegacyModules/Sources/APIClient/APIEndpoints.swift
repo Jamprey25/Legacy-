@@ -531,6 +531,26 @@ public struct UnlockResponse: Decodable, Sendable, Equatable {
 
 // MARK: - Account (§7)
 
+public struct PatchUserRequest: Encodable, Sendable {
+    public let displayName: String?
+
+    public init(displayName: String?) {
+        self.displayName = displayName
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case displayName = "display_name"
+    }
+}
+
+public struct PatchUserResponse: Decodable, Sendable, Equatable {
+    public let displayName: String?
+
+    enum CodingKeys: String, CodingKey {
+        case displayName = "display_name"
+    }
+}
+
 public struct ExportResponse: Decodable, Sendable, Equatable {
     public let archiveURL: String
     public let memoryCount: Int
@@ -673,6 +693,11 @@ extension LegacyAPIClient {
 
     public func logout() async throws {
         try await sendNoContent(LegacyRequest(method: .post, path: "/v1/auth/logout", body: Data("{}".utf8)))
+    }
+
+    /// Update mutable profile fields (display_name). Pass nil display_name to clear.
+    public func patchUser(_ body: PatchUserRequest) async throws -> PatchUserResponse {
+        try await send(request(.patch, "/v1/user", body), as: PatchUserResponse.self)
     }
 
     /// Packages all own memories into a downloadable archive (contract §7).

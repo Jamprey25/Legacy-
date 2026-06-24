@@ -68,11 +68,19 @@ export async function findExistingByEmail(email: string): Promise<User | null> {
 }
 
 /** Look up a user by id. Returns null if absent. */
-export async function findById(userId: string): Promise<{ id: string; email: string | null; age_tier: AgeTier } | null> {
-  type FullRow = { id: string; email: string | null; age_tier: AgeTier };
-  const rows = await sql`SELECT id, email, age_tier FROM users WHERE id = ${userId} LIMIT 1`;
+export async function findById(userId: string): Promise<{ id: string; email: string | null; age_tier: AgeTier; display_name: string | null } | null> {
+  type FullRow = { id: string; email: string | null; age_tier: AgeTier; display_name: string | null };
+  const rows = await sql`SELECT id, email, age_tier, display_name FROM users WHERE id = ${userId} LIMIT 1`;
   if (rows.length === 0) return null;
   return rows[0] as unknown as FullRow;
+}
+
+/**
+ * Update the user's display name. Pass null to clear it (revert to email-derived).
+ * Value is already trimmed and length-checked at the route layer.
+ */
+export async function updateDisplayName(userId: string, displayName: string | null): Promise<void> {
+  await sql`UPDATE users SET display_name = ${displayName} WHERE id = ${userId}`;
 }
 
 /** Find-or-create by verified email (OTP path). */

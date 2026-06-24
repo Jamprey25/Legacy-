@@ -429,6 +429,24 @@ Synchronously packages all own memories into a JSON archive and returns a downlo
 - For stub backend: `archive_url` is a placeholder URL; real URL requires `STORAGE_BACKEND=vercel-blob`.
 - `429 rate_limited` after 3 exports in 24 h.
 
+### `PATCH /v1/user`
+Update mutable profile fields. Currently supports `display_name` only.
+
+**Request body**
+```json
+{ "display_name": "Joseph" }
+```
+- `display_name`: string (max 100 chars) or `null` to clear (client reverts to email-derived name).
+- At least one field must be present or `400 invalid_request` is returned.
+
+**Response `200`**
+```json
+{ "display_name": "Joseph" }
+```
+- Returns `null` for `display_name` when cleared.
+
+---
+
 ### `DELETE /v1/user`
 Hard-deletes the account and all associated data synchronously. No undo.
 

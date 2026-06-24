@@ -7,7 +7,7 @@ import { put, del } from "@vercel/blob";
 import { ApiError } from "../lib/errors.js";
 import { requireAuth, type AuthVars } from "../middleware/auth.js";
 import { audit } from "../lib/audit.js";
-import { findById, listAllMemoriesForExport, listUserMediaKeys, deleteUser } from "../db/users.js";
+import { findById, listAllMemoriesForExport, listUserMediaKeys, deleteUser, updateDisplayName } from "../db/users.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 
 export const userRoutes = new Hono<{ Variables: AuthVars }>();
@@ -16,6 +16,41 @@ userRoutes.use("*", requireAuth);
 
 // One export per 24h — archives are expensive to generate and download.
 const exportLimit = rateLimit({ name: "export", limit: 3, windowSec: 86400, keyBy: "user" });
+
+// ---------------------------------------------------------------------------
+// PATCH /user
+//
+// Update mutable profile fields. Currently supports `display_name` only.
+// Null clears the field (client reverts to email-derived name).
+// ---------------------------------------------------------------------------
+
+userRoutes.patch("/", async (c) => {
+  const userId: string = c.get("userId");
+  const body = await c.req.json<{ display_name?: string | null }>().catch(() => ({}));
+
+  if (!("display_name" in body)) {
+    throw new ApiError("invalid_request", "No updatable fields provided.");
+  }
+
+  const raw = body.display_name;
+  let displayName: string | null;
+  if (raw === null || raw === undefined) {
+    displayName = null;
+  } else if (typeof raw !== "string") {
+    throw new ApiError("invalid_request", "display_name must be a string or null.");
+  } else {
+    const trimmed = raw.trim();
+    if (trimmed.length > 100) {
+      throw new ApiError("invalid_request", "display_name must be 100 characters or fewer.");
+    }
+    displayName = trimmed.length === 0 ? null : trimmed;
+  }
+
+  await updateDisplayName(userId, displayName);
+  audit(c, "user.update", { fields: ["display_name"] });
+
+  return c.json({ display_name: displayName });
+});
 
 // ---------------------------------------------------------------------------
 // GET /user/export

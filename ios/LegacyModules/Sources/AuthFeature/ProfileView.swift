@@ -142,8 +142,8 @@ public struct ProfileView: View {
                 ShareSheet(items: [url])
             }
             .sheet(isPresented: $showEditName) {
-                EditNameSheet(currentName: displayName) { newName in
-                    AccountProfileStore.customName = newName.isEmpty ? nil : newName
+                EditNameSheet(currentName: displayName, apiClient: apiClient) { savedName in
+                    AccountProfileStore.customName = savedName
                     displayName = AccountProfileStore.displayName
                 }
             }
@@ -414,13 +414,17 @@ extension URL: @retroactive Identifiable {
 
 private struct EditNameSheet: View {
     let currentName: String
-    let onSave: (String) -> Void
+    let apiClient: LegacyAPIClient
+    let onSave: (String?) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var draft: String
+    @State private var isSaving = false
+    @State private var errorMessage: String?
 
-    init(currentName: String, onSave: @escaping (String) -> Void) {
+    init(currentName: String, apiClient: LegacyAPIClient, onSave: @escaping (String?) -> Void) {
         self.currentName = currentName
+        self.apiClient = apiClient
         self.onSave = onSave
         _draft = State(initialValue: AccountProfileStore.customName ?? "")
     }
@@ -438,18 +442,30 @@ private struct EditNameSheet: View {
                         .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.md, style: .continuous))
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.words)
+                        .disabled(isSaving)
 
-                    Button("Clear name") {
-                        draft = ""
+                    Button("Clear name") { draft = "" }
+                        .font(LegacyFont.callout)
+                        .foregroundStyle(LegacyColor.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .disabled(isSaving)
+
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .font(LegacyFont.caption)
+                            .foregroundStyle(LegacyColor.danger)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .font(LegacyFont.callout)
-                    .foregroundStyle(LegacyColor.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
 
                     Spacer()
                 }
                 .padding(.horizontal, LegacySpacing.xl)
                 .padding(.top, LegacySpacing.lg)
+
+                if isSaving {
+                    ProgressView()
+                        .tint(LegacyColor.accent)
+                }
             }
             .navigationTitle("Display name")
             .navigationBarTitleDisplayMode(.inline)
@@ -457,19 +473,35 @@ private struct EditNameSheet: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
                         .foregroundStyle(LegacyColor.textSecondary)
+                        .disabled(isSaving)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") {
-                        onSave(draft)
-                        dismiss()
-                    }
-                    .font(LegacyFont.headline)
-                    .foregroundStyle(LegacyColor.accent)
+                    Button("Save") { Task { await save() } }
+                        .font(LegacyFont.headline)
+                        .foregroundStyle(LegacyColor.accent)
+                        .disabled(isSaving)
                 }
             }
             .preferredColorScheme(.dark)
         }
-        .presentationDetents([.height(220)])
+        .presentationDetents([.height(240)])
+    }
+
+    private func save() async {
+        isSaving = true
+        errorMessage = nil
+        defer { isSaving = false }
+
+        let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let newName: String? = trimmed.isEmpty ? nil : trimmed
+
+        do {
+            let response = try await apiClient.patchUser(PatchUserRequest(displayName: newName))
+            onSave(response.displayName)
+            dismiss()
+        } catch {
+            errorMessage = "Couldn't save. Check your connection and try again."
+        }
     }
 }
 

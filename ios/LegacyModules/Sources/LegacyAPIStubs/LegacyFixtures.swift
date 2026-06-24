@@ -178,6 +178,12 @@ public enum LegacyFixtures {
     }
     """.utf8)
 
+    public static let patchUserResponse = Data("""
+    {
+      "display_name": "Stub User"
+    }
+    """.utf8)
+
     public static let exportUserData = Data("""
     {
       "archive_url": "https://blob.vercel-storage.com/exports/stub/export.json",
@@ -254,6 +260,7 @@ extension StubHTTPTransport {
         transport.enqueue("POST /v1/memories/import", .json(201, LegacyFixtures.importMemories))
         transport.enqueue("/v1/discovery/scan", .ok(LegacyFixtures.scanWithTeasers))
         transport.enqueue("POST /v1/devices/apns", .noContent)
+        transport.enqueue("PATCH /v1/user", .ok(LegacyFixtures.patchUserResponse))
         transport.enqueue("GET /v1/user/export", .ok(LegacyFixtures.exportUserData))
         transport.enqueue("DELETE /v1/user", .noContent)
         transport.enqueue("/unlock", .json(423, LegacyFixtures.lockedDwell), .ok(LegacyFixtures.unlock))
@@ -275,6 +282,7 @@ extension StubHTTPTransport {
         transport.enqueue("POST /v1/memories/import", .json(201, LegacyFixtures.importMemories))
         transport.enqueue("/v1/discovery/scan", .ok(LegacyFixtures.scanWithTeasers))
         transport.enqueue("POST /v1/devices/apns", .noContent)
+        transport.enqueue("PATCH /v1/user", .ok(LegacyFixtures.patchUserResponse))
         transport.enqueue("GET /v1/user/export", .ok(LegacyFixtures.exportUserData))
         transport.enqueue("DELETE /v1/user", .noContent)
         transport.enqueue("/unlock", .json(423, LegacyFixtures.lockedDwell), .ok(LegacyFixtures.unlock))

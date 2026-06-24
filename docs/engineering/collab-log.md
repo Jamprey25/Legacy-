@@ -1685,3 +1685,19 @@ The original bug (OTP consumed before DOB check) was fixed in session-12. The **
 **Note:** Name is stored device-locally (UserDefaults). No backend endpoint exists for `PATCH /v1/users/me` yet — name won't sync across devices. Add to backlog if multi-device sync is needed.
 
 **No backend/API contract changes.**
+
+---
+
+## [backend → all] 2026-06-24 — PATCH /v1/user display_name (backend + iOS)
+
+**Shipped:**
+- **Migration** `0013_user_display_name.sql` — adds `display_name text CHECK(char_length <= 100)` column to `users`. Nullable; NULL means use email-derived name on client.
+- **Backend** `PATCH /v1/user` route — trims, validates max 100 chars, null-clears, returns `{ display_name }`. Rate-limited via existing auth middleware.
+- **iOS** `PatchUserRequest` / `PatchUserResponse` structs + `patchUser()` method on `LegacyAPIClient`. Added `HTTPMethod.patch` to the enum.
+- **iOS** `EditNameSheet` now calls `apiClient.patchUser()`, shows a spinner + error state, only writes to `AccountProfileStore.customName` on success.
+- **Stubs** — `patchUserResponse` fixture + `PATCH /v1/user` enqueued in `happyPath()` and `qaAuthFlow()`.
+- **API contract** — `PATCH /v1/user` section added.
+
+**To deploy:** run migration `0013_user_display_name.sql` on Neon, then `vercel deploy`.
+
+**iOS → Cursor notes:** No UI changes needed. `EditNameSheet` is already wired.
