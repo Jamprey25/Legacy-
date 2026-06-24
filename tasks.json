@@ -1108,6 +1108,151 @@
         "Requires backend APNS_* env vars on Vercel + real device (not simulator)"
       ],
       "verifiedAt": "2026-06-24"
+    },
+    {
+      "id": "qa-mt-age-gate-recovery",
+      "title": "Age gate — OTP expiry during DOB entry routes back to OTP screen",
+      "status": "pending",
+      "addedBy": "backend",
+      "platform": "simulator",
+      "milestone": "M0",
+      "relatedTasks": [
+        "ios-auth-ui",
+        "bug-age-gate-continue-noop"
+      ],
+      "steps": [
+        "Email sign-in → request OTP",
+        "Enter OTP code (stub accepts)",
+        "Wait ~10+ minutes (or manipulate backend to return expired error on next verify)",
+        "Enter DOB on gate — confirm error message says 'code expired' and routes back to OTP screen",
+        "Confirm Resend button is now visible on OTP screen"
+      ],
+      "notes": "Regression from age gate bug fix. If OTP expires during DOB entry, user should be able to resend without being stuck."
+    },
+    {
+      "id": "qa-mt-import-button-all-levels",
+      "title": "Import — button appears at all drill-down levels (state, city, visits)",
+      "status": "pending",
+      "addedBy": "backend",
+      "platform": "simulator",
+      "milestone": "M3",
+      "relatedTasks": [
+        "ios-import-flow"
+      ],
+      "steps": [
+        "Import tab → select a country",
+        "Confirm 'Import X memories' button appears at the bottom of the screen",
+        "Drill to state → select state → confirm button is still there",
+        "Drill to city → select city → confirm button is still there",
+        "Drill to visits → select a visit → confirm button is still there",
+        "Tap Import from any level — confirm import completes"
+      ],
+      "notes": "safeAreaInset(edge: .bottom) pins the button above safe area without wrapping the List."
+    },
+    {
+      "id": "qa-mt-display-name-edit",
+      "title": "Display name — edit locally in Profile settings",
+      "status": "pending",
+      "addedBy": "backend",
+      "platform": "simulator",
+      "milestone": "M4",
+      "relatedTasks": [
+        "ios-profile-view"
+      ],
+      "steps": [
+        "Sign in and open Profile (via tab or menu)",
+        "Tap 'Display name' row → sheet opens",
+        "Enter a custom name (e.g. 'Alice') → tap Save",
+        "Confirm hero name and monogram update immediately",
+        "Relaunch app — name persists (stored in UserDefaults locally)"
+      ],
+      "notes": "Local-only in Phase 1. Custom name stored in AccountProfileStore via UserDefaults."
+    },
+    {
+      "id": "qa-mt-display-name-sync",
+      "title": "Display name — PATCH /v1/user syncs across devices",
+      "status": "pending",
+      "addedBy": "backend",
+      "platform": "device",
+      "milestone": "M4",
+      "relatedTasks": [
+        "ios-profile-view",
+        "backend-user-patch"
+      ],
+      "steps": [
+        "Live API build on device (not stub)",
+        "Sign in and open Profile",
+        "Tap Display name → enter name → tap Save",
+        "Confirm spinner briefly; on success, name updates and persists",
+        "Optional: sign in on a second device with the same account → confirm name syncs via PATCH /v1/user backend store",
+        "Enter an empty name or tap 'Clear' → confirm reverts to email-derived name"
+      ],
+      "notes": "Requires migrations 0013_user_display_name.sql deployed to Neon + backend live."
+    },
+    {
+      "id": "qa-mt-muted-zones-create",
+      "title": "Muted zones — create a zone with slider and optional label",
+      "status": "pending",
+      "addedBy": "backend",
+      "platform": "simulator",
+      "milestone": "M4",
+      "relatedTasks": [
+        "ios-muted-zones",
+        "backend-muted-zones"
+      ],
+      "steps": [
+        "Open Profile → Notifications section → tap 'Muted zones'",
+        "Confirm map shows current location (or stub location in simulator)",
+        "Tap 'Add muted zone' → sheet opens with slider + label field + preview circle",
+        "Adjust slider from 100m to 5000m — confirm circle scales smoothly",
+        "Enter a label (e.g. 'Home') → tap Save",
+        "Confirm zone appears on map as a red translucent circle",
+        "Confirm zone persists when you navigate away and return"
+      ],
+      "notes": "Slider range 100–5000m, step 50m. Max 10 zones per user. Preview circle animates with slider."
+    },
+    {
+      "id": "qa-mt-muted-zones-list-delete",
+      "title": "Muted zones — list and delete zones",
+      "status": "pending",
+      "addedBy": "backend",
+      "platform": "simulator",
+      "milestone": "M4",
+      "relatedTasks": [
+        "ios-muted-zones",
+        "backend-muted-zones"
+      ],
+      "steps": [
+        "With zones created, open Muted zones view",
+        "Confirm all zones appear as red circles on map with bell-slash icons",
+        "Tap a zone pin → confirmation dialog appears",
+        "Confirm deletion and zone is removed from map",
+        "Create multiple zones, confirm max-10 limit — 'Add muted zone' button disables at 10"
+      ],
+      "notes": "Tap zone pin to delete. Zones sync via GET /v1/user/muted-zones on view load."
+    },
+    {
+      "id": "qa-mt-muted-zones-notification-suppression",
+      "title": "Muted zones — proximity push is suppressed when inside a zone",
+      "status": "pending",
+      "addedBy": "backend",
+      "platform": "device",
+      "milestone": "M4",
+      "relatedTasks": [
+        "ios-muted-zones",
+        "backend-muted-zones",
+        "backend-apns-push"
+      ],
+      "steps": [
+        "Drop a memory at location A",
+        "Create a muted zone covering location A (or location A is inside an existing zone)",
+        "Walk away from location A, kill the app",
+        "Walk back to location A (inside the muted zone) — backend scan returns in_range",
+        "Confirm NO proximity push notification fires (suppressed server-side)",
+        "Delete the muted zone, walk away and back",
+        "Confirm proximity push NOW fires (zone no longer suppresses)"
+      ],
+      "notes": "Server-side suppression in discovery.ts wraps push in isLocationMuted check. Requires real device + APNS env vars."
     }
   ],
   "tasks": [
