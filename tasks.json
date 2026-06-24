@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-24T14:03:07.073Z"
+    "lastUpdated": "2026-06-24T14:03:12.088Z"
   },
   "decisions": [
     {
@@ -865,7 +865,7 @@
     {
       "id": "qa-mt-memory-detail-dismiss",
       "title": "Memory detail sheet has a dismiss button",
-      "status": "pending",
+      "status": "passed",
       "addedBy": "backend",
       "platform": "device",
       "milestone": "M2",
@@ -877,7 +877,8 @@
         "Unlock or open a memory detail sheet",
         "Confirm Close button dismisses the sheet"
       ],
-      "notes": "iOS fix shipped (UnlockedMemorySheet Close button). Joseph re-run on device."
+      "notes": "iOS fix shipped (UnlockedMemorySheet Close button). Joseph re-run on device.",
+      "verifiedAt": "2026-06-24"
     },
     {
       "id": "qa-mt-one-memory-unlock-fails",
