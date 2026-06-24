@@ -1585,3 +1585,91 @@ Verification:
 - `swift test --package-path ios/LegacyModules` → 64/64 passing.
 
 No backend/API contract changes.
+
+---
+
+## [ios → all] 2026-06-24 — Dashboard architecture visualization tab
+
+**Shipped:**
+- Added a new **Architecture view** tab in `dashboard/src/app/page.tsx` alongside the existing delivery/task view.
+- Added `dashboard/src/app/components/TechnicalArchitecturePanel.tsx` with:
+  - system topology map (client/API/storage/control plane),
+  - iOS module dependency graph,
+  - runtime flow traces for Drop, Scan, and Unlock,
+  - live task ownership/completion counters.
+- Updated docs for discoverability:
+  - `README.md` (dashboard section now documents Delivery vs Architecture views),
+  - `docs/engineering/TECHNICAL_INTERNAL.md` (new architecture-visualization subsection + pedagogical note).
+
+**Tasks marked done:** none (feature-level dashboard enhancement only; no task id existed).
+
+**Blocked on Joseph / other agent:**
+- None.
+
+**Uncommitted / branch:** `main`, local dashboard/docs edits plus existing in-flight iOS working-tree changes.
+
+**Next session picks up:**
+1. Optional: hook architecture panel module graph to a generated source-of-truth file to avoid manual drift.
+2. Optional: add click-through links from each architecture node to relevant docs/modules.
+
+---
+
+## [ios → all] 2026-06-24 — Architecture deep links and repo/doc link roots
+
+**Shipped:**
+- Added click-through deep links in `TechnicalArchitecturePanel`:
+  - topology cards now link to `ios/`, `backend/`, `backend/migrations`, and `dashboard/`,
+  - module graph cards now link directly to each iOS module folder,
+  - flow cards now link to matching sections in `api-contract.md`,
+  - doc chips added for `TECHNICAL_INTERNAL.md`, `api-contract.md`, and `AGENT_WORKFLOW.md`.
+- Added configurable public link roots:
+  - `NEXT_PUBLIC_REPO_WEB_ROOT`
+  - `NEXT_PUBLIC_DOCS_WEB_ROOT`
+- Documented these variables in:
+  - `dashboard/.env.example`
+  - `README.md`
+  - `docs/engineering/TECHNICAL_INTERNAL.md`
+
+**Tasks marked done:** none.
+
+**Blocked on Joseph / other agent:** none.
+
+**Uncommitted / branch:** `main`, local dashboard/docs changes plus existing unrelated iOS in-flight edits.
+
+**Next session picks up:**
+1. Optional: add per-link health checks (detect 404s when repo defaults diverge).
+2. Optional: make flow cards open both contract docs and relevant source directories.
+
+---
+
+## [backend → all] 2026-06-24 — Age gate recovery fix
+
+**Shipped:**
+- `AuthCoordinator.swift` — when the OTP expires or fails during DOB confirmation, the user is now routed **back to the OTP screen** (`.emailOTP`) instead of being stuck on the DOB gate with a "Resend code" prompt that doesn't exist on that screen.
+- Removed double `isLoading`/`defer` in `confirmDOB()` → `verifyEmailCode()` call chain to prevent any SwiftUI rendering edge case.
+- DOB gate errors (code expired, network failure) now clear `otpCode` and return the user to EmailOTPView where they can tap "Resend code" and re-enter.
+
+**Root cause analysis:**
+The original bug (OTP consumed before DOB check) was fixed in session-12. The **remaining issue** was the recovery path: if `verifyEmailCode()` failed when called from `confirmDOB()`, the error message said "Tap 'Resend code'" — but the Resend button only exists on EmailOTPView, not DOBGateView. The user saw an error with no way to recover, or if the error message wasn't visible (SwiftUI timing), the failure appeared completely silent ("kicked out").
+
+**iOS → Cursor notes:**
+- No iOS UI changes needed — the fix is in AuthCoordinator (shared SwiftUI coordinator).
+- The DOBGateView, EmailOTPView layouts are unchanged.
+- The user's entered DOB (`dob` property) is preserved when bouncing back to OTP screen, so they won't need to re-enter it.
+
+**Blocked on:** Nothing.
+
+---
+
+## [backend → all] 2026-06-24 — Import button at all drill-down levels
+
+**Shipped:**
+- `ImportLocationBrowser.swift` — added `safeAreaInset(edge: .bottom)` to `ImportRegionLevel` that pins the import button at the bottom of every drill-down screen (depth > 0: state, city, visits) when at least one memory is selected.
+- The button is identical to the root-level one: "Import N memories/memory", disabled during import, respects the same `coordinator.selectedClusterIDs` shared state.
+- Root screen (depth 0) still shows the button in the parent VStack below the browser — no change there.
+
+**No backend/API contract changes.**
+
+**iOS → Cursor notes:**
+- No UI layout work needed — the `safeAreaInset` approach keeps the List full-height and pins the button above the safe area like a standard iOS action sheet footer.
+- Works at all 4 levels: country → state → city → visits.

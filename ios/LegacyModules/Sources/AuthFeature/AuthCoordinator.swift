@@ -124,9 +124,7 @@ public final class AuthCoordinator {
             return
         }
 
-        isLoading = true
         errorMessage = nil
-        defer { isLoading = false }
 
         switch pending {
         case .email:
@@ -198,6 +196,8 @@ public final class AuthCoordinator {
     }
 
     public func verifyEmailCode() async {
+        let calledFromDOBGate = if case .dobGate(.email) = route { true } else { false }
+
         isLoading = true
         errorMessage = nil
         infoMessage = nil
@@ -209,13 +209,7 @@ public final class AuthCoordinator {
             return
         }
 
-        // DOB is only required for first-time sign-up; returning users omit it.
-        let dobString: String? =
-            if case .dobGate(.email) = route {
-                AuthFormatting.dobString(from: dob)
-            } else {
-                nil
-            }
+        let dobString: String? = calledFromDOBGate ? AuthFormatting.dobString(from: dob) : nil
 
         do {
             let response = try await apiClient.authEmailVerify(
@@ -228,12 +222,22 @@ public final class AuthCoordinator {
             )
             try await finishAuth(response)
         } catch LegacyAPIError.unauthorized {
-            errorMessage = "That code is incorrect or has expired. Tap 'Resend code' to get a new one."
+            if calledFromDOBGate {
+                otpCode = ""
+                route = .emailOTP(email: email)
+                errorMessage = "Your code expired while you were entering your date of birth. Resend to get a new one."
+            } else {
+                errorMessage = "That code is incorrect or has expired. Tap 'Resend code' to get a new one."
+            }
         } catch let LegacyAPIError.invalidRequest(code, _) where code == "dob_required" {
             route = .dobGate(pending: .email)
         } catch let LegacyAPIError.forbidden(code, _) where code == "age_restricted" {
             route = .ageRestricted
         } catch {
+            if calledFromDOBGate {
+                otpCode = ""
+                route = .emailOTP(email: email)
+            }
             errorMessage = userFacingMessage(for: error)
         }
     }

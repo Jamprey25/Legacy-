@@ -582,6 +582,11 @@
           "author": "ios",
           "date": "2026-06-22",
           "text": "Fixed: backend assertValidCode (validate without consume) before dob_required; verifyCode only after DOB supplied. iOS: error text on DOBGateView + EmailOTPView so retries never fail silently."
+        },
+        {
+          "author": "backend",
+          "date": "2026-06-24",
+          "text": "Remaining issue: if OTP expires during DOB entry, error said 'Resend code' but no resend button on DOBGateView. Also double isLoading/defer in confirmDOB→verifyEmailCode could cause SwiftUI rendering edge case. Fix: on auth failure from DOB gate, route back to emailOTP screen (where Resend exists), clear otpCode, show clear 'code expired' message. Removed redundant isLoading/defer from confirmDOB."
         }
       ]
     },

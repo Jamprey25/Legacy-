@@ -90,6 +90,20 @@ struct ImportRegionLevel: View {
                 .font(LegacyFont.callout)
             }
         }
+        .safeAreaInset(edge: .bottom) {
+            if depth > 0, !coordinator.selectedClusterIDs.isEmpty {
+                let count = coordinator.selectedClusterIDs.count
+                Button("Import \(count) \(count == 1 ? "memory" : "memories")") {
+                    Task { await coordinator.importSelected() }
+                }
+                .buttonStyle(.legacyPrimary)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, LegacySpacing.lg)
+                .padding(.vertical, LegacySpacing.sm)
+                .background(LegacyColor.background.opacity(0.96))
+                .disabled(coordinator.isImporting)
+            }
+        }
     }
 
     // MARK: - Grouping
