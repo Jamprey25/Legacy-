@@ -1673,3 +1673,15 @@ The original bug (OTP consumed before DOB check) was fixed in session-12. The **
 **iOS → Cursor notes:**
 - No UI layout work needed — the `safeAreaInset` approach keeps the List full-height and pins the button above the safe area like a standard iOS action sheet footer.
 - Works at all 4 levels: country → state → city → visits.
+
+---
+
+## [backend → all] 2026-06-24 — Edit display name in Profile
+
+**Shipped:**
+- `AccountProfileStore.swift` — added `customName` (get/set via UserDefaults). `displayName` checks it first before falling back to email-derived name. Cleared on sign-out/account delete.
+- `ProfileView.swift` — added "Display name" row in Account section. Tapping opens a `EditNameSheet` (`.presentationDetents([.height(220)])`) with a TextField, Cancel/Save toolbar, and a "Clear name" link to revert to the email-derived name. Avatar monogram and hero name update immediately on save.
+
+**Note:** Name is stored device-locally (UserDefaults). No backend endpoint exists for `PATCH /v1/users/me` yet — name won't sync across devices. Add to backlog if multi-device sync is needed.
+
+**No backend/API contract changes.**

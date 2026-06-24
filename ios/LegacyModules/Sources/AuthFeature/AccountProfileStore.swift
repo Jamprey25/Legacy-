@@ -7,9 +7,26 @@ public enum AccountProfileStore {
     private static let emailKey = "legacyAccountEmail"
     private static let userIDKey = "legacyAccountUserID"
     private static let devAdminKey = "legacyDevAdmin"
+    private static let customNameKey = "legacyAccountCustomName"
 
     public static var isDevAdmin: Bool {
         UserDefaults.standard.bool(forKey: devAdminKey)
+    }
+
+    /// User-set display name, or nil if they've never set one.
+    public static var customName: String? {
+        get {
+            let v = UserDefaults.standard.string(forKey: customNameKey) ?? ""
+            return v.isEmpty ? nil : v
+        }
+        set {
+            let trimmed = newValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if trimmed.isEmpty {
+                UserDefaults.standard.removeObject(forKey: customNameKey)
+            } else {
+                UserDefaults.standard.set(trimmed, forKey: customNameKey)
+            }
+        }
     }
 
     public static var displayLabel: String {
@@ -23,9 +40,10 @@ public enum AccountProfileStore {
         return "Signed in"
     }
 
-    /// Primary line for profile header (name, not raw email).
+    /// Primary line for profile header. Custom name takes priority over email-derived name.
     public static var displayName: String {
         if isDevAdmin { return "Admin" }
+        if let name = customName { return name }
         if let email = UserDefaults.standard.string(forKey: emailKey),
            email.contains("@") {
             let local = email.split(separator: "@").first.map(String.init) ?? email
@@ -83,6 +101,7 @@ public enum AccountProfileStore {
         UserDefaults.standard.removeObject(forKey: emailKey)
         UserDefaults.standard.removeObject(forKey: userIDKey)
         UserDefaults.standard.removeObject(forKey: devAdminKey)
+        UserDefaults.standard.removeObject(forKey: customNameKey)
     }
 }
 

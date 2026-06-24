@@ -22,6 +22,8 @@ public struct ProfileView: View {
     @State private var exportShareURL: URL?
     @State private var locationStatus = "Checking…"
     @State private var notificationStatus = "Checking…"
+    @State private var showEditName = false
+    @State private var displayName = AccountProfileStore.displayName
 
     public var body: some View {
         NavigationStack {
@@ -66,6 +68,12 @@ public struct ProfileView: View {
                         VStack(alignment: .leading, spacing: LegacySpacing.sm) {
                             ProfileSectionLabel("Account")
                             ProfileActionCard {
+                                ProfileActionRow(
+                                    title: "Display name",
+                                    subtitle: displayName,
+                                    icon: "person",
+                                    action: { showEditName = true }
+                                )
                                 ProfileActionRow(
                                     title: "Sign out",
                                     subtitle: "End this session on this device",
@@ -132,6 +140,12 @@ public struct ProfileView: View {
             }
             .sheet(item: $exportShareURL) { url in
                 ShareSheet(items: [url])
+            }
+            .sheet(isPresented: $showEditName) {
+                EditNameSheet(currentName: displayName) { newName in
+                    AccountProfileStore.customName = newName.isEmpty ? nil : newName
+                    displayName = AccountProfileStore.displayName
+                }
             }
             .task { await refreshPermissionStatuses() }
             .onChange(of: scenePhase) { _, phase in
@@ -200,7 +214,7 @@ public struct ProfileView: View {
                     )
                     .frame(width: 84, height: 84)
                     .overlay {
-                        Text(AccountProfileStore.avatarMonogram)
+                        Text(monogram(for: displayName))
                             .font(LegacyFont.title)
                             .foregroundStyle(LegacyColor.accent)
                     }
@@ -208,7 +222,7 @@ public struct ProfileView: View {
             .padding(.top, LegacySpacing.sm)
 
             VStack(spacing: LegacySpacing.xs) {
-                Text(AccountProfileStore.displayName)
+                Text(displayName)
                     .font(LegacyFont.title2)
                     .foregroundStyle(LegacyColor.textPrimary)
 
@@ -232,6 +246,12 @@ public struct ProfileView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, LegacySpacing.lg)
+    }
+
+    private func monogram(for name: String) -> String {
+        let letters = name.split(separator: " ").compactMap { $0.first }.prefix(2)
+        if letters.isEmpty { return String(name.prefix(1)).uppercased() }
+        return letters.map { String($0) }.joined().uppercased()
     }
 
     private var appVersionLabel: String {
@@ -388,6 +408,69 @@ private struct ShareSheet: UIViewControllerRepresentable {
 
 extension URL: @retroactive Identifiable {
     public var id: String { absoluteString }
+}
+
+// MARK: - Edit name sheet
+
+private struct EditNameSheet: View {
+    let currentName: String
+    let onSave: (String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var draft: String
+
+    init(currentName: String, onSave: @escaping (String) -> Void) {
+        self.currentName = currentName
+        self.onSave = onSave
+        _draft = State(initialValue: AccountProfileStore.customName ?? "")
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                LegacyColor.background.ignoresSafeArea()
+                VStack(spacing: LegacySpacing.lg) {
+                    TextField("Display name", text: $draft)
+                        .font(LegacyFont.body)
+                        .foregroundStyle(LegacyColor.textPrimary)
+                        .padding(LegacySpacing.md)
+                        .background(LegacyColor.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.md, style: .continuous))
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.words)
+
+                    Button("Clear name") {
+                        draft = ""
+                    }
+                    .font(LegacyFont.callout)
+                    .foregroundStyle(LegacyColor.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Spacer()
+                }
+                .padding(.horizontal, LegacySpacing.xl)
+                .padding(.top, LegacySpacing.lg)
+            }
+            .navigationTitle("Display name")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundStyle(LegacyColor.textSecondary)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") {
+                        onSave(draft)
+                        dismiss()
+                    }
+                    .font(LegacyFont.headline)
+                    .foregroundStyle(LegacyColor.accent)
+                }
+            }
+            .preferredColorScheme(.dark)
+        }
+        .presentationDetents([.height(220)])
+    }
 }
 
 #endif
