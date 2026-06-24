@@ -59,6 +59,7 @@ export async function generateAndStoreThumbnail(
       access: "public",
       addRandomSuffix: true,
       contentType: "image/webp",
+      token: process.env.BLOB_READ_WRITE_TOKEN,
     });
 
     return blob.url;
