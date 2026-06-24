@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-24T14:03:24.919Z"
+    "lastUpdated": "2026-06-24T14:03:34.765Z"
   },
   "decisions": [
     {
@@ -1085,7 +1085,7 @@
     {
       "id": "qa-apns-proximity-push",
       "title": "Proximity push opens Wander and refreshes scan",
-      "status": "pending",
+      "status": "passed",
       "addedBy": "ios",
       "platform": "device",
       "milestone": "M4",
@@ -1099,7 +1099,8 @@
         "Walk back in range so backend /scan returns in_range and fires APNs",
         "Tap the notification — app opens to Wander tab with updated warmth/teasers",
         "Requires backend APNS_* env vars on Vercel + real device (not simulator)"
-      ]
+      ],
+      "verifiedAt": "2026-06-24"
     }
   ],
   "tasks": [
