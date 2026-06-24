@@ -87,7 +87,6 @@ uploadsRoutes.post("/direct", async (c) => {
     access: "public",
     addRandomSuffix: true,
     contentType,
-    token: process.env.BLOB_READ_WRITE_TOKEN,
   });
 
   // Record this photo in the media set. Position 0 is also mirrored onto the memory row
