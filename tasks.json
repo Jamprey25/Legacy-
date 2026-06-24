@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-24T19:51:04.538Z"
+    "lastUpdated": "2026-06-24T19:51:09.881Z"
   },
   "decisions": [
     {
@@ -1132,7 +1132,7 @@
     {
       "id": "qa-mt-import-button-all-levels",
       "title": "Import — button appears at all drill-down levels (state, city, visits)",
-      "status": "pending",
+      "status": "passed",
       "addedBy": "backend",
       "platform": "simulator",
       "milestone": "M3",
@@ -1147,7 +1147,8 @@
         "Drill to visits → select a visit → confirm button is still there",
         "Tap Import from any level — confirm import completes"
       ],
-      "notes": "safeAreaInset(edge: .bottom) pins the button above safe area without wrapping the List."
+      "notes": "safeAreaInset(edge: .bottom) pins the button above safe area without wrapping the List.",
+      "verifiedAt": "2026-06-24"
     },
     {
       "id": "qa-mt-display-name-edit",
