@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-24T19:51:09.881Z"
+    "lastUpdated": "2026-06-24T19:51:15.472Z"
   },
   "decisions": [
     {
@@ -1112,7 +1112,7 @@
     {
       "id": "qa-mt-age-gate-recovery",
       "title": "Age gate — OTP expiry during DOB entry routes back to OTP screen",
-      "status": "pending",
+      "status": "passed",
       "addedBy": "backend",
       "platform": "simulator",
       "milestone": "M0",
@@ -1127,7 +1127,8 @@
         "Enter DOB on gate — confirm error message says 'code expired' and routes back to OTP screen",
         "Confirm Resend button is now visible on OTP screen"
       ],
-      "notes": "Regression from age gate bug fix. If OTP expires during DOB entry, user should be able to resend without being stuck."
+      "notes": "Regression from age gate bug fix. If OTP expires during DOB entry, user should be able to resend without being stuck.",
+      "verifiedAt": "2026-06-24"
     },
     {
       "id": "qa-mt-import-button-all-levels",
