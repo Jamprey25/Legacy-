@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-24T14:03:34.765Z"
+    "lastUpdated": "2026-06-24T14:03:36.092Z"
   },
   "decisions": [
     {
@@ -991,7 +991,7 @@
     {
       "id": "qa-memory-lane-grid",
       "title": "Memory Lane grid loads own memories",
-      "status": "pending",
+      "status": "passed",
       "addedBy": "ios",
       "platform": "simulator",
       "milestone": "M2",
@@ -1003,7 +1003,8 @@
         "Open Memory Lane tab",
         "Confirm teaser cards appear oldest-first; tap one opens detail",
         "Pull to refresh or scroll — pagination / error banner behaves correctly"
-      ]
+      ],
+      "verifiedAt": "2026-06-24"
     },
     {
       "id": "qa-tab-shell",
