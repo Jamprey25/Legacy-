@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-24T14:58:00.938Z"
+    "lastUpdated": "2026-06-24T19:51:04.538Z"
   },
   "decisions": [
     {
@@ -1071,7 +1071,7 @@
     {
       "id": "qa-pin-drop-celebration",
       "title": "Pin drop celebration after photo drop or import",
-      "status": "failed",
+      "status": "passed",
       "addedBy": "ios",
       "platform": "simulator",
       "milestone": "M6",
