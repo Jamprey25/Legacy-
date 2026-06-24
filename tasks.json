@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-23T20:00:00.000Z"
+    "lastUpdated": "2026-06-24T14:03:07.073Z"
   },
   "decisions": [
     {
@@ -882,7 +882,7 @@
     {
       "id": "qa-mt-one-memory-unlock-fails",
       "title": "All memories unlock successfully",
-      "status": "pending",
+      "status": "passed",
       "addedBy": "backend",
       "platform": "device",
       "milestone": "M2",
@@ -893,7 +893,8 @@
         "After qa-mt-drop-upload passes, re-drop if needed",
         "Confirm all nearby memories unlock successfully"
       ],
-      "notes": "Likely scan_status pending from pre-fix upload crash. Re-drop after qa-mt-drop-upload passes; no further iOS code expected."
+      "notes": "Likely scan_status pending from pre-fix upload crash. Re-drop after qa-mt-drop-upload passes; no further iOS code expected.",
+      "verifiedAt": "2026-06-24"
     },
     {
       "id": "qa-auth-cold-launch",
