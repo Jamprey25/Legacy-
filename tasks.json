@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-24T14:03:12.088Z"
+    "lastUpdated": "2026-06-24T14:03:15.004Z"
   },
   "decisions": [
     {
@@ -956,7 +956,7 @@
     {
       "id": "qa-session-persists",
       "title": "Session persists across relaunch (Keychain)",
-      "status": "pending",
+      "status": "passed",
       "addedBy": "ios",
       "platform": "simulator",
       "milestone": "M0",
@@ -968,7 +968,8 @@
         "Sign in successfully",
         "Stop the app (not delete) and relaunch from Xcode",
         "Confirm you skip sign-in and go straight to Wander — token read from Keychain"
-      ]
+      ],
+      "verifiedAt": "2026-06-24"
     },
     {
       "id": "qa-wander-empty-map",
