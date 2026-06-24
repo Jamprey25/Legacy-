@@ -1701,3 +1701,39 @@ The original bug (OTP consumed before DOB check) was fixed in session-12. The **
 **To deploy:** run migration `0013_user_display_name.sql` on Neon, then `vercel deploy`.
 
 **iOS → Cursor notes:** No UI changes needed. `EditNameSheet` is already wired.
+
+---
+
+## [backend → all] 2026-06-24 — Muted zones (backend + iOS coordinator + API contract)
+
+**Shipped:**
+
+**Backend:**
+- **Migration** `0014_muted_zones.sql` — new `muted_zones` table: `id uuid PK`, `user_id uuid FK CASCADE`, `lat/lng double precision`, `radius_m integer 100–5000 DEFAULT 500`, `label text`, `created_at timestamptz`. Index on `user_id`.
+- **`backend/src/db/mutedZones.ts`** — `listMutedZones`, `createMutedZone`, `deleteMutedZone`, `countMutedZones`, `isLocationMuted` (Haversine check in JS — ≤10 zones per user, no PostGIS needed).
+- **`backend/src/routes/mutedZones.ts`** — `GET /`, `POST /`, `DELETE /:id` routes. Input validated (`validateLocationInput`, radius 100–5000, label ≤50 chars, max 10 zones per user).
+- **`backend/src/app.ts`** — registered `mutedZonesRoutes` at `/v1/user/muted-zones`.
+- **`backend/src/routes/discovery.ts`** — proximity push now wrapped in `isLocationMuted(userId, lat, lng)` check; push is skipped silently when user is inside a muted zone.
+
+**iOS (shared layer — no Cursor work needed here):**
+- **`APIEndpoints.swift`** — `MutedZone`, `MutedZonesResponse`, `CreateMutedZoneRequest`, `CreateMutedZoneResponse` types; `listMutedZones()`, `createMutedZone()`, `deleteMutedZone()` methods on `LegacyAPIClient`.
+- **`MutedZonesCoordinator.swift`** — `@MainActor @Observable` coordinator with `zones`, `isLoading`, `errorMessage`; `load()`, `addZone()`, `deleteZone()`.
+- **`MutedZonesView.swift`** — full map view with `MapCircle` red overlays, `UserAnnotation`, `MutedZonePin` (tap to confirm delete), `AddMutedZoneSheet` (slider 100–5000m step 50, optional label, preview circle that scales with slider, Save/Cancel toolbar). Radius chosen by slider first; drag-handle is a future enhancement.
+- **`ProfileView.swift`** — "Notifications" section with NavigationLink to `MutedZonesView`. Coordinator initialized lazily on `.task`.
+- **`LegacyFixtures.swift`** — `listMutedZonesResponse` + `createMutedZoneResponse` fixtures; enqueued in `happyPath()` and `qaAuthFlow()`; added to `validateAll()`.
+
+**API contract:** §9 muted zones added.
+
+**To deploy:** run migrations `0013_user_display_name.sql` AND `0014_muted_zones.sql` on Neon, then `vercel deploy`.
+
+**iOS → Cursor — action required:**
+
+The `AddMutedZoneSheet` currently places the zone at the user's **current device location** (from `CLLocationManager`). To allow placing a zone at an **arbitrary map location** (tap anywhere on the map):
+
+1. Add `@State private var pendingCoordinate: CLLocationCoordinate2D?` to `MutedZonesView`.
+2. Add an `onTapGesture` (or `MapReader` tap) on the `Map` that sets `pendingCoordinate` from the tapped map coordinate and opens `showAddSheet = true`.
+3. Pass `pendingCoordinate ?? currentLocation` into `AddMutedZoneSheet` instead of `currentLocation`.
+4. Show a temporary pin annotation at `pendingCoordinate` while the sheet is open.
+
+**Optional:** Add a subtle pulse animation (`scaleEffect` + `.easeInOut` repeat) on a newly added zone's `MapCircle` for 2–3 seconds after creation. The coordinator's `zones` array is `@Observable` so you can track the last-added ID.
+

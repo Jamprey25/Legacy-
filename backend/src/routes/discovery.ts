@@ -14,6 +14,7 @@ import { requireAuth, type AuthVars } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { getApnsTokensForUser, clearApnsToken } from "../db/sessions.js";
 import { sendProximityPush } from "../lib/apns.js";
+import { isLocationMuted } from "../db/mutedZones.js";
 
 export const discoveryRoutes = new Hono<{ Variables: AuthVars }>();
 
@@ -108,18 +109,21 @@ discoveryRoutes.post("/scan", async (c) => {
     return new Response(null, { status: 204 });
   }
 
-  // Fire-and-forget proximity push if any teasers are in-range.
-  // Runs after response is assembled; never blocks or throws to the caller.
+  // Fire-and-forget proximity push if any teasers are in-range and the user
+  // hasn't muted this location. Runs after response is assembled; never throws.
   const hasInRange = filteredTeasers.some((t) => t && t.in_range);
   if (hasInRange) {
-    getApnsTokensForUser(userId).then((tokens) => {
-      for (const token of tokens) {
-        sendProximityPush(token).then((result) => {
-          if (!result.ok && result.unregistered) {
-            clearApnsToken(userId, token).catch(() => {});
-          }
-        }).catch(() => {});
-      }
+    isLocationMuted(userId, lat, lng).then((muted) => {
+      if (muted) return; // user silenced this zone — skip push
+      getApnsTokensForUser(userId).then((tokens) => {
+        for (const token of tokens) {
+          sendProximityPush(token).then((result) => {
+            if (!result.ok && result.unregistered) {
+              clearApnsToken(userId, token).catch(() => {});
+            }
+          }).catch(() => {});
+        }
+      }).catch(() => {});
     }).catch(() => {});
   }
 

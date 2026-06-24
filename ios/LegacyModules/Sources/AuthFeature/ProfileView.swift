@@ -24,6 +24,7 @@ public struct ProfileView: View {
     @State private var notificationStatus = "Checking…"
     @State private var showEditName = false
     @State private var displayName = AccountProfileStore.displayName
+    @State private var mutedZonesCoordinator: MutedZonesCoordinator?
 
     public var body: some View {
         NavigationStack {
@@ -33,6 +34,42 @@ public struct ProfileView: View {
                 ScrollView {
                     VStack(spacing: LegacySpacing.xl) {
                         profileHero
+
+                        VStack(alignment: .leading, spacing: LegacySpacing.sm) {
+                            ProfileSectionLabel("Notifications")
+                            ProfileActionCard {
+                                NavigationLink {
+                                    if let coordinator = mutedZonesCoordinator {
+                                        MutedZonesView(coordinator: coordinator)
+                                    }
+                                } label: {
+                                    HStack(spacing: LegacySpacing.md) {
+                                        Image(systemName: "bell.slash")
+                                            .font(.system(size: 17, weight: .medium))
+                                            .foregroundStyle(LegacyColor.accent)
+                                            .frame(width: 36, height: 36)
+                                            .background(LegacyColor.accent.opacity(0.12))
+                                            .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.sm, style: .continuous))
+                                        VStack(alignment: .leading, spacing: LegacySpacing.xxs) {
+                                            Text("Muted zones")
+                                                .font(LegacyFont.headline)
+                                                .foregroundStyle(LegacyColor.textPrimary)
+                                            Text("Places where notifications stay quiet")
+                                                .font(LegacyFont.caption)
+                                                .foregroundStyle(LegacyColor.textSecondary)
+                                        }
+                                        Spacer(minLength: LegacySpacing.sm)
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundStyle(LegacyColor.textSecondary.opacity(0.6))
+                                    }
+                                    .padding(.horizontal, LegacySpacing.lg)
+                                    .padding(.vertical, LegacySpacing.md)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
 
                         VStack(alignment: .leading, spacing: LegacySpacing.sm) {
                             ProfileSectionLabel("Data & privacy")
@@ -147,7 +184,12 @@ public struct ProfileView: View {
                     displayName = AccountProfileStore.displayName
                 }
             }
-            .task { await refreshPermissionStatuses() }
+            .task {
+                await refreshPermissionStatuses()
+                if mutedZonesCoordinator == nil {
+                    mutedZonesCoordinator = MutedZonesCoordinator(apiClient: apiClient)
+                }
+            }
             .onChange(of: scenePhase) { _, phase in
                 // Re-read after the user may have toggled permissions in Settings.
                 if phase == .active { Task { await refreshPermissionStatuses() } }

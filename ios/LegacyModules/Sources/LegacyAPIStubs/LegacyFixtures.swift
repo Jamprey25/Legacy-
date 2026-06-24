@@ -184,6 +184,34 @@ public enum LegacyFixtures {
     }
     """.utf8)
 
+    public static let listMutedZonesResponse = Data("""
+    {
+      "zones": [
+        {
+          "id": "77777777-7777-7777-7777-777777777777",
+          "lat": 37.7749,
+          "lng": -122.4194,
+          "radius_m": 500,
+          "label": "Home",
+          "created_at": "2026-06-24T10:00:00Z"
+        }
+      ]
+    }
+    """.utf8)
+
+    public static let createMutedZoneResponse = Data("""
+    {
+      "zone": {
+        "id": "88888888-8888-8888-8888-888888888888",
+        "lat": 37.7749,
+        "lng": -122.4194,
+        "radius_m": 300,
+        "label": null,
+        "created_at": "2026-06-24T11:00:00Z"
+      }
+    }
+    """.utf8)
+
     public static let exportUserData = Data("""
     {
       "archive_url": "https://blob.vercel-storage.com/exports/stub/export.json",
@@ -242,6 +270,8 @@ public enum LegacyFixtures {
         _ = try decoder.decode(ImportMemoriesResponse.self, from: importMemoriesBlob)
         _ = try decoder.decode(ExportResponse.self, from: exportUserData)
         _ = try decoder.decode(AttestChallengeResponse.self, from: attestChallenge)
+        _ = try decoder.decode(MutedZonesResponse.self, from: listMutedZonesResponse)
+        _ = try decoder.decode(CreateMutedZoneResponse.self, from: createMutedZoneResponse)
     }
 }
 
@@ -261,6 +291,9 @@ extension StubHTTPTransport {
         transport.enqueue("/v1/discovery/scan", .ok(LegacyFixtures.scanWithTeasers))
         transport.enqueue("POST /v1/devices/apns", .noContent)
         transport.enqueue("PATCH /v1/user", .ok(LegacyFixtures.patchUserResponse))
+        transport.enqueue("GET /v1/user/muted-zones", .ok(LegacyFixtures.listMutedZonesResponse))
+        transport.enqueue("POST /v1/user/muted-zones", .json(201, LegacyFixtures.createMutedZoneResponse))
+        transport.enqueue("DELETE /v1/user/muted-zones", .noContent)
         transport.enqueue("GET /v1/user/export", .ok(LegacyFixtures.exportUserData))
         transport.enqueue("DELETE /v1/user", .noContent)
         transport.enqueue("/unlock", .json(423, LegacyFixtures.lockedDwell), .ok(LegacyFixtures.unlock))
@@ -283,6 +316,9 @@ extension StubHTTPTransport {
         transport.enqueue("/v1/discovery/scan", .ok(LegacyFixtures.scanWithTeasers))
         transport.enqueue("POST /v1/devices/apns", .noContent)
         transport.enqueue("PATCH /v1/user", .ok(LegacyFixtures.patchUserResponse))
+        transport.enqueue("GET /v1/user/muted-zones", .ok(LegacyFixtures.listMutedZonesResponse))
+        transport.enqueue("POST /v1/user/muted-zones", .json(201, LegacyFixtures.createMutedZoneResponse))
+        transport.enqueue("DELETE /v1/user/muted-zones", .noContent)
         transport.enqueue("GET /v1/user/export", .ok(LegacyFixtures.exportUserData))
         transport.enqueue("DELETE /v1/user", .noContent)
         transport.enqueue("/unlock", .json(423, LegacyFixtures.lockedDwell), .ok(LegacyFixtures.unlock))

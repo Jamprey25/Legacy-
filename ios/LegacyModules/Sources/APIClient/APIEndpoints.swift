@@ -551,6 +551,50 @@ public struct PatchUserResponse: Decodable, Sendable, Equatable {
     }
 }
 
+// MARK: - Muted zones (§9)
+
+public struct MutedZone: Decodable, Sendable, Identifiable, Equatable {
+    public let id: String
+    public let lat: Double
+    public let lng: Double
+    public let radiusM: Int
+    public let label: String?
+    public let createdAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, lat, lng, label
+        case radiusM = "radius_m"
+        case createdAt = "created_at"
+    }
+}
+
+public struct CreateMutedZoneRequest: Encodable, Sendable {
+    public let lat: Double
+    public let lng: Double
+    public let radiusM: Int
+    public let label: String?
+
+    public init(lat: Double, lng: Double, radiusM: Int, label: String?) {
+        self.lat = lat
+        self.lng = lng
+        self.radiusM = radiusM
+        self.label = label
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case lat, lng, label
+        case radiusM = "radius_m"
+    }
+}
+
+public struct MutedZonesResponse: Decodable, Sendable {
+    public let zones: [MutedZone]
+}
+
+public struct CreateMutedZoneResponse: Decodable, Sendable {
+    public let zone: MutedZone
+}
+
 public struct ExportResponse: Decodable, Sendable, Equatable {
     public let archiveURL: String
     public let memoryCount: Int
@@ -693,6 +737,23 @@ extension LegacyAPIClient {
 
     public func logout() async throws {
         try await sendNoContent(LegacyRequest(method: .post, path: "/v1/auth/logout", body: Data("{}".utf8)))
+    }
+
+    /// Fetch all muted zones for the authenticated user.
+    public func listMutedZones() async throws -> [MutedZone] {
+        let response = try await send(LegacyRequest(method: .get, path: "/v1/user/muted-zones"), as: MutedZonesResponse.self)
+        return response.zones
+    }
+
+    /// Create a new muted zone. Max 10 per user.
+    public func createMutedZone(_ body: CreateMutedZoneRequest) async throws -> MutedZone {
+        let response = try await send(request(.post, "/v1/user/muted-zones", body), as: CreateMutedZoneResponse.self)
+        return response.zone
+    }
+
+    /// Delete a muted zone by ID.
+    public func deleteMutedZone(id: String) async throws {
+        try await sendNoContent(LegacyRequest(method: .delete, path: "/v1/user/muted-zones/\(id)"))
     }
 
     /// Update mutable profile fields (display_name). Pass nil display_name to clear.

@@ -539,6 +539,65 @@ skips verification when `APP_ATTEST_REQUIRED=false`.
 
 ---
 
-## 9. Open items (tracked in collab-log)
+## 9. Muted zones
+
+Radius circles where proximity push notifications are suppressed. Zones are evaluated server-side before APNs fires — no client-side notification extension required. Max 10 zones per user.
+
+### `GET /v1/user/muted-zones`
+
+**Response `200`**
+```json
+{
+  "zones": [
+    {
+      "id": "<uuid>",
+      "lat": 37.7749,
+      "lng": -122.4194,
+      "radius_m": 500,
+      "label": "Home",
+      "created_at": "2026-06-24T10:00:00Z"
+    }
+  ]
+}
+```
+
+### `POST /v1/user/muted-zones`
+
+**Request**
+```json
+{
+  "lat": 37.7749,
+  "lng": -122.4194,
+  "radius_m": 300,
+  "label": "Work"
+}
+```
+- `radius_m`: integer, 100–5000 (metres). Default 500.
+- `label`: string (max 50 chars) or `null`.
+- `400 invalid_request` if lat/lng invalid, radius out of range, or label exceeds 50 chars.
+- `422 zone_limit_reached` if the user already has 10 zones.
+
+**Response `201`**
+```json
+{
+  "zone": {
+    "id": "<uuid>",
+    "lat": 37.7749,
+    "lng": -122.4194,
+    "radius_m": 300,
+    "label": "Work",
+    "created_at": "2026-06-24T11:00:00Z"
+  }
+}
+```
+
+### `DELETE /v1/user/muted-zones/:id`
+
+**Response `204`** — zone deleted.  
+**`404`** — zone not found or not owned by the requesting user.
+
+---
+
+## 10. Open items (tracked in collab-log)
 
 - Phase 2 endpoints (recipients, friends, replies, summons) — not in this v1 contract; added when M6 starts.
