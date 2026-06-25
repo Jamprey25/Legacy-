@@ -108,6 +108,16 @@ export async function getMemoryByOwner(
   return rows.length > 0 ? (rows[0] as unknown as MemoryRow) : null;
 }
 
+/** Delete one memory owned by the caller. Returns the deleted row or null. */
+export async function deleteMemoryByOwner(memoryId: string, ownerId: string): Promise<MemoryRow | null> {
+  const rows = await sql`
+    DELETE FROM memories
+    WHERE id = ${memoryId} AND owner_id = ${ownerId}
+    RETURNING *
+  `;
+  return rows.length > 0 ? (rows[0] as unknown as MemoryRow) : null;
+}
+
 /** Fetch any memory by id. Caller enforces access rules (e.g. unlock route). */
 export async function getMemoryById(memoryId: string): Promise<MemoryRow | null> {
   const rows = await sql`SELECT * FROM memories WHERE id = ${memoryId} LIMIT 1`;

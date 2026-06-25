@@ -2,14 +2,16 @@
 //   POST /v1/memories            — drop a memory, get back memory_id + signed PUT URL
 //   GET  /v1/memories            — paginated owner list (Memory Lane)
 //   GET  /v1/memories/:id        — fetch own memory detail (owner only)
+//   DELETE /v1/memories/:id      — owner-only hard delete ("undrop")
 //   POST /v1/memories/:id/unlock — proximity+dwell+seal+condition check, return media URL
 //   POST /v1/memories/import     — batch-create private memories from on-device clusters
 
 import { Hono } from "hono";
+import { del } from "@vercel/blob";
 import { ApiError } from "../lib/errors.js";
 import { encode as geohashEncode } from "../lib/geohash.js";
 import { generateSignedPutUrl, generateSignedGetUrl, usesClientUpload } from "../lib/storage.js";
-import { createMemory, getMemoryByOwner, getMemoryWithContext, listMemoriesByOwner } from "../db/memories.js";
+import { createMemory, deleteMemoryByOwner, getMemoryByOwner, getMemoryWithContext, listMemoriesByOwner } from "../db/memories.js";
 import { createSeal, type SealType } from "../db/seals.js";
 import { createCondition, type ConditionType } from "../db/conditions.js";
 import { upsertPresencePing, getPresencePing } from "../db/presencePings.js";
@@ -22,7 +24,7 @@ import { rateLimit } from "../middleware/rateLimit.js";
 import { validateLocationInput } from "../lib/locationInput.js";
 import { audit } from "../lib/audit.js";
 import { storeImportResult, findImportByKey } from "../db/imports.js";
-import { createMediaSlots, listMediaByMemory } from "../db/memoryMedia.js";
+import { createMediaSlots, listMediaByMemory, listMediaKeysByMemory } from "../db/memoryMedia.js";
 
 export const memoriesRoutes = new Hono<{ Variables: AuthVars }>();
 
@@ -525,6 +527,39 @@ memoriesRoutes.get("/:id", async (c) => {
     discoverable_after: memory.discoverable_after,
     created_at: memory.created_at,
   });
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /memories/:id
+// ---------------------------------------------------------------------------
+
+memoriesRoutes.delete("/:id", async (c) => {
+  const memoryId = c.req.param("id");
+  const userId: string = c.get("userId");
+
+  // Owner-only delete. 404 for not found/non-owner to avoid leaking existence.
+  const existing = await getMemoryByOwner(memoryId, userId);
+  if (!existing) throw new ApiError("not_found", "Memory not found.");
+
+  // Collect keys before delete (FK cascade removes memory_media rows).
+  const mediaKeys = await listMediaKeysByMemory(memoryId);
+  const keys = new Set<string>(mediaKeys);
+  if (existing.media_key) keys.add(existing.media_key);
+  if (existing.thumbnail_key) keys.add(existing.thumbnail_key);
+
+  await deleteMemoryByOwner(memoryId, userId);
+  // Blob cleanup is awaited so a 204 implies both DB + storage deletion succeeded.
+  const STORAGE = process.env.STORAGE_BACKEND ?? "stub";
+  if (STORAGE === "vercel-blob" && keys.size > 0) {
+    const deletions = await Promise.allSettled(Array.from(keys).map((key) => del(key)));
+    const failed = deletions.filter((d) => d.status === "rejected").length;
+    if (failed > 0) {
+      throw new ApiError("internal_error", "Memory removed, but blob cleanup failed.");
+    }
+  }
+
+  audit(c, "memory.delete", { memory_id: memoryId, media_asset_count: keys.size });
+  return new Response(null, { status: 204 });
 });
 
 // ---------------------------------------------------------------------------

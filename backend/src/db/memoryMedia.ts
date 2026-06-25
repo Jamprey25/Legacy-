@@ -46,6 +46,21 @@ export async function listMediaByMemory(memoryId: string): Promise<MemoryMediaRo
   return rows as unknown as MemoryMediaRow[];
 }
 
+/** All non-null media/thumbnail blob keys for one memory (for storage cleanup). */
+export async function listMediaKeysByMemory(memoryId: string): Promise<string[]> {
+  const rows = await sql`
+    SELECT media_key, thumbnail_key
+    FROM memory_media
+    WHERE memory_id = ${memoryId}
+  `;
+  const keys = new Set<string>();
+  for (const row of rows as Array<{ media_key: string | null; thumbnail_key: string | null }>) {
+    if (row.media_key) keys.add(row.media_key);
+    if (row.thumbnail_key) keys.add(row.thumbnail_key);
+  }
+  return Array.from(keys);
+}
+
 /**
  * Record a successful upload for one slot: set its media_key and flip scan_status → clear.
  * Upserts so live drops (which don't pre-create slots) and out-of-band positions still work.
