@@ -8,6 +8,7 @@ import MilestoneGroup, {
 } from "./components/MilestoneGroup";
 import DecisionsPanel from "./components/DecisionsPanel";
 import ManualTestPanel from "./components/ManualTestPanel";
+import TechnicalArchitecturePanel from "./components/TechnicalArchitecturePanel";
 
 const POLL_INTERVAL = 30;
 
@@ -73,6 +74,7 @@ export default function Dashboard() {
   const [flashKey, setFlashKey] = useState(0);
   const [readyOpen, setReadyOpen] = useState(false);
   const [milestoneCollapseRevision, setMilestoneCollapseRevision] = useState(0);
+  const [activeView, setActiveView] = useState<"delivery" | "architecture">("delivery");
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -206,6 +208,40 @@ export default function Dashboard() {
           <p style={{ color: "#666", fontSize: 13 }}>
             Last updated: {meta.lastUpdated} · ↻ Refreshing in {countdown}s…
           </p>
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <button
+              type="button"
+              onClick={() => setActiveView("delivery")}
+              style={{
+                background: activeView === "delivery" ? "#16a34a1a" : "#141414",
+                color: activeView === "delivery" ? "#4ade80" : "#888",
+                border: `1px solid ${activeView === "delivery" ? "#16a34a55" : "#333"}`,
+                borderRadius: 999,
+                padding: "6px 12px",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Delivery view
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveView("architecture")}
+              style={{
+                background: activeView === "architecture" ? "#0ea5e91a" : "#141414",
+                color: activeView === "architecture" ? "#7dd3fc" : "#888",
+                border: `1px solid ${activeView === "architecture" ? "#0ea5e955" : "#333"}`,
+                borderRadius: 999,
+                padding: "6px 12px",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Architecture view
+            </button>
+          </div>
 
           {/* Stats block — flashes green on each successful refresh */}
           <div
@@ -298,193 +334,199 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* ── Decisions (top priority when open) ── */}
-        {(openDecisions.length > 0 || decisions.some((d) => d.status === "decided")) && (
-          <DecisionsPanel
-            decisions={decisions}
-            tasks={tasks}
-            onResolved={fetchTasks}
-            prominent={openDecisions.length > 0}
-          />
-        )}
+        {activeView === "architecture" ? (
+          <TechnicalArchitecturePanel tasks={tasks} />
+        ) : (
+          <>
+            {/* ── Decisions (top priority when open) ── */}
+            {(openDecisions.length > 0 || decisions.some((d) => d.status === "decided")) && (
+              <DecisionsPanel
+                decisions={decisions}
+                tasks={tasks}
+                onResolved={fetchTasks}
+                prominent={openDecisions.length > 0}
+              />
+            )}
 
-        {/* ── Phase swimlane ── */}
-        {phases.length > 0 && (
-          <div
-            style={{
-              display: "flex", gap: 10, marginBottom: 28,
-              padding: "14px 16px", background: "#141414",
-              border: "1px solid #242424", borderRadius: 8,
-            }}
-          >
-            {phases.map(({ phase, total: pt, done: pd }) => {
-              const pct = pt > 0 ? Math.round((pd / pt) * 100) : 0;
-              const isPhaseComplete = pct === 100;
-              return (
-                <div key={phase} style={{ flex: 1 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
-                    <span style={{ fontSize: 11, color: "#888", fontWeight: 600 }}>Phase {phase}</span>
-                    <span style={{ fontSize: 11, color: isPhaseComplete ? "#16a34a" : "#555" }}>{pct}%</span>
-                  </div>
-                  <div style={{ height: 4, background: "#242424", borderRadius: 2, overflow: "hidden" }}>
-                    <div
-                      style={{
-                        height: "100%", width: `${pct}%`,
-                        background: isPhaseComplete ? "#16a34a" : "#6366f1",
-                        borderRadius: 2, transition: "width 0.5s",
-                      }}
-                    />
-                  </div>
-                  <div style={{ fontSize: 10, color: "#555", marginTop: 3 }}>{pd}/{pt}</div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* ── Legend ── */}
-        <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
-          {[
-            { label: "Backend (Claude)", color: "#6366f1" },
-            { label: "iOS (Cursor)",     color: "#0ea5e9" },
-            { label: "Either",           color: "#8b5cf6" },
-          ].map(({ label, color }) => (
-            <div key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
-              <span style={{ fontSize: 12, color: "#888" }}>{label}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* ── Ready to build ── */}
-        {readyTasks.length > 0 && (
-          <div style={{ marginBottom: 32 }}>
-            <button
-              onClick={() => setReadyOpen((o) => !o)}
-              style={{
-                display: "flex", alignItems: "center", gap: 8,
-                background: "#16a34a11", border: "1px solid #16a34a33",
-                borderRadius: 6, padding: "8px 14px", cursor: "pointer",
-                color: "#16a34a", fontSize: 13, fontWeight: 600,
-                width: "100%", textAlign: "left",
-              }}
-            >
-              <span>✓ Ready to build ({readyTasks.length} task{readyTasks.length !== 1 ? "s" : ""})</span>
-              <span style={{ marginLeft: "auto", fontSize: 10 }}>{readyOpen ? "▲" : "▼"}</span>
-            </button>
-            {readyOpen && (
-              <div style={{ marginTop: 12 }}>
-                {readyByOwner.map(({ owner, label }) => {
-                  const group = readyTasks.filter((t) => t.owner === owner);
-                  if (group.length === 0) return null;
+            {/* ── Phase swimlane ── */}
+            {phases.length > 0 && (
+              <div
+                style={{
+                  display: "flex", gap: 10, marginBottom: 28,
+                  padding: "14px 16px", background: "#141414",
+                  border: "1px solid #242424", borderRadius: 8,
+                }}
+              >
+                {phases.map(({ phase, total: pt, done: pd }) => {
+                  const pct = pt > 0 ? Math.round((pd / pt) * 100) : 0;
+                  const isPhaseComplete = pct === 100;
                   return (
-                    <div key={owner} style={{ marginBottom: 10 }}>
-                      <div style={{ fontSize: 11, color: "#666", fontWeight: 600, marginBottom: 5 }}>{label}</div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                        {group.map((t) => (
-                          <span
-                            key={t.id}
-                            title={t.title}
-                            style={{
-                              background: "#141414", border: "1px solid #242424",
-                              borderRadius: 4, padding: "3px 10px",
-                              fontSize: 11, color: "#ccc",
-                              display: "flex", alignItems: "center", gap: 5,
-                              maxWidth: 240, overflow: "hidden", whiteSpace: "nowrap",
-                            }}
-                          >
-                            <span
-                              style={{
-                                width: 6, height: 6, borderRadius: "50%",
-                                background: ownerColor(owner), flexShrink: 0, display: "inline-block",
-                              }}
-                            />
-                            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                              {t.title.length > 38 ? t.title.slice(0, 38) + "…" : t.title}
-                            </span>
-                          </span>
-                        ))}
+                    <div key={phase} style={{ flex: 1 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+                        <span style={{ fontSize: 11, color: "#888", fontWeight: 600 }}>Phase {phase}</span>
+                        <span style={{ fontSize: 11, color: isPhaseComplete ? "#16a34a" : "#555" }}>{pct}%</span>
                       </div>
+                      <div style={{ height: 4, background: "#242424", borderRadius: 2, overflow: "hidden" }}>
+                        <div
+                          style={{
+                            height: "100%", width: `${pct}%`,
+                            background: isPhaseComplete ? "#16a34a" : "#6366f1",
+                            borderRadius: 2, transition: "width 0.5s",
+                          }}
+                        />
+                      </div>
+                      <div style={{ fontSize: 10, color: "#555", marginTop: 3 }}>{pd}/{pt}</div>
                     </div>
                   );
                 })}
               </div>
             )}
-          </div>
-        )}
 
-        {/* ── Milestones (M0 … M11) ── */}
-        {byMilestone.length > 0 && (
-          <div style={{ marginBottom: 8 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                marginBottom: 12,
-              }}
-            >
-              <h2 style={{ fontSize: 15, fontWeight: 800, color: "#e8e8e8", margin: 0 }}>
-                Milestones
-              </h2>
-              <span style={{ color: "#555", fontSize: 11 }}>
-                Click ▼ on any row to collapse
-              </span>
-              <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const complete = byMilestone
-                      .filter(
-                        ({ tasks: mt }) => mt.length > 0 && mt.every((t) => t.status === "done")
-                      )
-                      .map(({ milestone: m }) => m);
-                    collapseMilestones(complete);
-                    setMilestoneCollapseRevision((n) => n + 1);
-                  }}
-                  style={{
-                    background: "#141414",
-                    border: "1px solid #333",
-                    borderRadius: 4,
-                    color: "#aaa",
-                    fontSize: 11,
-                    padding: "4px 10px",
-                    cursor: "pointer",
-                  }}
-                >
-                  Collapse completed
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    expandAllMilestones();
-                    setMilestoneCollapseRevision((n) => n + 1);
-                  }}
-                  style={{
-                    background: "#141414",
-                    border: "1px solid #333",
-                    borderRadius: 4,
-                    color: "#aaa",
-                    fontSize: 11,
-                    padding: "4px 10px",
-                    cursor: "pointer",
-                  }}
-                >
-                  Expand all
-                </button>
-              </div>
+            {/* ── Legend ── */}
+            <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
+              {[
+                { label: "Backend (Claude)", color: "#6366f1" },
+                { label: "iOS (Cursor)",     color: "#0ea5e9" },
+                { label: "Either",           color: "#8b5cf6" },
+              ].map(({ label, color }) => (
+                <div key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
+                  <span style={{ fontSize: 12, color: "#888" }}>{label}</span>
+                </div>
+              ))}
             </div>
-          </div>
+
+            {/* ── Ready to build ── */}
+            {readyTasks.length > 0 && (
+              <div style={{ marginBottom: 32 }}>
+                <button
+                  onClick={() => setReadyOpen((o) => !o)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    background: "#16a34a11", border: "1px solid #16a34a33",
+                    borderRadius: 6, padding: "8px 14px", cursor: "pointer",
+                    color: "#16a34a", fontSize: 13, fontWeight: 600,
+                    width: "100%", textAlign: "left",
+                  }}
+                >
+                  <span>✓ Ready to build ({readyTasks.length} task{readyTasks.length !== 1 ? "s" : ""})</span>
+                  <span style={{ marginLeft: "auto", fontSize: 10 }}>{readyOpen ? "▲" : "▼"}</span>
+                </button>
+                {readyOpen && (
+                  <div style={{ marginTop: 12 }}>
+                    {readyByOwner.map(({ owner, label }) => {
+                      const group = readyTasks.filter((t) => t.owner === owner);
+                      if (group.length === 0) return null;
+                      return (
+                        <div key={owner} style={{ marginBottom: 10 }}>
+                          <div style={{ fontSize: 11, color: "#666", fontWeight: 600, marginBottom: 5 }}>{label}</div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            {group.map((t) => (
+                              <span
+                                key={t.id}
+                                title={t.title}
+                                style={{
+                                  background: "#141414", border: "1px solid #242424",
+                                  borderRadius: 4, padding: "3px 10px",
+                                  fontSize: 11, color: "#ccc",
+                                  display: "flex", alignItems: "center", gap: 5,
+                                  maxWidth: 240, overflow: "hidden", whiteSpace: "nowrap",
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    width: 6, height: 6, borderRadius: "50%",
+                                    background: ownerColor(owner), flexShrink: 0, display: "inline-block",
+                                  }}
+                                />
+                                <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                                  {t.title.length > 38 ? t.title.slice(0, 38) + "…" : t.title}
+                                </span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Milestones (M0 … M11) ── */}
+            {byMilestone.length > 0 && (
+              <div style={{ marginBottom: 8 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    marginBottom: 12,
+                  }}
+                >
+                  <h2 style={{ fontSize: 15, fontWeight: 800, color: "#e8e8e8", margin: 0 }}>
+                    Milestones
+                  </h2>
+                  <span style={{ color: "#555", fontSize: 11 }}>
+                    Click ▼ on any row to collapse
+                  </span>
+                  <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const complete = byMilestone
+                          .filter(
+                            ({ tasks: mt }) => mt.length > 0 && mt.every((t) => t.status === "done")
+                          )
+                          .map(({ milestone: m }) => m);
+                        collapseMilestones(complete);
+                        setMilestoneCollapseRevision((n) => n + 1);
+                      }}
+                      style={{
+                        background: "#141414",
+                        border: "1px solid #333",
+                        borderRadius: 4,
+                        color: "#aaa",
+                        fontSize: 11,
+                        padding: "4px 10px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Collapse completed
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        expandAllMilestones();
+                        setMilestoneCollapseRevision((n) => n + 1);
+                      }}
+                      style={{
+                        background: "#141414",
+                        border: "1px solid #333",
+                        borderRadius: 4,
+                        color: "#aaa",
+                        fontSize: 11,
+                        padding: "4px 10px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Expand all
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {byMilestone.map(({ milestone, tasks: mt }) => (
+              <MilestoneGroup
+                key={milestone}
+                milestone={milestone}
+                tasks={mt}
+                allTasks={tasks}
+                collapseRevision={milestoneCollapseRevision}
+              />
+            ))}
+          </>
         )}
-        {byMilestone.map(({ milestone, tasks: mt }) => (
-          <MilestoneGroup
-            key={milestone}
-            milestone={milestone}
-            tasks={mt}
-            allTasks={tasks}
-            collapseRevision={milestoneCollapseRevision}
-          />
-        ))}
       </main>
     </>
   );

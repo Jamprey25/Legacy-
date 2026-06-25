@@ -42,6 +42,9 @@ public final class DropCoordinator {
     public private(set) var pendingRecovery: PendingUploadRecovery?
     public private(set) var pendingCelebrationPin: CachedOwnPin?
 
+    /// Exposed for compose subviews (summons preview UI).
+    public var apiClientForSummons: LegacyAPIClient { apiClient }
+
     public func consumeCelebrationPin() -> CachedOwnPin? {
         defer { pendingCelebrationPin = nil }
         return pendingCelebrationPin
@@ -176,6 +179,7 @@ public final class DropCoordinator {
                 cachedAt: Date()
             )
             state = .succeeded(memoryID: response.memoryID)
+            await sendSummonsIfNeeded(memoryID: response.memoryID, compose: compose)
         } catch LocationEngineError.simulatedLocation {
             state = .failed("Simulated location is not allowed for drops.")
         } catch is EXIFStripError {
@@ -245,6 +249,16 @@ public final class DropCoordinator {
         } catch {
             state = .failed("Could not drop your note. Check location and connectivity.")
         }
+    }
+
+    private func sendSummonsIfNeeded(memoryID: String, compose: DropComposeDraft) async {
+        guard !compose.recipientPhones.isEmpty else { return }
+        let label = compose.teaserText.trimmingCharacters(in: .whitespacesAndNewlines)
+        try? await apiClient.sendSummons(
+            memoryID: memoryID,
+            recipients: compose.recipientPhones,
+            placeLabel: label.isEmpty ? nil : label
+        )
     }
 
     private func makeCreateRequest(

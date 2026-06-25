@@ -20,6 +20,7 @@ public struct MemorySection: Identifiable, Equatable {
 
 #if os(iOS)
 import MapKit
+import CoreLocation
 #endif
 
 @MainActor
@@ -36,6 +37,13 @@ public final class MemoryLaneCoordinator {
 
     public var sort: MemorySort = .oldest
     public var mediaTypeFilter: MemoryMediaTypeFilter = .all
+    public var searchQuery: String = ""
+    #if os(iOS)
+    public var viewMode: MemoryLaneViewMode = .grid
+    public var selectedPlaceCluster: MemoryPlaceCluster?
+    #endif
+    /// Memory IDs to highlight after import — cleared when user opens one.
+    public var highlightedMemoryIDs: Set<String> = []
 
     public private(set) var items: [MemoryLaneItem] = []
     public private(set) var isLoading = false
@@ -44,26 +52,69 @@ public final class MemoryLaneCoordinator {
 
     public private(set) var detail: MemoryDetail?
     public private(set) var isLoadingDetail = false
+    public private(set) var isDeletingDetail = false
     public private(set) var isUnlocking = false
     public private(set) var ownerMediaURL: URL?
     public private(set) var unlockedMediaURL: URL?
     public private(set) var unlockMessage: String?
+    public private(set) var detailReturnCount: Int?
+    public private(set) var detailLastFoundAt: String?
 
     public var canLoadMore: Bool { nextCursor != nil }
 
     /// Memories dropped on today's calendar day in previous years — surfaced as a
-    /// resurfacing banner. Most-recent year first. Empty on days with no match.
+    /// resurfacing banner. Uses ±3 day window when exact-day matches are empty.
     public var onThisDayItems: [MemoryLaneItem] {
-        items
-            .filter { MemoryLaneFormatting.isOnThisDay(dropDate: $0.dropDate) }
-            .sorted { $0.dropDate > $1.dropDate }
+        let exact = items.filter { MemoryLaneFormatting.isOnThisDay(dropDate: $0.dropDate) }
+        let pool = exact.isEmpty
+            ? items.filter { MemoryLaneFormatting.isOnThisDayWindow(dropDate: $0.dropDate, windowDays: 3) }
+            : exact
+        return pool.sorted { $0.dropDate > $1.dropDate }
+    }
+
+    public var filteredItems: [MemoryLaneItem] {
+        let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !q.isEmpty else { return items }
+        return items.filter { item in
+            if item.dropDate.lowercased().contains(q) { return true }
+            if let label = item.displayLabel?.lowercased(), label.contains(q) { return true }
+            if item.mediaType.lowercased().contains(q) { return true }
+            if let year = MemoryLaneFormatting.year(of: item.dropDate), String(year).contains(q) { return true }
+            #if os(iOS)
+            if let cluster = placeClusters.first(where: { $0.items.contains(where: { $0.memoryID == item.memoryID }) }),
+               let name = cluster.placeName?.lowercased(), name.contains(q) {
+                return true
+            }
+            #endif
+            return false
+        }
+    }
+
+    public var placeClusters: [MemoryPlaceCluster] {
+        let cache = UserDefaults.standard.dictionary(forKey: "legacyPlaceNameCache") as? [String: String] ?? [:]
+        return MemoryPlaceClustering.cluster(items: filteredItems).map { cluster in
+            MemoryPlaceCluster(
+                id: cluster.id,
+                lat: cluster.lat,
+                lng: cluster.lng,
+                items: cluster.items,
+                placeName: cache[cluster.id]
+            )
+        }
+    }
+
+    public var uniquePlaceCount: Int { placeClusters.count }
+
+    public var statsLabel: String {
+        "\(uniquePlaceCount) \(uniquePlaceCount == 1 ? "place" : "places") · \(items.count) \(items.count == 1 ? "memory" : "memories")"
     }
 
     /// Items grouped into year sections for browsing. Section order follows the
     /// active sort (newest → years descending). Within a year, the backend's
     /// ordering is preserved. Unparseable dates collect under year 0 ("Undated").
     public var sections: [MemorySection] {
-        let grouped = Dictionary(grouping: items) { MemoryLaneFormatting.year(of: $0.dropDate) ?? 0 }
+        let source = filteredItems
+        let grouped = Dictionary(grouping: source) { MemoryLaneFormatting.year(of: $0.dropDate) ?? 0 }
         let unsorted = grouped.map { MemorySection(year: $0.key, items: $0.value) }
         return unsorted.sorted { sort == .newest ? $0.year > $1.year : $0.year < $1.year }
     }
@@ -89,6 +140,11 @@ public final class MemoryLaneCoordinator {
         do {
             items = try await fetchAllPages()
             nextCursor = nil
+            #if os(iOS)
+            await resolvePlaceNames()
+            OnThisDayNotificationScheduler.reschedule(with: items)
+            updateWidgetDefaults()
+            #endif
         } catch {
             errorMessage = "Could not load your memories."
         }
@@ -108,6 +164,60 @@ public final class MemoryLaneCoordinator {
         } while cursor != nil
         return aggregated
     }
+
+    #if os(iOS)
+    public func resolvePlaceNames() async {
+        let clusters = MemoryPlaceClustering.cluster(items: items)
+        var named: [String: String] = [:]
+        for cluster in clusters {
+            let location = CLLocation(latitude: cluster.lat, longitude: cluster.lng)
+            if let placemarks = try? await CLGeocoder().reverseGeocodeLocation(location),
+               let placemark = placemarks.first {
+                let primary = placemark.areasOfInterest?.first
+                    ?? placemark.subLocality
+                    ?? placemark.locality
+                    ?? placemark.name
+                if let primary {
+                    let label: String
+                    if let city = placemark.locality, city != primary {
+                        label = "\(primary), \(city)"
+                    } else {
+                        label = primary
+                    }
+                    named[cluster.id] = label
+                }
+            }
+        }
+        UserDefaults.standard.set(named, forKey: "legacyPlaceNameCache")
+    }
+
+    public func placeName(for item: MemoryLaneItem) -> String? {
+        guard let lat = item.lat, let lng = item.lng else { return nil }
+        let key = MemoryPlaceClustering.bucketKey(lat: lat, lng: lng)
+        let cache = UserDefaults.standard.dictionary(forKey: "legacyPlaceNameCache") as? [String: String]
+        return cache?[key]
+    }
+
+    public func highlightImportedMemories(_ memoryIDs: [String]) {
+        highlightedMemoryIDs = Set(memoryIDs)
+    }
+
+    public func clearHighlight(for memoryID: String) {
+        highlightedMemoryIDs.remove(memoryID)
+    }
+
+    private func updateWidgetDefaults() {
+        guard let defaults = UserDefaults(suiteName: "group.app.legacy.shared") else { return }
+        let matches = onThisDayItems
+        if let first = matches.first {
+            defaults.set("On this day", forKey: "widget.onThisDay.title")
+            defaults.set(MemoryLaneFormatting.onThisDayLabel(dropDate: first.dropDate), forKey: "widget.onThisDay.subtitle")
+        } else {
+            defaults.set("On this day", forKey: "widget.onThisDay.title")
+            defaults.set("Open Legacy to browse your map", forKey: "widget.onThisDay.subtitle")
+        }
+    }
+    #endif
 
     public func loadMoreIfNeeded(current item: MemoryLaneItem) async {
         guard let cursor = nextCursor, !isLoadingMore else { return }
@@ -135,6 +245,8 @@ public final class MemoryLaneCoordinator {
         ownerMediaURL = nil
         unlockedMediaURL = nil
         unlockMessage = nil
+        detailReturnCount = nil
+        detailLastFoundAt = nil
         defer { isLoadingDetail = false }
 
         if item.scanStatus == "clear",
@@ -146,12 +258,44 @@ public final class MemoryLaneCoordinator {
         do {
             let loaded = try await apiClient.getMemory(id: item.memoryID)
             detail = loaded
+            detailReturnCount = loaded.returnCount
+            detailLastFoundAt = loaded.lastFoundAt
             if loaded.scanStatus == "clear", let urlString = loaded.mediaURL ?? loaded.thumbnailURL,
                let url = URL(string: urlString) {
                 ownerMediaURL = url
             }
+            await pollLifecycleStatus(for: item.memoryID, initial: loaded)
         } catch {
             errorMessage = "Could not load memory details."
+        }
+    }
+
+    private func shouldPollLifecycle(_ memory: MemoryDetail) -> Bool {
+        if let uploadStatus = memory.uploadStatus {
+            return !uploadStatus.isReady
+        }
+        return memory.scanStatus != "clear"
+    }
+
+    private func pollLifecycleStatus(for memoryID: String, initial: MemoryDetail) async {
+        guard shouldPollLifecycle(initial) else { return }
+        for _ in 0..<8 {
+            if Task.isCancelled { return }
+            try? await Task.sleep(for: .seconds(3))
+            if Task.isCancelled { return }
+            do {
+                let refreshed = try await apiClient.getMemory(id: memoryID)
+                detail = refreshed
+                if refreshed.scanStatus == "clear",
+                   let urlString = refreshed.mediaURL ?? refreshed.thumbnailURL,
+                   let url = URL(string: urlString) {
+                    ownerMediaURL = url
+                }
+                if !shouldPollLifecycle(refreshed) { return }
+            } catch {
+                // Keep current detail state if refresh fails; user can pull-to-refresh/reopen.
+                return
+            }
         }
     }
 
@@ -176,6 +320,13 @@ public final class MemoryLaneCoordinator {
                 unlockedMediaURL = url
             }
             unlockMessage = response.caption
+            detailReturnCount = response.returnCount
+            LegacyHaptics.unlockCeremony(isFirstReturn: response.returnCount <= 1)
+            if let refreshed = try? await apiClient.getMemory(id: memoryID) {
+                detail = refreshed
+                detailReturnCount = refreshed.returnCount
+                detailLastFoundAt = refreshed.lastFoundAt
+            }
         } catch let LegacyAPIError.locked(code, message, _) {
             unlockMessage = code == "not_in_range"
                 ? "Visit the drop location to view this memory."
@@ -186,6 +337,29 @@ public final class MemoryLaneCoordinator {
             unlockMessage = "Session expired. Sign out and sign in again."
         } catch {
             unlockMessage = "Could not open memory. Try again when you have a signal."
+        }
+    }
+
+    @discardableResult
+    public func deleteMemory(memoryID: String) async -> Bool {
+        guard !isDeletingDetail else { return false }
+        isDeletingDetail = true
+        defer { isDeletingDetail = false }
+
+        do {
+            try await apiClient.deleteMemory(id: memoryID)
+            items.removeAll { $0.memoryID == memoryID }
+            detail = nil
+            ownerMediaURL = nil
+            unlockedMediaURL = nil
+            unlockMessage = nil
+            return true
+        } catch LegacyAPIError.notFound {
+            errorMessage = "Memory no longer exists."
+            return false
+        } catch {
+            errorMessage = "Could not remove memory. Try again."
+            return false
         }
     }
 }
@@ -225,7 +399,7 @@ public struct MemoryLaneFeatureRootView: View {
                                     Text("Memory Vault")
                                         .font(LegacyFont.headline)
                                         .foregroundStyle(LegacyColor.textPrimary)
-                                    Text("\(coordinator.items.count) memories · \(coordinator.sections.count) years")
+                                    Text(coordinator.statsLabel)
                                         .font(LegacyFont.caption)
                                         .foregroundStyle(LegacyColor.textSecondary)
                                 }
@@ -239,45 +413,40 @@ public struct MemoryLaneFeatureRootView: View {
                         .padding(.top, LegacySpacing.sm)
 
                         #if os(iOS)
+                        Picker("View", selection: $coordinator.viewMode) {
+                            ForEach(MemoryLaneViewMode.allCases) { mode in
+                                Label(mode.label, systemImage: mode.icon).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.horizontal, LegacySpacing.lg)
+                        .padding(.top, LegacySpacing.sm)
+
+                        MemoryLaneSearchBar(query: $coordinator.searchQuery)
+                            .padding(.horizontal, LegacySpacing.lg)
+                            .padding(.top, LegacySpacing.sm)
+
                         if !coordinator.onThisDayItems.isEmpty {
                             OnThisDaySection(items: coordinator.onThisDayItems)
                         }
-                        #endif
 
-                        LazyVStack(alignment: .leading, spacing: LegacySpacing.lg, pinnedViews: [.sectionHeaders]) {
-                            ForEach(coordinator.sections) { section in
-                                Section {
-                                    LazyVGrid(columns: columns, spacing: LegacySpacing.md) {
-                                        ForEach(section.items) { item in
-                                            NavigationLink(value: item) {
-                                                MemoryLaneCard(item: item)
-                                            }
-                                            .buttonStyle(.plain)
-                                            .onAppear {
-                                                Task { await coordinator.loadMoreIfNeeded(current: item) }
-                                            }
-                                        }
-                                    }
-                                    .padding(.horizontal, LegacySpacing.lg)
-                                } header: {
-                                    MemoryLaneSectionHeader(title: section.title, count: section.items.count)
-                                }
+                        switch coordinator.viewMode {
+                        case .grid:
+                            gridContent
+                        case .places:
+                            MemoryPlacesAtlasView(clusters: coordinator.placeClusters) { cluster in
+                                coordinator.selectedPlaceCluster = cluster
                             }
+                            .padding(.vertical, LegacySpacing.md)
+                        case .map:
+                            MemoryPlacesMapView(clusters: coordinator.placeClusters) { cluster in
+                                coordinator.selectedPlaceCluster = cluster
+                            }
+                            .padding(.vertical, LegacySpacing.md)
                         }
-                        .padding(.vertical, LegacySpacing.lg)
-
-                        if coordinator.isLoadingMore {
-                            ProgressView()
-                                .tint(LegacyColor.accent)
-                                .padding(.bottom, LegacySpacing.lg)
-                        }
-
-                        if coordinator.items.count > 1 {
-                            Text("\(coordinator.items.count) memories")
-                                .font(LegacyFont.caption)
-                                .foregroundStyle(LegacyColor.textSecondary)
-                                .padding(.bottom, LegacySpacing.lg)
-                        }
+                        #else
+                        gridContent
+                        #endif
                     }
                 }
             }
@@ -292,6 +461,10 @@ public struct MemoryLaneFeatureRootView: View {
             }
             .navigationDestination(for: MemoryLaneItem.self) { item in
                 MemoryLaneDetailView(item: item, coordinator: coordinator)
+                    .onAppear { coordinator.clearHighlight(for: item.memoryID) }
+            }
+            .sheet(item: $coordinator.selectedPlaceCluster) { cluster in
+                MemoryPlaceFilterSheet(cluster: cluster, coordinator: coordinator)
             }
             #endif
             .task { await coordinator.loadInitial() }
@@ -306,6 +479,40 @@ public struct MemoryLaneFeatureRootView: View {
                         .background(LegacyColor.background)
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var gridContent: some View {
+        LazyVStack(alignment: .leading, spacing: LegacySpacing.lg, pinnedViews: [.sectionHeaders]) {
+            ForEach(coordinator.sections) { section in
+                Section {
+                    LazyVGrid(columns: columns, spacing: LegacySpacing.md) {
+                        ForEach(section.items) { item in
+                            NavigationLink(value: item) {
+                                MemoryLaneCard(
+                                    item: item,
+                                    isHighlighted: coordinator.highlightedMemoryIDs.contains(item.memoryID)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .onAppear {
+                                Task { await coordinator.loadMoreIfNeeded(current: item) }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, LegacySpacing.lg)
+                } header: {
+                    MemoryLaneSectionHeader(title: section.title, count: section.items.count)
+                }
+            }
+        }
+        .padding(.vertical, LegacySpacing.lg)
+
+        if coordinator.isLoadingMore {
+            ProgressView()
+                .tint(LegacyColor.accent)
+                .padding(.bottom, LegacySpacing.lg)
         }
     }
 
@@ -528,7 +735,7 @@ private struct OnThisDayCard: View {
                 endPoint: .bottom
             )
 
-            Text(MemoryLaneFormatting.yearsAgoToday(dropDate: item.dropDate))
+            Text(MemoryLaneFormatting.onThisDayLabel(dropDate: item.dropDate))
                 .font(LegacyFont.caption)
                 .foregroundStyle(.white)
                 .padding(LegacySpacing.sm)
@@ -551,21 +758,46 @@ private struct OnThisDayCard: View {
 
 struct MemoryLaneCard: View {
     let item: MemoryLaneItem
+    var isHighlighted: Bool = false
+
+    private var isTextNote: Bool { item.mediaType == "text" }
 
     var body: some View {
         VStack(alignment: .leading, spacing: LegacySpacing.sm) {
             ZStack {
                 RoundedRectangle(cornerRadius: LegacyRadius.sm)
                     .fill(
-                        LinearGradient(
-                            colors: [LegacyColor.surface, LegacyColor.background.opacity(0.85)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
+                        isTextNote
+                            ? LinearGradient(
+                                colors: [
+                                    Color(red: 0.42, green: 0.34, blue: 0.22),
+                                    Color(red: 0.28, green: 0.22, blue: 0.14),
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            : LinearGradient(
+                                colors: [LegacyColor.surface, LegacyColor.background.opacity(0.85)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
                     )
                     .aspectRatio(1, contentMode: .fit)
 
-                if let urlString = item.previewImageURL,
+                if isTextNote {
+                    VStack(alignment: .leading, spacing: LegacySpacing.xs) {
+                        Image(systemName: "scroll.fill")
+                            .font(.title2)
+                            .foregroundStyle(Color(red: 0.95, green: 0.88, blue: 0.72))
+                        Text(item.displayLabel ?? item.teaserText ?? "Note in a bottle")
+                            .font(LegacyFont.callout)
+                            .foregroundStyle(Color(red: 0.95, green: 0.88, blue: 0.72))
+                            .lineLimit(4)
+                            .multilineTextAlignment(.leading)
+                    }
+                    .padding(LegacySpacing.md)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                } else if let urlString = item.previewImageURL,
                    let url = URL(string: urlString) {
                     AsyncImage(url: url) { phase in
                         switch phase {
@@ -612,8 +844,9 @@ struct MemoryLaneCard: View {
             .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.sm))
             .overlay(
                 RoundedRectangle(cornerRadius: LegacyRadius.sm)
-                    .stroke(LegacyColor.separator, lineWidth: 1)
+                    .stroke(isHighlighted ? LegacyColor.accent : LegacyColor.separator, lineWidth: isHighlighted ? 2 : 1)
             )
+            .accessibilityLabel(accessibilitySummary)
 
             if let label = item.displayLabel {
                 Text(label)
@@ -637,12 +870,23 @@ struct MemoryLaneCard: View {
             }
         }
     }
+
+    private var accessibilitySummary: String {
+        var parts = [item.dropDate]
+        if isTextNote { parts.append("text note") }
+        if let label = item.displayLabel { parts.append(label) }
+        if item.isMultiPhoto, let count = item.photoCount { parts.append("\(count) photos") }
+        if isHighlighted { parts.append("newly imported") }
+        return parts.joined(separator: ", ")
+    }
 }
 
 #if os(iOS)
 struct MemoryLaneDetailView: View {
     let item: MemoryLaneItem
     @Bindable var coordinator: MemoryLaneCoordinator
+    @Environment(\.dismiss) private var dismiss
+    @State private var showDeleteConfirm = false
 
     var body: some View {
         ScrollView {
@@ -662,12 +906,45 @@ struct MemoryLaneDetailView: View {
                         Text(detail.createdAt.prefix(10))
                             .font(LegacyFont.body)
                     }
-                    LabeledContent("Status") {
-                        Text(detail.scanStatus)
-                            .font(LegacyFont.body)
+
+                    if let count = coordinator.detailReturnCount, count > 0 {
+                        LabeledContent("Returns") {
+                            Text(UnlockReturnNarrative.headline(returnCount: count))
+                                .font(LegacyFont.body)
+                        }
                     }
 
-                    if detail.scanStatus == "clear" {
+                    if let lastLabel = UnlockReturnNarrative.lastUnlockedLabel(iso8601: coordinator.detailLastFoundAt) {
+                        LabeledContent("Last visit") {
+                            Text(lastLabel.replacingOccurrences(of: "Last unlocked ", with: ""))
+                                .font(LegacyFont.body)
+                        }
+                    }
+
+                    LabeledContent("Status") {
+                        VStack(alignment: .trailing, spacing: LegacySpacing.xxs) {
+                            Text(lifecycleTitle(for: detail))
+                                .font(LegacyFont.body)
+                            if let status = detail.uploadStatus,
+                               status.totalMedia > 0,
+                               !status.isReady {
+                                Text("\(status.uploadedMedia) of \(status.totalMedia) uploaded")
+                                    .font(LegacyFont.caption)
+                                    .foregroundStyle(LegacyColor.textSecondary)
+                                ProgressView(value: status.progressFraction)
+                                    .tint(LegacyColor.accent)
+                                    .frame(width: 130)
+                            }
+                            if let status = detail.uploadStatus,
+                               status.failedMedia > 0 {
+                                Text("\(status.failedMedia) failed, retrying in background")
+                                    .font(LegacyFont.caption)
+                                    .foregroundStyle(LegacyColor.textSecondary)
+                            }
+                        }
+                    }
+
+                    if isReadyForViewing(detail) {
                         if coordinator.ownerMediaURL == nil && coordinator.unlockedMediaURL == nil,
                            item.previewImageURL == nil {
                             Button("Open at location") {
@@ -715,7 +992,63 @@ struct MemoryLaneDetailView: View {
         .background(LegacyColor.background)
         .navigationTitle(item.dropDate)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(role: .destructive) {
+                    showDeleteConfirm = true
+                } label: {
+                    if coordinator.isDeletingDetail {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "trash")
+                    }
+                }
+                .disabled(coordinator.isDeletingDetail)
+                .accessibilityLabel("Remove memory")
+            }
+        }
+        .confirmationDialog(
+            "Remove this memory?",
+            isPresented: $showDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Remove memory", role: .destructive) {
+                Task {
+                    let removed = await coordinator.deleteMemory(memoryID: item.memoryID)
+                    if removed {
+                        dismiss()
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This permanently removes the memory and its photos from your account.")
+        }
         .task { await coordinator.loadDetail(for: item) }
+    }
+
+    private func isReadyForViewing(_ detail: MemoryDetail) -> Bool {
+        detail.uploadStatus?.isReady ?? (detail.scanStatus == "clear")
+    }
+
+    private func lifecycleTitle(for detail: MemoryDetail) -> String {
+        guard let status = detail.uploadStatus else {
+            return detail.scanStatus == "clear" ? "Ready" : "Preparing memory"
+        }
+        switch status.stage {
+        case "creating":
+            return "Creating memory"
+        case "uploading_hero":
+            return "Uploading first photo"
+        case "uploading_extras":
+            return "Uploading remaining photos"
+        case "partial_failure":
+            return "Partially uploaded"
+        case "ready":
+            return "Ready"
+        default:
+            return detail.scanStatus == "clear" ? "Ready" : "Preparing memory"
+        }
     }
 }
 

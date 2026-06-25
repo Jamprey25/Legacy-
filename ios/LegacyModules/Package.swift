@@ -44,7 +44,7 @@ let package = Package(
         .target(
             name: "WanderFeature",
             dependencies: [
-                "DesignSystem", "APIClient", "LocationEngine",
+                "DesignSystem", "APIClient", "LocationEngine", "MemoryLaneFeature",
                 .product(
                     name: "MapLibre",
                     package: "maplibre-gl-native-distribution",

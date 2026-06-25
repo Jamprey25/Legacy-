@@ -26,3 +26,5 @@ DerivedData/
 
 # claude-flow / ruflo local session state
 .claude-flow/
+.vercel
+.env*

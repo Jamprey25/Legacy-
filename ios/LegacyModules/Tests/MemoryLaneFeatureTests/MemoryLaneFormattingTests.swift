@@ -49,15 +49,9 @@ final class MemoryLaneFormattingTests: XCTestCase {
         XCTAssertNil(MemoryLaneFormatting.year(of: "nope", calendar: calendar))
     }
 
-    func testYearsAgoTodaySingularAndPlural() {
+    func testIsOnThisDayWindowAllowsNearbyDates() {
         let now = date(2026, 6, 22)
-        XCTAssertEqual(
-            MemoryLaneFormatting.yearsAgoToday(dropDate: "2025-06-22", now: now, calendar: calendar),
-            "1 year ago today"
-        )
-        XCTAssertEqual(
-            MemoryLaneFormatting.yearsAgoToday(dropDate: "2023-06-22", now: now, calendar: calendar),
-            "3 years ago today"
-        )
+        XCTAssertTrue(MemoryLaneFormatting.isOnThisDayWindow(dropDate: "2023-06-24", windowDays: 3, now: now, calendar: calendar))
+        XCTAssertFalse(MemoryLaneFormatting.isOnThisDayWindow(dropDate: "2023-06-16", windowDays: 3, now: now, calendar: calendar))
     }
 }

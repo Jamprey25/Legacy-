@@ -1,7 +1,7 @@
 # Legacy — Technical Internal
 
 **Audience:** Engineers (and future-you) implementing or reviewing iOS and API behavior.  
-**Last updated:** 2026-06-17  
+**Last updated:** 2026-06-24  
 **Companion docs:** `engineering-plan.md` (product-wide), `api-contract.md` (wire format), `collab-log.md` (decisions)
 
 ---
@@ -61,6 +61,32 @@ LegacyAPIClient
 ```
 
 **Dependency inversion:** `LegacyAPIClient` never calls `URLSession.shared` directly. Tests and SwiftUI previews inject `StubHTTPTransport` without network or global mocks.
+
+### 1.4 Dashboard architecture visualization surface (added 2026-06-24)
+
+The shared Next.js dashboard now exposes an **Architecture view** tab in addition to the delivery/task view. This turns the dashboard into a live system map, not only a planning board.
+
+Included visual layers:
+
+1. **System topology cards** — iOS client, backend API, storage plane, and control plane (`tasks.json` + engineering docs).
+2. **iOS module dependency graph** — explicit module-level edges used by the app target (`DesignSystem`, `APIClient`, `LocationEngine`, feature modules).
+3. **Core runtime flow traces** — step diagrams for Drop, Scan, and Unlock request paths.
+4. **Execution counters** — ownership and completion snapshots tied to `tasks.json`.
+5. **Deep links** — each node and flow has click-through links to module directories and contract/workflow docs.
+
+Configuration hooks:
+- `NEXT_PUBLIC_REPO_WEB_ROOT` for module/folder link targets.
+- `NEXT_PUBLIC_DOCS_WEB_ROOT` for engineering-doc link targets.
+
+### Pedagogical Note
+
+This visualization follows a **layered architecture + data-flow tracing** teaching model:
+
+- Topology cards answer *where responsibilities live* (bounded contexts).
+- Module graph answers *who can call whom* (dependency direction constraints).
+- Flow traces answer *what happens over time* (state transitions per request).
+
+Together, those three views let new engineers reason about correctness using invariants: privacy boundaries, ownership boundaries, and API boundary contracts.
 
 ---
 
@@ -146,14 +172,32 @@ User taps pin → POST /v1/memories/{id}/unlock
 
 `StubHTTPTransport.happyPath()` models this with a **response queue**: first `/unlock` → 423, second → 200.
 
-### 3.4 Drop flow (M1 — planned)
+### 3.4 Drop flow + lifecycle clarity
 
 ```
-Capture photo → strip EXIF (ImageIO, synchronous)
-  → POST /v1/memories → { memory_id, upload.signed_put_url }
-  → Background URLSession PUT to S3 (resumable)
-  → Server webhook: EXIF re-strip, CSAM scan, thumbnail
+Capture/import photo(s) → EXIFStripper.downsampledStrippedJPEG
+  → POST /v1/memories or POST /v1/memories/import
+  → POST /v1/uploads/direct (hero position 0 first, extras 1+)
+  → memory_media slots flip pending → clear as uploads land
+  → GET /v1/memories/{id} returns upload_status { stage, uploaded_media, ... }
+  → iOS Memory Lane detail polls while stage != ready and renders progress text/bar
+  → After each direct upload, iOS best-effort uploads X-Media-Role: thumbnail (~400px JPEG)
 ```
+
+**Unlock ceremony (2026-06-25):** `POST /unlock` and `GET /:id` expose `return_count` + `last_found_at`. Wander shows dwell ring + return headline; Memory Lane surfaces returns in detail.
+
+**Places atlas (iOS-only):** list items include owner `lat`/`lng`; client clusters ~110m buckets, reverse-geocodes labels, exposes Grid | Places | Map segments.
+
+**On this day retention:** exact-day match preferred; ±3 day window fallback; local notification + App Group widget payload (no coordinates in widget).
+
+**Summons preview:** `POST /v1/summons/*` + Treasure Chest recipient UI; SMS body is place label + deep link only.
+
+`upload_status.stage` lifecycle:
+- `creating` — memory row exists, no cleared media yet
+- `uploading_hero` — first (position 0) media still pending
+- `uploading_extras` — hero is ready, additional media still pending
+- `partial_failure` — one or more media slots failed; existing clear media remains usable
+- `ready` — all known slots clear
 
 ### 3.5 Background proximity (M4)
 
@@ -221,6 +265,7 @@ Steady-state power: zero continuous GPS; hardware wakes only on significant move
 - **Warmth bands only:** A continuous `warmth_level` scalar would enable gradient-ascent trilateration even without bearing. Contract stays at 3 bands; client owns animation easing (DEC-15, locked 2026-06-16).
 - **Silent accuracy rejection:** For others' memories, `accuracy_m > 50` returns the same `423 not_in_range` as genuinely being out of range. Client cannot distinguish — by design.
 - **Pending scan_status:** Owner sees own `pending` media; everyone else does not (prevents duplicate uploads on perceived failure).
+- **Lifecycle truth source:** UI progress must come from `upload_status` counters, not optimistic local timers. This preserves consistency across foreground + background uploads.
 - **Import elevation:** `422 cannot_elevate_import` if user tries to share an imported memory without a live drop at that location.
 
 ### 5.2 LocationEngine

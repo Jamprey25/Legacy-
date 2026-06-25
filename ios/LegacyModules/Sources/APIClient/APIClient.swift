@@ -145,7 +145,8 @@ public struct LegacyAPIClient: LegacyAPIClientProtocol {
     public func directUploadRequest(
         memoryID: String,
         contentType: String,
-        position: Int = 0
+        position: Int = 0,
+        mediaRole: String = "full"
     ) throws -> URLRequest {
         guard let url = URL(string: "/v1/uploads/direct", relativeTo: configuration.baseURL) else {
             throw LegacyAPIError.invalidRequest(code: "invalid_path", message: "Bad upload path.")
@@ -159,6 +160,7 @@ public struct LegacyAPIClient: LegacyAPIClientProtocol {
         req.setValue(contentType, forHTTPHeaderField: "Content-Type")
         req.setValue(memoryID, forHTTPHeaderField: "X-Memory-Id")
         req.setValue(String(position), forHTTPHeaderField: "X-Media-Position")
+        req.setValue(mediaRole, forHTTPHeaderField: "X-Media-Role")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         req.setValue(configuration.appVersion, forHTTPHeaderField: "X-App-Version")
         req.setValue(configuration.deviceID, forHTTPHeaderField: "X-Device-Id")
@@ -171,9 +173,15 @@ public struct LegacyAPIClient: LegacyAPIClientProtocol {
         memoryID: String,
         data: Data,
         contentType: String,
-        position: Int = 0
+        position: Int = 0,
+        mediaRole: String = "full"
     ) async throws -> String {
-        var req = try directUploadRequest(memoryID: memoryID, contentType: contentType, position: position)
+        var req = try directUploadRequest(
+            memoryID: memoryID,
+            contentType: contentType,
+            position: position,
+            mediaRole: mediaRole
+        )
         req.httpBody = data
 
         let respData: Data

@@ -4,12 +4,12 @@ import DesignSystem
 import MapKit
 import SwiftUI
 
-enum MemoryLaneViewMode: String, CaseIterable, Identifiable {
+public enum MemoryLaneViewMode: String, CaseIterable, Identifiable {
     case grid
     case places
     case map
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
     var label: String {
         switch self {

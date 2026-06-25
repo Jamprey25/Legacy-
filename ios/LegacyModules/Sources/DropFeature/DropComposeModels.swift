@@ -8,19 +8,23 @@ public struct DropComposeDraft: Sendable, Equatable {
     public var seal: SealDraft
     public var condition: ConditionDraft?
     public var noteText: String
+    /// E.164 or US-local phone numbers to summon after drop (Phase 2 preview).
+    public var recipientPhones: [String]
 
     public init(
         teaserText: String = "",
         privacyTier: PrivacyTierDraft = .private,
         seal: SealDraft = .none,
         condition: ConditionDraft? = nil,
-        noteText: String = ""
+        noteText: String = "",
+        recipientPhones: [String] = []
     ) {
         self.teaserText = teaserText
         self.privacyTier = privacyTier
         self.seal = seal
         self.condition = condition
         self.noteText = noteText
+        self.recipientPhones = recipientPhones
     }
 
     public static let pinDefault = DropComposeDraft()

@@ -1,20 +1,20 @@
-#if os(iOS)
 import APIClient
 import DesignSystem
 import SwiftUI
 
-/// A memory's full photo set, hero-first. Swipe the hero or tap a filmstrip thumb to move
-/// through the set; the strip auto-scrolls to keep the selection centered. Collapses to a
-/// single image (no strip, no counter) when a memory has one photo — so normal drops look
-/// exactly as before.
-struct MemoryPhotoGallery: View {
+/// A memory's full photo set, hero-first.
+public struct MemoryPhotoGallery: View {
     let photos: [MemoryMediaItem]
 
     @State private var selection = 0
 
+    public init(photos: [MemoryMediaItem]) {
+        self.photos = photos
+    }
+
     private var isMulti: Bool { photos.count > 1 }
 
-    var body: some View {
+    public var body: some View {
         VStack(spacing: LegacySpacing.sm) {
             TabView(selection: $selection) {
                 ForEach(Array(photos.enumerated()), id: \.offset) { index, photo in
@@ -36,7 +36,9 @@ struct MemoryPhotoGallery: View {
             }
             .frame(height: 280)
             .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.md))
+            #if os(iOS)
             .tabViewStyle(.page(indexDisplayMode: isMulti ? .automatic : .never))
+            #endif
 
             if isMulti {
                 filmstrip
@@ -93,4 +95,3 @@ struct MemoryPhotoGallery: View {
         }
     }
 }
-#endif

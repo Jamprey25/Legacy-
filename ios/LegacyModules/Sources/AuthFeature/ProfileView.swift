@@ -7,13 +7,15 @@ import UserNotifications
 #if os(iOS)
 
 public struct ProfileView: View {
-    public init(apiClient: LegacyAPIClient, onSignOut: @escaping () -> Void) {
+    public init(apiClient: LegacyAPIClient, onSignOut: @escaping () -> Void, statsLabel: String? = nil) {
         self.apiClient = apiClient
         self.onSignOut = onSignOut
+        self.statsLabel = statsLabel
     }
 
     private let apiClient: LegacyAPIClient
     private let onSignOut: () -> Void
+    private let statsLabel: String?
 
     @Environment(\.scenePhase) private var scenePhase
     @State private var isBusy = false
@@ -273,6 +275,17 @@ public struct ProfileView: View {
                         .font(LegacyFont.callout)
                         .foregroundStyle(LegacyColor.textSecondary)
                         .multilineTextAlignment(.center)
+                }
+
+                if let statsLabel, !statsLabel.isEmpty {
+                    Text(statsLabel)
+                        .font(LegacyFont.caption)
+                        .foregroundStyle(LegacyColor.accent)
+                        .padding(.horizontal, LegacySpacing.md)
+                        .padding(.vertical, LegacySpacing.xs)
+                        .background(LegacyColor.accent.opacity(0.12))
+                        .clipShape(Capsule())
+                        .accessibilityLabel("Your map stats: \(statsLabel)")
                 }
             }
 

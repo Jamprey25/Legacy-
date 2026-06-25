@@ -88,6 +88,31 @@ When Joseph clicks an option, the dashboard sets `status: "decided"`, `chosenOpt
 
 ---
 
+## [ios → all] 2026-06-25 — Product roadmap batch (Tier 1–3)
+
+Implemented the attached product roadmap while TestFlight is pending. Full-stack where noted.
+
+**Shipped (iOS):**
+- **Unlock ceremony** — Wander sheet + Memory Lane detail show `return_count` / last visit; haptic bloom on first return; dwell progress ring; first-discovery toast.
+- **Wander multi-photo gallery** — reuses `MemoryPhotoGallery` on unlock.
+- **Memory Lane Places** — Grid / Places / Map segments, search bar, parchment text-note cards, import→Lane highlight handoff, Profile stats pill.
+- **On this day** — ±3 day window fallback, local notification scheduler, widget data bridge (`ios/LegacyWidget/OnThisDayWidget.swift` — add Widget Extension target in Xcode + App Group `group.app.legacy.shared`).
+- **Summons preview UI** — Treasure Chest `RecipientSummonSection` (phone OTP + recipient list); sends summons after drop.
+
+**Shipped (backend):**
+- `GET /v1/memories/:id` → `return_count`, `last_found_at`.
+- `GET /v1/memories` list → `lat`, `lng` (owner-only).
+- `POST /v1/uploads/direct` → `X-Media-Role: thumbnail` for client-side grid thumbnails.
+- **Summons preview** — `POST /v1/summons/phone/send|verify`, `POST /v1/summons/memories/:id/summons` (Twilio when configured, log-only in dev). Migration `0014_summons_preview.sql`.
+
+**Verification:** iOS `swift test` 64/64; backend vitest 65/65.
+
+**Joseph QA:** new `manualTests[]` — `qa-roadmap-unlock-ceremony`, `qa-roadmap-places-atlas`, `qa-roadmap-import-lane-handoff`, `qa-testflight-screenshots`.
+
+**For backend:** redeploy + run migration 0014 before summons QA. Resolve `idea-client-side-thumbnails`.
+
+---
+
 ## [ios → all] 2026-06-22 (session 7) — UX polish batch: onboarding, On-this-day, permissions, a11y
 
 Autonomous user-friendliness pass (Joseph away, asked to "keep adding practical features"). Six self-contained iOS features, each built + tested + committed separately. **Did not touch `backend/**`** — there is in-flight backend `memory_media` WIP in the tree (migrations `0012_memory_media.sql`, `memoryMedia.ts`, `uploads`/`memories` routes, plus its iOS client `APIClient`/`ImportEndpoints`/`MemoryMediaUploader`/`ImportCoordinator`); I left all of it untouched and staged only my own files per-commit.
@@ -1794,3 +1819,89 @@ Not included in this pass:
 **Still parked (NOT applied — your call):** `stash@{1}` "wip dashboard retry", `stash@{2}` "remove Sign in with Apple". `stash@{0}` still holds the rest of its original 36-file snapshot beyond the muted-zones files I pulled — review before dropping.
 
 **Process note (important):** we keep losing work because both agents share **one working tree + one HEAD** — branches don't isolate uncommitted files, and HEAD got yanked between branches mid-session several times. Strongly recommend Cursor work in its own `git worktree` (separate folder, separate branch) so the two checkouts stop colliding. Until then: commit early/often; don't leave large work uncommitted or stashed.
+
+---
+
+## [ios → all] 2026-06-25 — Memory "undrop"/remove (owner delete)
+
+User-requested feature shipped end-to-end so a memory can be removed from Memory Lane detail.
+
+**Backend/API:**
+- Added `DELETE /v1/memories/:id` in `backend/src/routes/memories.ts` (owner-only).
+- Behavior: `204` on success, `404 not_found` for not-owned/missing memory.
+- Deletes the memory row (FK cascade removes `memory_media`, finds, pings, seals, conditions).
+- Best-effort async blob cleanup after delete (same pattern as `DELETE /v1/user`).
+- Added `deleteMemoryByOwner()` in `backend/src/db/memories.ts`.
+- Added `listMediaKeysByMemory()` in `backend/src/db/memoryMedia.ts` for cleanup key collection.
+- Updated contract: `docs/engineering/api-contract.md` §7 with `DELETE /v1/memories/{id}`.
+
+**iOS:**
+- Added `LegacyAPIClient.deleteMemory(id:)`.
+- `MemoryLaneCoordinator`: new `deleteMemory(memoryID:)` flow with local list removal + detail/media state clear.
+- `MemoryLaneDetailView`: trash button in nav bar + destructive confirmation dialog; dismisses detail on success.
+- Stub transport updated to return `204` for `DELETE /v1/memories/2222...`.
+
+**Verification:**
+- `swift test --package-path ios/LegacyModules` → 64/64 passing.
+
+**No migration required.**
+
+---
+
+## [ios → all] 2026-06-25 — Memory delete blob cleanup made blocking
+
+Follow-up on user requirement: memory removal should delete storage assets too.
+
+- Updated `DELETE /v1/memories/:id` so Vercel Blob deletions are **awaited** before returning `204`.
+- Route now uses `Promise.allSettled` over collected media/thumbnail keys and throws `internal_error` if any blob delete fails.
+- Result: successful `204` now implies memory row + blob assets were both deleted.
+
+Verification:
+- `npm run typecheck && npm test` in `backend/` → passing (63 tests).
+
+---
+
+## [ios → all] 2026-06-25 — Memory lifecycle clarity (upload status + detail progress)
+
+Shipped first pass of lifecycle clarity for Memory Lane detail so pending uploads are no longer ambiguous:
+
+- **Backend API (`GET /v1/memories/:id`)**
+  - Added `upload_status` object with:
+    - `stage`: `creating | uploading_hero | uploading_extras | partial_failure | ready`
+    - `total_media`, `uploaded_media`, `pending_media`, `failed_media`, `hero_ready`
+  - Added `getMemoryUploadCounts()` in `backend/src/db/memoryMedia.ts` and status synthesis for single-photo drops without pre-created `memory_media` slots.
+- **iOS detail UX (`MemoryLaneFeature.swift`)**
+  - Replaced raw `scan_status` display with lifecycle titles + numeric progress (`uploaded / total`) + progress bar.
+  - Added automatic detail polling (every ~3s, bounded attempts) while status is not ready.
+  - Added partial-failure messaging ("failed, retrying in background") when backend reports failed slots.
+- **Contract/docs**
+  - Updated `docs/engineering/api-contract.md` `GET /v1/memories/{id}` with `upload_status`.
+  - Corrected delete contract note: `DELETE /v1/memories/{id}` now returns `204` only after blob cleanup succeeds.
+  - Updated `docs/engineering/TECHNICAL_INTERNAL.md` drop/upload flow and lifecycle state definitions.
+
+Verification:
+- `npm run typecheck` in `backend/` → passing.
+- `swift build --package-path ios/LegacyModules` → passing.
+
+---
+
+## [ios → all] 2026-06-25 — Muted zones save fix (accuracy_m validation bug)
+
+**Reported:** Joseph QA — saving a muted zone at 300m (any radius) returned server error `accuracy_m must be > 0 and < 1000`, despite the UI slider correctly offering 100–5000m.
+
+**Root cause:** `POST /v1/user/muted-zones` called `validateLocationInput(body.lat, body.lng, undefined)`. That helper is for scan/unlock/drop payloads that include `accuracy_m`. Muted zones only send `{ lat, lng, radius_m, label? }`, so `undefined` always failed the accuracy check.
+
+**Fix (backend):**
+- Added `validateCoordinates(lat, lng)` in `backend/src/lib/locationInput.ts` — lat/lng range only, no accuracy.
+- `backend/src/routes/mutedZones.ts` now uses `validateCoordinates` instead of `validateLocationInput`.
+- `radius_m` validation unchanged: integer 100–5000.
+- Tests added in `backend/test/locationInput.test.ts`.
+
+**No iOS change needed** — `CreateMutedZoneRequest` and `MutedZonesView` slider were already correct.
+
+**Backend → action required:** Redeploy backend to prod so `qa-mt-muted-zones-create` / list-delete manual tests can pass.
+
+**Dashboard thread:** `tasks.json` → `decisions[]` id `bug-muted-zones-accuracy-validation` (resolved).
+
+Verification:
+- `npm run typecheck && npm test test/locationInput.test.ts` in `backend/` → passing.

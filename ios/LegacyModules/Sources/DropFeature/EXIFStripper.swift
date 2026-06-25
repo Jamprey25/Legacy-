@@ -95,6 +95,11 @@ public enum EXIFStripper {
         }
     }
 
+    /// Grid-preview thumbnail (~400px longest edge, metadata-free JPEG).
+    public static func thumbnailJPEG(from data: Data, maxPixelSize: Int = 400, quality: CGFloat = 0.7) throws -> Data {
+        try downsampledStrippedJPEG(from: data, maxPixelSize: maxPixelSize, quality: quality)
+    }
+
     /// True when GPS or other location-bearing metadata is present (privacy-critical check).
     public static func hasLocationMetadata(in data: Data) -> Bool {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return false }

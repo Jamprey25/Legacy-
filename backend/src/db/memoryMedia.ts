@@ -16,6 +16,14 @@ export interface MemoryMediaRow {
   created_at: Date;
 }
 
+export interface MemoryUploadCounts {
+  total: number;
+  clear: number;
+  pending: number;
+  failed: number;
+  heroClear: boolean;
+}
+
 /**
  * Pre-create `count` pending media slots (positions 0..count-1) for a freshly inserted
  * memory. Idempotent per (memory_id, position) so a retried import doesn't duplicate slots.
@@ -44,6 +52,36 @@ export async function listMediaByMemory(memoryId: string): Promise<MemoryMediaRo
     ORDER BY position ASC
   `;
   return rows as unknown as MemoryMediaRow[];
+}
+
+/** Aggregate upload lifecycle counts for one memory's media slots. */
+export async function getMemoryUploadCounts(memoryId: string): Promise<MemoryUploadCounts> {
+  const rows = await sql`
+    SELECT
+      count(*)::int AS total,
+      count(*) FILTER (WHERE scan_status = 'clear')::int AS clear,
+      count(*) FILTER (WHERE scan_status = 'pending')::int AS pending,
+      count(*) FILTER (WHERE scan_status = 'failed')::int AS failed,
+      count(*) FILTER (WHERE position = 0 AND scan_status = 'clear')::int AS hero_clear
+    FROM memory_media
+    WHERE memory_id = ${memoryId}
+  `;
+  const row = rows[0] as
+    | {
+        total: number;
+        clear: number;
+        pending: number;
+        failed: number;
+        hero_clear: number;
+      }
+    | undefined;
+  return {
+    total: row?.total ?? 0,
+    clear: row?.clear ?? 0,
+    pending: row?.pending ?? 0,
+    failed: row?.failed ?? 0,
+    heroClear: (row?.hero_clear ?? 0) > 0,
+  };
 }
 
 /** All non-null media/thumbnail blob keys for one memory (for storage cleanup). */

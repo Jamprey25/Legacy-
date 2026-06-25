@@ -21,11 +21,10 @@ public struct ImportFeatureRootView: View {
 
     public var body: some View {
         NavigationStack {
-            ZStack {
-                content
-            }
-            .legacyFeatureBackground(glow: LegacyColor.accent)
-            .navigationTitle("Import")
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .legacyFeatureBackground(glow: LegacyColor.accent)
+                .navigationTitle("Import")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -50,6 +49,8 @@ public struct ImportFeatureRootView: View {
 
     private var idleView: some View {
         VStack(spacing: LegacySpacing.lg) {
+            Spacer(minLength: LegacySpacing.xxxl)
+
             LegacyChromeCard(glow: LegacyColor.accent) {
                 VStack(spacing: LegacySpacing.sm) {
                     Image(systemName: "square.stack.3d.up")
@@ -71,9 +72,13 @@ public struct ImportFeatureRootView: View {
                 Task { await coordinator.scanPhotoLibrary() }
             }
             .buttonStyle(.legacyPrimary)
-            .padding(.horizontal, LegacySpacing.xl)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, LegacySpacing.lg)
             #endif
+
+            Spacer(minLength: LegacySpacing.xxxl)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Cluster explorer
@@ -106,6 +111,7 @@ public struct ImportFeatureRootView: View {
                     total: Double(total)
                 )
                 .tint(LegacyColor.accent)
+                .animation(.easeOut(duration: 0.25), value: current)
                 .padding(.horizontal, LegacySpacing.lg)
                 .padding(.top, LegacySpacing.sm)
             }
@@ -130,7 +136,8 @@ public struct ImportFeatureRootView: View {
                     Task { await coordinator.importSelected() }
                 }
                 .buttonStyle(.legacyPrimary)
-                .padding(.horizontal, LegacySpacing.xl)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, LegacySpacing.lg)
                 .padding(.vertical, LegacySpacing.sm)
                 .disabled(coordinator.isImporting)
             }
@@ -141,6 +148,7 @@ public struct ImportFeatureRootView: View {
 
     private func completionView(count: Int) -> some View {
         VStack(spacing: LegacySpacing.lg) {
+            Spacer(minLength: LegacySpacing.xxxl)
             LegacyChromeCard {
                 VStack(spacing: LegacySpacing.sm) {
                     Image(systemName: "checkmark.circle.fill")
@@ -158,11 +166,14 @@ public struct ImportFeatureRootView: View {
             .padding(.horizontal, LegacySpacing.lg)
             Button("Import more") { coordinator.reset() }
                 .buttonStyle(.legacySecondary)
+            Spacer(minLength: LegacySpacing.xxxl)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func failedView(message: String) -> some View {
         VStack(spacing: LegacySpacing.lg) {
+            Spacer(minLength: LegacySpacing.xxxl)
             LegacyChromeCard(glow: LegacyColor.danger) {
                 VStack(spacing: LegacySpacing.sm) {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -182,21 +193,27 @@ public struct ImportFeatureRootView: View {
             // Permission failures can't be retried in-app — send the user to Settings.
             if message.localizedCaseInsensitiveContains("Settings") {
                 OpenSettingsButton()
-                    .padding(.horizontal, LegacySpacing.xl)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, LegacySpacing.lg)
             } else {
                 Button("Try again") {
                     Task { await coordinator.scanPhotoLibrary() }
                 }
                 .buttonStyle(.legacyPrimary)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, LegacySpacing.lg)
             }
             #endif
             Button("Start over") { coordinator.reset() }
                 .buttonStyle(.legacySecondary)
+            Spacer(minLength: LegacySpacing.xxxl)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var scanningView: some View {
         VStack(spacing: LegacySpacing.lg) {
+            Spacer(minLength: LegacySpacing.xxxl)
             LegacyChromeCard(glow: LegacyColor.accent) {
                 VStack(spacing: LegacySpacing.sm) {
                     Image(systemName: "sparkles.rectangle.stack")
@@ -219,7 +236,9 @@ public struct ImportFeatureRootView: View {
                 .frame(maxWidth: .infinity)
             }
             .padding(.horizontal, LegacySpacing.lg)
+            Spacer(minLength: LegacySpacing.xxxl)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

@@ -54,10 +54,10 @@ private struct AuthWelcomeView: View {
             VStack(spacing: LegacySpacing.sm) {
                 Text("Legacy")
                     .font(LegacyFont.largeTitle)
-                    .foregroundStyle(LegacyColor.textPrimary)
+                    .foregroundStyle(LegacyColor.accent)
                 Text("The places remember you.")
                     .font(LegacyFont.body)
-                    .foregroundStyle(LegacyColor.textSecondary)
+                    .foregroundStyle(.white)
             }
 
             VStack(spacing: LegacySpacing.md) {

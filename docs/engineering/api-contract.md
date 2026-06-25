@@ -170,7 +170,9 @@ X-Memory-Id: <memory_id>
 X-Media-Position: <int >= 0>     // optional, default 0. A memory holds many photos;
                                  // 0 = hero (mirrored to memories.media_key + drives
                                  // discovery), 1+ = additional photos in capture order.
-Body: raw EXIF-stripped bytes (max 25 MB)
+X-Media-Role: full | thumbnail   // optional, default full. thumbnail = grid preview only
+                                 // (~400px client JPEG); does not advance scan_status.
+Body: raw EXIF-stripped bytes (max 25 MB full, 512 KB thumbnail)
 ```
 
 Response `200`:
@@ -368,12 +370,31 @@ Owner-only full memory detail. `404` if not owner.
   "media_type": "photo",
   "media_url": "https://blob.vercel-storage.com/...",
   "thumbnail_url": "https://blob.vercel-storage.com/...",
+  "upload_status": {
+    "stage": "ready",                                  // creating | uploading_hero | uploading_extras | partial_failure | ready
+    "total_media": 12,
+    "uploaded_media": 12,
+    "pending_media": 0,
+    "failed_media": 0,
+    "hero_ready": true
+  },
   "discoverable_after": "2026-06-19T11:00:00Z",
   "created_at": "2026-06-18T11:00:00Z"
 }
 ```
 - `media_url` and `thumbnail_url` are non-null only when `scan_status = "clear"` AND caller is owner. Otherwise `null`. For Vercel Blob these are the full public URLs (unguessable bearer capability); for S3/R2 they will be short-TTL signed GET URLs.
+- `upload_status` is owner-only lifecycle metadata for UI clarity. `stage=ready` means all known media slots are clear. `partial_failure` means at least one slot failed while others may still be available.
+- Live one-photo drops that have no explicit `memory_media` slots still return a valid `upload_status` synthesized from the memory row (`creating`/`ready`).
 - Coordinates (`lat`, `lng`, `geohash`) are included — owner data only, never returned to non-owners.
+
+### `DELETE /v1/memories/{id}`
+Owner-only hard delete for one memory ("undrop"/remove).
+
+**Response `204`** — memory deleted, empty body.
+
+- Returns `404 not_found` if the memory does not exist or is not owned by the caller.
+- DB cascade deletes child rows (`memory_media`, `finds`, `presence_pings`, `seals`, `conditions`).
+- Blob cleanup is blocking for this route: `204` is returned only after DB rows and blob assets are both deleted. Blob-delete failures return `500 internal_error`.
 
 ### `GET /v1/memories` (list)
 Paginated owner list for Memory Lane. Auth required.
@@ -598,6 +619,28 @@ Radius circles where proximity push notifications are suppressed. Zones are eval
 
 ---
 
-## 10. Open items (tracked in collab-log)
+## 10. Summons preview (Phase 2 — shipped 2026-06-25)
 
-- Phase 2 endpoints (recipients, friends, replies, summons) — not in this v1 contract; added when M6 starts.
+Phone verification and owner-triggered SMS invitations. Never includes memory content or coordinates in the SMS body.
+
+### `POST /v1/summons/phone/send`
+
+Body: `{ "phone": "+1…" }` → sends 6-digit OTP (Twilio when `TWILIO_*` env set; dev logs code).
+
+### `POST /v1/summons/phone/verify`
+
+Body: `{ "phone": "+1…", "code": "123456" }` → `{ "ok": true, "phone_e164": "+1…" }`
+
+### `POST /v1/summons/memories/:id/summons`
+
+Owner-only. Body: `{ "recipients": ["+1…"], "place_label": "Dolores Park" }`  
+Response: `{ "memory_id", "summons": [{ "phone", "status" }] }`  
+Statuses: `sent` | `preview_logged` | `failed`
+
+Migration: `0014_summons_preview.sql`
+
+---
+
+## 11. Open items (tracked in collab-log)
+
+- Phase 2 ACL enforcement at `/scan` for recipients — not yet wired; summons preview is owner SMS only.

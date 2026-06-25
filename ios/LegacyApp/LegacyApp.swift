@@ -310,6 +310,14 @@ private struct MainTabView: View {
         .onChange(of: importCoordinator.phase) { _, phase in
             if case .completed = phase {
                 let pins = importCoordinator.consumeCelebrationPins()
+                let memoryIDs = pins.map(\.memoryID)
+                if !memoryIDs.isEmpty {
+                    memoryLaneCoordinator.highlightImportedMemories(memoryIDs)
+                    Task {
+                        await memoryLaneCoordinator.loadInitial()
+                        selectedTab = .lane
+                    }
+                }
                 if !pins.isEmpty { celebratePins(pins) }
             }
         }
@@ -424,7 +432,8 @@ private struct MainTabView: View {
     private var profileTab: some View {
         ProfileView(
             apiClient: appModel.apiClient,
-            onSignOut: { appModel.signOut() }
+            onSignOut: { appModel.signOut() },
+            statsLabel: memoryLaneCoordinator.items.isEmpty ? nil : memoryLaneCoordinator.statsLabel
         )
         .tabItem { Label("Profile", systemImage: "person.circle") }
         .tag(MainTab.profile)

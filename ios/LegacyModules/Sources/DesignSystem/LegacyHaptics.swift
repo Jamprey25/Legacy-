@@ -30,4 +30,17 @@ public enum LegacyHaptics {
         UISelectionFeedbackGenerator().selectionChanged()
         #endif
     }
+
+    /// Unlock ceremony — stronger bloom on first return, lighter tick on revisits.
+    public static func unlockCeremony(isFirstReturn: Bool) {
+        #if os(iOS)
+        if isFirstReturn {
+            success()
+        } else {
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.prepare()
+            generator.impactOccurred(intensity: 0.65)
+        }
+        #endif
+    }
 }

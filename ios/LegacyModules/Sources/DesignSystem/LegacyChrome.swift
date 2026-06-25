@@ -10,7 +10,7 @@ public struct LegacyFeatureBackground: ViewModifier {
     }
 
     public func body(content: Content) -> some View {
-        content.background {
+        ZStack {
             ZStack {
                 LinearGradient(
                     colors: [
@@ -37,6 +37,8 @@ public struct LegacyFeatureBackground: ViewModifier {
                 )
             }
             .ignoresSafeArea()
+
+            content
         }
     }
 }

@@ -2,6 +2,7 @@ import APIClient
 import CoreLocation
 import DesignSystem
 import LocationEngine
+import MemoryLaneFeature
 import SwiftUI
 
 #if os(iOS)
@@ -45,8 +46,14 @@ public final class WanderCoordinator {
     public private(set) var isScanning = false
     public private(set) var isUnlocking = false
     public private(set) var statusMessage: String?
-    public private(set) var unlockedMediaURL: URL?
+    public private(set) var unlockedMedia: [MemoryMediaItem] = []
     public private(set) var unlockedCaption: String?
+    public private(set) var unlockedReturnCount: Int = 0
+    public private(set) var unlockedDropDate: String?
+    public private(set) var dwellRemainingSeconds: Int?
+
+    /// Active dwell countdown task — cancelled when unlock succeeds or user dismisses.
+    private var dwellCountdownTask: Task<Void, Never>?
 
     /// Own-memory pins unlocked in range — safe to render offline (never stores others' coords).
     public private(set) var cachedOwnPins: [CachedOwnPin]
@@ -97,11 +104,16 @@ public final class WanderCoordinator {
         isOffline && WanderScanPolicy.maxWarmthLevel(from: teasers) != .none
     }
 
-    public var isShowingUnlockedMedia: Bool { unlockedMediaURL != nil }
+    public var isShowingUnlockedMedia: Bool { !unlockedMedia.isEmpty }
 
     public func dismissUnlockedMedia() {
-        unlockedMediaURL = nil
+        dwellCountdownTask?.cancel()
+        dwellCountdownTask = nil
+        dwellRemainingSeconds = nil
+        unlockedMedia = []
         unlockedCaption = nil
+        unlockedReturnCount = 0
+        unlockedDropDate = nil
     }
 
     /// Movement-gated foreground scan. Safe to call on appear and after significant movement.
@@ -171,8 +183,10 @@ public final class WanderCoordinator {
 
         isUnlocking = true
         statusMessage = nil
-        unlockedMediaURL = nil
+        unlockedMedia = []
         unlockedCaption = nil
+        dwellCountdownTask?.cancel()
+        dwellRemainingSeconds = nil
         defer { isUnlocking = false }
 
         do {
@@ -186,11 +200,20 @@ public final class WanderCoordinator {
             )
             let response = try await apiClient.unlock(memoryID: teaser.memoryID, body)
 
-            if let urlString = response.media.first?.url, let url = URL(string: urlString) {
-                unlockedMediaURL = url
+            unlockedMedia = response.media.enumerated().map { index, item in
+                MemoryMediaItem(
+                    url: item.url,
+                    thumbnailURL: nil,
+                    type: item.type,
+                    position: item.position ?? index
+                )
             }
             unlockedCaption = response.caption
-            statusMessage = response.caption
+            unlockedReturnCount = response.returnCount
+            unlockedDropDate = response.dropDate
+            statusMessage = nil
+
+            LegacyHaptics.unlockCeremony(isFirstReturn: response.returnCount <= 1)
 
             if teaser.isOwn {
                 cacheOwnPin(
@@ -208,7 +231,7 @@ public final class WanderCoordinator {
                     ? "Stay here a moment longer."
                     : message
                 if let seconds = info.retryAfterSeconds {
-                    statusMessage? += " (~\(seconds)s)"
+                    startDwellCountdown(seconds: seconds)
                 }
             case "not_in_range":
                 statusMessage = "Walk closer to open this memory."
@@ -225,6 +248,25 @@ public final class WanderCoordinator {
             statusMessage = "You need a signal to open this."
         } catch {
             statusMessage = "Could not unlock. Try again when you have a signal."
+        }
+    }
+
+    private func startDwellCountdown(seconds: Int) {
+        dwellCountdownTask?.cancel()
+        dwellRemainingSeconds = seconds
+        dwellCountdownTask = Task { [weak self] in
+            guard let self else { return }
+            var remaining = seconds
+            while remaining > 0, !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                remaining -= 1
+                if !Task.isCancelled {
+                    self.dwellRemainingSeconds = max(remaining, 0)
+                }
+            }
+            if !Task.isCancelled {
+                self.dwellRemainingSeconds = nil
+            }
         }
     }
 
@@ -313,6 +355,7 @@ public struct WanderFeatureRootView: View {
     /// stays gone across tab switches and app launches (fixes "it comes over every
     /// time I go back to Wander").
     @AppStorage("legacyHasDismissedWalkHint") private var hasDismissedWalkHint = false
+    @State private var discoveryToast: LegacyToast?
 
     private var showsDiscoveryHint: Bool {
         coordinator.teasers.isEmpty
@@ -381,7 +424,15 @@ public struct WanderFeatureRootView: View {
                         .padding(.bottom, LegacySpacing.sm)
                 }
 
-                if let message = coordinator.statusMessage, !coordinator.isShowingUnlockedMedia {
+                if let seconds = coordinator.dwellRemainingSeconds, !coordinator.isShowingUnlockedMedia {
+                    #if os(iOS)
+                    DwellProgressRing(remainingSeconds: seconds)
+                        .padding(.bottom, LegacySpacing.md)
+                    #endif
+                }
+
+                if let message = coordinator.statusMessage, !coordinator.isShowingUnlockedMedia,
+                   coordinator.dwellRemainingSeconds == nil {
                     Text(message)
                         .font(LegacyFont.callout)
                         .foregroundStyle(LegacyColor.textSecondary)
@@ -443,30 +494,35 @@ public struct WanderFeatureRootView: View {
         .task {
             await coordinator.scanIfNeeded(force: true)
         }
+        #if os(iOS)
         .onChange(of: coordinator.isShowingUnlockedMedia) { wasShowing, isShowing in
-            if !wasShowing, isShowing {
-                LegacyHaptics.success()
+            if !wasShowing, isShowing, coordinator.unlockedReturnCount <= 1 {
+                discoveryToast = LegacyToast(
+                    message: UnlockReturnNarrative.firstDiscoveryToast(),
+                    style: .success
+                )
             }
         }
         .onChange(of: coordinator.locationAuthorizationStatus) { _, status in
-            // The first scan returns early at .notDetermined after firing the system
-            // prompt. When the user grants access, the status flips here — re-run the
-            // scan automatically so the map populates instead of sitting on
-            // "Waiting for location permission…" (the "nothing happens" symptom).
-            #if os(iOS)
             if status == .authorizedWhenInUse || status == .authorizedAlways {
                 Task { await coordinator.scanIfNeeded(force: true) }
             }
-            #endif
         }
+        .legacyToast($discoveryToast)
         .sheet(isPresented: Binding(
             get: { coordinator.isShowingUnlockedMedia },
             set: { if !$0 { coordinator.dismissUnlockedMedia() } }
         )) {
-            if let url = coordinator.unlockedMediaURL {
-                UnlockedMemorySheet(url: url, caption: coordinator.unlockedCaption)
+            if !coordinator.unlockedMedia.isEmpty {
+                UnlockedMemorySheet(
+                    photos: coordinator.unlockedMedia,
+                    caption: coordinator.unlockedCaption,
+                    returnCount: coordinator.unlockedReturnCount,
+                    dropDate: coordinator.unlockedDropDate
+                )
             }
         }
+        #endif
     }
 
     private var backgroundOverlayOpacity: Double {
@@ -678,6 +734,9 @@ private struct TeaserCard: View {
             RoundedRectangle(cornerRadius: LegacyRadius.md)
                 .stroke(LegacyColor.separator, lineWidth: 1)
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(teaser.ownerDisplay == "you" ? "Your memory" : teaser.ownerDisplay), dropped \(teaser.dropDate), \(warmthLabel)\(teaser.inRange ? ", in range to open" : "")")
+        .accessibilityHint(teaser.inRange ? "Double tap Open to unlock" : "Walk closer to unlock")
     }
 
     private var warmthLabel: String {
@@ -746,8 +805,10 @@ private struct OfflineNearBanner: View {
 }
 
 private struct UnlockedMemorySheet: View {
-    let url: URL
+    let photos: [MemoryMediaItem]
     let caption: String?
+    let returnCount: Int
+    let dropDate: String?
 
     @Environment(\.dismiss) private var dismiss
     @State private var revealProgress = false
@@ -756,24 +817,21 @@ private struct UnlockedMemorySheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: LegacySpacing.lg) {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .scaledToFit()
-                                .frame(maxWidth: .infinity)
-                                .blur(radius: revealProgress ? 0 : 12)
-                                .scaleEffect(revealProgress ? 1 : 0.94)
-                                .animation(LegacyMotion.animation(.easeOut(duration: 0.55)), value: revealProgress)
-                                .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.md))
-                        case .failure:
-                            ContentUnavailableView("Could not load", systemImage: "photo")
-                        default:
-                            ProgressView()
-                                .tint(LegacyColor.accent)
-                        }
+                    VStack(spacing: LegacySpacing.xxs) {
+                        Text(UnlockReturnNarrative.headline(returnCount: returnCount))
+                            .font(LegacyFont.headline)
+                            .foregroundStyle(LegacyColor.accent)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Text(UnlockReturnNarrative.subtitle(returnCount: returnCount, dropDate: dropDate))
+                            .font(LegacyFont.caption)
+                            .foregroundStyle(LegacyColor.textSecondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
+
+                    MemoryPhotoGallery(photos: photos)
+                        .opacity(revealProgress ? 1 : 0.6)
+                        .scaleEffect(revealProgress ? 1 : 0.97)
+                        .animation(LegacyMotion.animation(.easeOut(duration: 0.55)), value: revealProgress)
 
                     if let caption, !caption.isEmpty {
                         Text(caption)
@@ -888,7 +946,7 @@ private struct WanderUserMap: View {
         }
         .mapStyle(.standard(elevation: .realistic))
         .onAppear {
-            syncVisiblePins(animated: true)
+            syncVisiblePins(animated: false)
             fitCamera()
         }
         .onChange(of: ownPins.map(\.memoryID)) { oldIDs, newIDs in

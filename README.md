@@ -57,6 +57,8 @@ cd ios/LegacyModules && swift test   # or xcodebuild test in Xcode
 
 The app currently launches into an empty **Wander** map shell (M0 demo target).
 
+**Recent (2026-06-25):** Memory Lane adds Places/Map browsing, search, unlock return narrative, client-side thumbnails, and a Phase 2 summons preview in Treasure Chest drops. See `collab-log.md` for the full roadmap batch.
+
 ---
 
 ## Quick start — backend
@@ -74,6 +76,15 @@ cd dashboard && npm install && npm run dev
 ```
 
 Production: [dashboard-two-orpin-63.vercel.app](https://dashboard-two-orpin-63.vercel.app)
+
+The dashboard now has two live views:
+- **Delivery view** — tasks, blockers, milestones, decision queue.
+- **Architecture view** — technical structure map (system topology, iOS module graph, and core runtime flows for drop/scan/unlock).
+- **Architecture deep links** — each architecture node and flow card links to the corresponding repo module or engineering doc.
+
+Optional link-root overrides for different forks/orgs:
+- `NEXT_PUBLIC_REPO_WEB_ROOT` (default: `https://github.com/Jamprey25/Legacy-/tree/main`)
+- `NEXT_PUBLIC_DOCS_WEB_ROOT` (default: `https://github.com/Jamprey25/Legacy-/blob/main`)
 
 ### Vercel setup (required — monorepo)
 

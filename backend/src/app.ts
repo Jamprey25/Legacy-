@@ -13,6 +13,7 @@ import { uploadsRoutes } from "./routes/uploads.js";
 import { userRoutes } from "./routes/user.js";
 import { attestRoutes } from "./routes/attest.js";
 import { mutedZonesRoutes } from "./routes/mutedZones.js";
+import { summonsRoutes } from "./routes/summons.js";
 
 export function createApp() {
   const app = new Hono<{ Variables: AuthVars }>().basePath("/v1");
@@ -49,6 +50,7 @@ export function createApp() {
   app.route("/uploads", uploadsRoutes);
   app.route("/user", userRoutes);
   app.route("/user/muted-zones", mutedZonesRoutes);
+  app.route("/summons", summonsRoutes);
   app.route("/internal/webhook", webhookRoutes);
 
   return app;

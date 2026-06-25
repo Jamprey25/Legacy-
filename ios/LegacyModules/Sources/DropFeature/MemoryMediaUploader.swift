@@ -50,12 +50,25 @@ public struct MemoryMediaUploader: Sendable {
         // Vercel Blob path: POST bytes to the backend, which stores them server-side
         // with the official @vercel/blob put(). Avoids reverse-engineering Vercel's
         // internal client-upload protocol (which 400s).
-        return try await apiClient.uploadMemoryMediaDirect(
+        let url = try await apiClient.uploadMemoryMediaDirect(
             memoryID: memoryID,
             data: data,
             contentType: contentType,
             position: position
         )
+
+        // Client-side grid thumbnail — best-effort, never blocks the main upload.
+        if contentType.hasPrefix("image/"), let thumb = try? EXIFStripper.thumbnailJPEG(from: data) {
+            _ = try? await apiClient.uploadMemoryMediaDirect(
+                memoryID: memoryID,
+                data: thumb,
+                contentType: "image/jpeg",
+                position: position,
+                mediaRole: "thumbnail"
+            )
+        }
+
+        return url
     }
 
     private static func isPlaceholderUploadURL(_ url: String) -> Bool {

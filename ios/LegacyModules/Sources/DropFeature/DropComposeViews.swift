@@ -1,3 +1,4 @@
+import APIClient
 import DesignSystem
 import SwiftUI
 
@@ -34,6 +35,7 @@ struct DropComposeViews {
         @Binding var compose: DropComposeDraft
         let hasPhoto: Bool
         let isDropping: Bool
+        let apiClient: LegacyAPIClient
         let onDrop: () -> Void
 
         var body: some View {
@@ -62,11 +64,7 @@ struct DropComposeViews {
 
                 PrivacyPickerSection(tier: $compose.privacyTier)
 
-                Section("Recipients") {
-                    Text("Recipient targeting ships in a future update.")
-                        .font(LegacyFont.caption)
-                        .foregroundStyle(LegacyColor.textSecondary)
-                }
+                RecipientSummonSection(phones: $compose.recipientPhones, apiClient: apiClient)
 
                 Section {
                     Button("Drop treasure chest", action: onDrop)

@@ -64,6 +64,7 @@ uploadsRoutes.post("/direct", async (c) => {
   // 1+ = additional photos that live only in memory_media.
   const positionRaw = c.req.header("x-media-position");
   const position = positionRaw ? Number.parseInt(positionRaw, 10) : 0;
+  const mediaRole = c.req.header("x-media-role")?.toLowerCase() ?? "full";
 
   if (!memoryId) throw new ApiError("invalid_request", "X-Memory-Id header is required.");
   if (!ALLOWED_CONTENT_TYPES.includes(contentType)) {
@@ -72,6 +73,9 @@ uploadsRoutes.post("/direct", async (c) => {
   if (!Number.isInteger(position) || position < 0) {
     throw new ApiError("invalid_request", "X-Media-Position must be a non-negative integer.");
   }
+  if (mediaRole !== "full" && mediaRole !== "thumbnail") {
+    throw new ApiError("invalid_request", "X-Media-Role must be full or thumbnail.");
+  }
 
   // Authorize: memory must exist and belong to the requesting user.
   const memory = await getMemoryByOwner(memoryId, userId);
@@ -79,15 +83,26 @@ uploadsRoutes.post("/direct", async (c) => {
 
   const body = Buffer.from(await c.req.arrayBuffer());
   if (body.byteLength === 0) throw new ApiError("invalid_request", "Empty upload body.");
-  if (body.byteLength > MAX_UPLOAD_BYTES) throw new ApiError("invalid_request", "File too large.");
+  const maxBytes = mediaRole === "thumbnail" ? 512 * 1024 : MAX_UPLOAD_BYTES;
+  if (body.byteLength > maxBytes) throw new ApiError("invalid_request", "File too large.");
 
   const mediaType = contentType.includes("mp4") ? "video" : "photo";
-  const pathname = `memories/${memoryId}/${position}.${extFor(contentType)}`;
+  const pathname =
+    mediaRole === "thumbnail"
+      ? `memories/${memoryId}/${position}_thumb.${extFor(contentType)}`
+      : `memories/${memoryId}/${position}.${extFor(contentType)}`;
   const blob = await put(pathname, body, {
     access: "public",
     addRandomSuffix: true,
     contentType,
   });
+
+  if (mediaRole === "thumbnail") {
+    await setMediaThumbnail(memoryId, position, blob.url);
+    if (position === 0) await setThumbnailKey(memoryId, blob.url);
+    audit(c, "memory.upload_thumbnail", { position });
+    return c.json({ url: blob.url });
+  }
 
   // Record this photo in the media set. Position 0 is also mirrored onto the memory row
   // (media_key + scan_status → clear) so discovery/proximity keep working off the hero.

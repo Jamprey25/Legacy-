@@ -110,6 +110,7 @@ public struct DropFeatureRootView: View {
                     compose: $compose,
                     hasPhoto: coordinator.selectedPhotoData != nil,
                     isDropping: coordinator.isDropping,
+                    apiClient: coordinator.apiClientForSummons,
                     onDrop: { Task { await coordinator.confirmTreasureDrop(compose: compose) } }
                 )
                 .frame(minHeight: 540)

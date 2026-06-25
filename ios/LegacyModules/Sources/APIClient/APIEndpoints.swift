@@ -336,9 +336,43 @@ public struct MemoryMediaItem: Decodable, Sendable, Equatable, Identifiable {
 
     public var id: Int { position }
 
+    public init(url: String, thumbnailURL: String?, type: String, position: Int) {
+        self.url = url
+        self.thumbnailURL = thumbnailURL
+        self.type = type
+        self.position = position
+    }
+
     enum CodingKeys: String, CodingKey {
         case url, type, position
         case thumbnailURL = "thumbnail_url"
+    }
+}
+
+/// Upload lifecycle state for a memory's media pipeline.
+public struct MemoryUploadStatus: Decodable, Sendable, Equatable {
+    public let stage: String
+    public let totalMedia: Int
+    public let uploadedMedia: Int
+    public let pendingMedia: Int
+    public let failedMedia: Int
+    public let heroReady: Bool
+
+    /// 0...1 progress across all media slots. Returns 1 when total is zero and stage is ready.
+    public var progressFraction: Double {
+        guard totalMedia > 0 else { return stage == "ready" ? 1 : 0 }
+        return min(max(Double(uploadedMedia) / Double(totalMedia), 0), 1)
+    }
+
+    public var isReady: Bool { stage == "ready" }
+
+    enum CodingKeys: String, CodingKey {
+        case stage
+        case totalMedia = "total_media"
+        case uploadedMedia = "uploaded_media"
+        case pendingMedia = "pending_media"
+        case failedMedia = "failed_media"
+        case heroReady = "hero_ready"
     }
 }
 
@@ -358,8 +392,14 @@ public struct MemoryDetail: Decodable, Sendable, Equatable {
     /// Full ordered photo set (hero-first). Optional — older servers omit it; mediaURL is
     /// the hero for back-compat. Empty/absent until the upload pipeline clears each photo.
     public let media: [MemoryMediaItem]?
+    /// Lifecycle counters for hero/extras upload state.
+    public let uploadStatus: MemoryUploadStatus?
     public let discoverableAfter: String
     public let createdAt: String
+    /// Times the owner has unlocked/returned to this memory. Optional for older servers.
+    public let returnCount: Int?
+    /// ISO8601 timestamp of the most recent unlock, if any.
+    public let lastFoundAt: String?
 
     enum CodingKeys: String, CodingKey {
         case memoryID = "memory_id"
@@ -371,8 +411,11 @@ public struct MemoryDetail: Decodable, Sendable, Equatable {
         case mediaURL = "media_url"
         case thumbnailURL = "thumbnail_url"
         case media
+        case uploadStatus = "upload_status"
         case discoverableAfter = "discoverable_after"
         case createdAt = "created_at"
+        case returnCount = "return_count"
+        case lastFoundAt = "last_found_at"
     }
 }
 
@@ -723,6 +766,11 @@ extension LegacyAPIClient {
     /// Owner-only detail including drop coordinates.
     public func getMemory(id: String) async throws -> MemoryDetail {
         try await send(LegacyRequest(method: .get, path: "/v1/memories/\(id)"), as: MemoryDetail.self)
+    }
+
+    /// Owner-only hard delete for one memory ("undrop"/remove).
+    public func deleteMemory(id: String) async throws {
+        try await sendNoContent(LegacyRequest(method: .delete, path: "/v1/memories/\(id)"))
     }
 
     /// Batch-create private memories from on-device clusters (contract §5).

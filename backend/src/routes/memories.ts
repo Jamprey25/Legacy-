@@ -24,7 +24,12 @@ import { rateLimit } from "../middleware/rateLimit.js";
 import { validateLocationInput } from "../lib/locationInput.js";
 import { audit } from "../lib/audit.js";
 import { storeImportResult, findImportByKey } from "../db/imports.js";
-import { createMediaSlots, listMediaByMemory, listMediaKeysByMemory } from "../db/memoryMedia.js";
+import {
+  createMediaSlots,
+  getMemoryUploadCounts,
+  listMediaByMemory,
+  listMediaKeysByMemory,
+} from "../db/memoryMedia.js";
 
 export const memoriesRoutes = new Hono<{ Variables: AuthVars }>();
 
@@ -90,6 +95,8 @@ memoriesRoutes.get("/", async (c) => {
         memory_id: m.id,
         drop_date: m.created_at.toISOString().slice(0, 10),
         created_at: m.created_at.toISOString(),
+        lat: m.lat,
+        lng: m.lng,
         media_type: m.media_type,
         scan_status: m.scan_status,
         thumbnail_url: thumbnailUrl,
@@ -499,6 +506,56 @@ async function clearedMediaFor(memoryId: string): Promise<
   return out;
 }
 
+type UploadLifecycleStage = "creating" | "uploading_hero" | "uploading_extras" | "partial_failure" | "ready";
+
+async function uploadStatusFor(memoryId: string, memoryScanStatus: string, hasHeroKey: boolean): Promise<{
+  stage: UploadLifecycleStage;
+  total_media: number;
+  uploaded_media: number;
+  pending_media: number;
+  failed_media: number;
+  hero_ready: boolean;
+}> {
+  const counts = await getMemoryUploadCounts(memoryId);
+
+  // Live one-photo drops may not have a pre-created slot; fall back to memory row status.
+  if (counts.total === 0) {
+    const total = hasHeroKey || memoryScanStatus === "clear" ? 1 : 0;
+    const uploaded = memoryScanStatus === "clear" && total > 0 ? 1 : 0;
+    return {
+      stage: uploaded > 0 ? "ready" : "creating",
+      total_media: total,
+      uploaded_media: uploaded,
+      pending_media: Math.max(total - uploaded, 0),
+      failed_media: 0,
+      hero_ready: uploaded > 0,
+    };
+  }
+
+  const pending = Math.max(counts.total - counts.clear - counts.failed, 0);
+  let stage: UploadLifecycleStage;
+  if (counts.failed > 0 && counts.clear === 0) {
+    stage = "partial_failure";
+  } else if (counts.failed > 0) {
+    stage = "partial_failure";
+  } else if (!counts.heroClear) {
+    stage = "uploading_hero";
+  } else if (pending > 0) {
+    stage = "uploading_extras";
+  } else {
+    stage = "ready";
+  }
+
+  return {
+    stage,
+    total_media: counts.total,
+    uploaded_media: counts.clear,
+    pending_media: pending,
+    failed_media: counts.failed,
+    hero_ready: counts.heroClear,
+  };
+}
+
 memoriesRoutes.get("/:id", async (c) => {
   const memoryId = c.req.param("id");
   const userId: string = c.get("userId");
@@ -508,7 +565,12 @@ memoriesRoutes.get("/:id", async (c) => {
 
   // Full ordered photo set. media_url/thumbnail_url remain as the hero (position 0) for
   // back-compat with clients that haven't adopted the array yet.
-  const media = await clearedMediaFor(memoryId);
+  const [media, uploadStatus, returnCount, lastFoundAt] = await Promise.all([
+    clearedMediaFor(memoryId),
+    uploadStatusFor(memoryId, memory.scan_status, Boolean(memory.media_key)),
+    getReturnCount(memoryId, userId),
+    getLastFoundAt(memoryId, userId),
+  ]);
   const hero = media[0] ?? null;
 
   return c.json({
@@ -524,8 +586,11 @@ memoriesRoutes.get("/:id", async (c) => {
     media_url: hero?.url ?? null,
     thumbnail_url: hero?.thumbnail_url ?? null,
     media: media.map(({ url, thumbnail_url, type, position }) => ({ url, thumbnail_url, type, position })),
+    upload_status: uploadStatus,
     discoverable_after: memory.discoverable_after,
     created_at: memory.created_at,
+    return_count: returnCount,
+    last_found_at: lastFoundAt?.toISOString() ?? null,
   });
 });
 
