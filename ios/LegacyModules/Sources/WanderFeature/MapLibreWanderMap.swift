@@ -29,7 +29,8 @@ struct MapLibreWanderMap: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeUIView(context: Context) -> MLNMapView {
-        let mapView = MLNMapView(frame: .zero, styleURL: WanderMapStyle.current)
+        let mapView = OffsetMLNMapView(frame: .zero, styleURL: WanderMapStyle.current)
+        mapView.verticalBias = WanderMapStyle.userScreenBias
         mapView.delegate = context.coordinator
         context.coordinator.mapView = mapView
 
@@ -148,6 +149,13 @@ struct MapLibreWanderMap: UIViewRepresentable {
             mapView.addAnnotations(annotations)
         }
 
+        /// Directional avatar for the user's own location. Returning nil for every other
+        /// annotation lets the image-based pins (see `imageFor`) keep working.
+        func mapView(_ mapView: MLNMapView, viewFor annotation: MLNAnnotation) -> MLNAnnotationView? {
+            guard annotation is MLNUserLocation else { return nil }
+            return LegacyUserPuckView()
+        }
+
         func mapView(_ mapView: MLNMapView, imageFor annotation: MLNAnnotation) -> MLNAnnotationImage? {
             guard let pin = annotation as? PinAnnotation else { return nil }
             let reuseID = pin.style == .own ? Self.ownReuseID : Self.revealedReuseID
@@ -224,6 +232,66 @@ private final class PinAnnotation: MLNPointAnnotation {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 }
 
+/// Map view that keeps the user's focal point low on screen via a top content inset,
+/// so the world scrolls *ahead* of the avatar (PoGo-style first-person framing).
+/// Applied in `layoutSubviews` because the inset depends on the laid-out height.
+private final class OffsetMLNMapView: MLNMapView {
+    /// Fraction of view height used as the top content inset. See WanderMapStyle.userScreenBias.
+    var verticalBias: CGFloat = 0.42
+    private var appliedTopInset: CGFloat = -1
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let height = bounds.height
+        guard height > 0 else { return }
+        let topInset = (height * verticalBias).rounded()
+        // Guard against re-setting (setContentInset re-centers the camera and re-triggers
+        // layout — the guard makes it converge after a single application).
+        guard abs(appliedTopInset - topInset) > 0.5 else { return }
+        appliedTopInset = topInset
+        setContentInset(UIEdgeInsets(top: topInset, left: 0, bottom: 0, right: 0), animated: false)
+    }
+}
+
+/// Forward-pointing navigation arrow for the user's location. In follow-with-heading mode
+/// the map rotates so "forward" is always screen-up, so the arrow points up and the world
+/// swings around it as you turn — making your facing/turn direction unmistakable.
+private final class LegacyUserPuckView: MLNUserLocationAnnotationView {
+    private let puckSize = CGSize(width: 26, height: 30)
+    private var built = false
+
+    override func update() {
+        if frame.isNull {
+            frame = CGRect(origin: .zero, size: puckSize)
+            return setNeedsLayout()
+        }
+        guard !built else { return }
+        built = true
+        backgroundColor = .clear
+
+        let w = puckSize.width
+        let h = puckSize.height
+        let path = UIBezierPath()
+        path.move(to: CGPoint(x: w / 2, y: 0))            // tip — points forward (up)
+        path.addLine(to: CGPoint(x: w, y: h))             // bottom-right wing
+        path.addLine(to: CGPoint(x: w / 2, y: h * 0.72))  // inner notch (chevron)
+        path.addLine(to: CGPoint(x: 0, y: h))             // bottom-left wing
+        path.close()
+
+        let arrow = CAShapeLayer()
+        arrow.path = path.cgPath
+        arrow.fillColor = UIColor(LegacyColor.accent).cgColor
+        arrow.strokeColor = UIColor.white.cgColor
+        arrow.lineWidth = 2
+        arrow.lineJoin = .round
+        arrow.shadowColor = UIColor.black.cgColor
+        arrow.shadowOpacity = 0.4
+        arrow.shadowRadius = 3
+        arrow.shadowOffset = CGSize(width: 0, height: 2)
+        layer.addSublayer(arrow)
+    }
+}
+
 /// The single source of truth for the Wander map's look & camera.
 /// Swap `current` to any OpenFreeMap style to retheme the entire map.
 enum WanderMapStyle {
@@ -231,10 +299,16 @@ enum WanderMapStyle {
     /// Alternatives (same host): `positron` (minimal/light), `bright`, `dark`, `fiord`.
     static let current = URL(string: "https://tiles.openfreemap.org/styles/liberty")!
 
-    /// Camera tilt in degrees — the lean-into-the-world angle.
-    static let pitch: CGFloat = 55
+    /// Camera tilt in degrees — the lean-into-the-world angle. Higher = more first-person.
+    static let pitch: CGFloat = 62
 
-    /// Street-level zoom for the follow camera.
-    static let streetZoom: Double = 16.5
+    /// Street-level zoom for the follow camera (PoGo sits roughly here).
+    static let streetZoom: Double = 17
+
+    /// How far down the screen the user avatar sits, as a fraction of view height.
+    /// Implemented as a top content inset so the map's focal point drops below center
+    /// and the world scrolls *ahead* of you — the core PoGo first-person framing.
+    /// 0.0 = centered (bird's-eye), ~0.42 = avatar in the bottom third (strong).
+    static let userScreenBias: CGFloat = 0.42
 }
 #endif
