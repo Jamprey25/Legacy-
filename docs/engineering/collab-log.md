@@ -1776,3 +1776,21 @@ Not included in this pass:
 **Still open (product decision, not blocking):** even at ~300 KB/photo, an unbounded "import the whole camera roll" can still pile up. Worth deciding on a per-visit photo cap and/or moving off the Hobby plan before real users. Tracked for Joseph.
 
 **Dev tooling:** added `backend/scripts/purge-blobs.sh` — empties the blob store via the guarded `POST /v1/internal/purge-blobs` route while testing. Prod needs the prod `WEBHOOK_SECRET` passed inline (`WEBHOOK_SECRET=… ./scripts/purge-blobs.sh`); local dev reads `.env.local`. **Dev only — never cron this; it deletes everything.**
+
+---
+
+## [backend → all] 2026-06-25 — Consolidation for end-to-end test + MapLibre Wander map
+
+**Why:** Joseph asked to consolidate everything so he could run an E2E test. A large amount of in-flight work was sitting **uncommitted on the shared tree** (and some parked in stashes), so it was absent from `main` and kept appearing "unfixed" / vanishing between sessions. Everything below is now **committed + pushed to `origin/main`** and the full app + backend both build clean.
+
+**Cursor — please `git pull` before doing more iOS work.** Your uncommitted work was committed to `main` to make it durable; pulling avoids re-committing or conflicting. Commits landed:
+- `cabf975`, `37a4b18` — **MapLibre Wander map** (Claude). Replaced the MapKit `WanderUserMap` with `MapLibreWanderMap` (`WanderFeature`): OpenFreeMap "Liberty" custom vector style (free, no API key), pitched (62°) + heading-locked follow camera, bottom-third avatar offset (PoGo-style first-person), forward-pointing arrow puck. Added MapLibre 6.27.0 as an **iOS-only** SPM dep in `Package.swift`. The old `WanderUserMap` is kept in the file, unused, for instant revert. Tunables: `WanderMapStyle.current` (whole look), `.pitch`, `.userScreenBias`. **Heading rotation only shows on a real device (sim has no compass).**
+- `800b2c0` — **muted-zones tap-to-place** recovered from a stash (was completed but never committed): `MutedZonesView.swift` tap-to-place (`pendingCoordinate`) + `mutedZones.ts` + `locationInput.ts` `validateCoordinates` (the route's missing dependency).
+- `5ce2d03` — **summons preview** (backend): phone OTP + recipient SMS (`db/summons.ts`, `routes/summons.ts`, migration `0014`). I fixed the route's TS typing (json `.catch` fallbacks, `internal_error` code) so backend typechecks clean — **please confirm the summons feature is functionally complete; I only made it compile.**
+- `32f5d76` — **iOS + dashboard consolidation** (Cursor's work): `MemoryPlacesAtlas`, `MemoryPlaceClustering`, `OnThisDayNotificationScheduler`, `LegacyWidget/OnThisDayWidget`, `DwellProgressRing`, `UnlockReturnNarrative`, `RecipientSummonSection`, APIClient endpoints, `TechnicalArchitecturePanel`. Committed because they build clean (full `Legacy` scheme build succeeds) — **please verify they're feature-complete, not just compiling.**
+
+**Verification:** full `Legacy` app build (iOS Simulator) ✅; backend `tsc --noEmit` 0 errors ✅.
+
+**Still parked (NOT applied — your call):** `stash@{1}` "wip dashboard retry", `stash@{2}` "remove Sign in with Apple". `stash@{0}` still holds the rest of its original 36-file snapshot beyond the muted-zones files I pulled — review before dropping.
+
+**Process note (important):** we keep losing work because both agents share **one working tree + one HEAD** — branches don't isolate uncommitted files, and HEAD got yanked between branches mid-session several times. Strongly recommend Cursor work in its own `git worktree` (separate folder, separate branch) so the two checkouts stop colliding. Until then: commit early/often; don't leave large work uncommitted or stashed.
