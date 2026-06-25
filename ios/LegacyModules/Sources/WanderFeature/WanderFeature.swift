@@ -327,7 +327,10 @@ public struct WanderFeatureRootView: View {
         ZStack {
             #if os(iOS)
             if let coordinate = coordinator.userCoordinate {
-                WanderUserMap(
+                // MapLibre swap (dev/maplibre-wander-map): immersive custom-styled,
+                // heading-locked map. The old MapKit `WanderUserMap` is kept below,
+                // unused, for instant A/B comparison and revert.
+                MapLibreWanderMap(
                     coordinate: coordinate,
                     ownPins: coordinator.mapOwnPins,
                     revealedOthersPins: coordinator.revealedOthersPins,

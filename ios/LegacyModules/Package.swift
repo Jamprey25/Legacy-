@@ -18,6 +18,12 @@ let package = Package(
         // Debug/test/preview support only — intentionally NOT a dependency of the app target.
         .library(name: "LegacyAPIStubs", targets: ["LegacyAPIStubs"]),
     ],
+    dependencies: [
+        // MapLibre Native — custom-styled vector-tile renderer powering the immersive
+        // Wander map (pitched, heading-locked, art-directed style). iOS-only binary;
+        // gated per-platform on the WanderFeature target so macOS host compiles (CI) stay clean.
+        .package(url: "https://github.com/maplibre/maplibre-gl-native-distribution.git", from: "6.27.0"),
+    ],
     targets: [
         .target(
             name: "DesignSystem",
@@ -37,7 +43,14 @@ let package = Package(
         ),
         .target(
             name: "WanderFeature",
-            dependencies: ["DesignSystem", "APIClient", "LocationEngine"]
+            dependencies: [
+                "DesignSystem", "APIClient", "LocationEngine",
+                .product(
+                    name: "MapLibre",
+                    package: "maplibre-gl-native-distribution",
+                    condition: .when(platforms: [.iOS])
+                ),
+            ]
         ),
         .target(
             name: "MemoryLaneFeature",
