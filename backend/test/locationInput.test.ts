@@ -3,8 +3,23 @@
 // explicit coverage — including the exact-1000 edge that was previously inconsistent.
 
 import { describe, it, expect } from "vitest";
-import { validateLocationInput } from "../src/lib/locationInput.js";
+import { validateCoordinates, validateLocationInput } from "../src/lib/locationInput.js";
 import { ApiError } from "../src/lib/errors.js";
+
+describe("validateCoordinates", () => {
+  it("accepts valid lat/lng without accuracy", () => {
+    expect(validateCoordinates(37.7749, -122.4194)).toEqual({
+      lat: 37.7749,
+      lng: -122.4194,
+    });
+  });
+
+  it("rejects invalid coordinate shapes", () => {
+    expect(() => validateCoordinates("37", -122)).toThrow(ApiError);
+    expect(() => validateCoordinates(37, null)).toThrow(ApiError);
+    expect(() => validateCoordinates(91, 0)).toThrow(ApiError);
+  });
+});
 
 describe("validateLocationInput", () => {
   it("accepts a valid fix", () => {

@@ -6,7 +6,7 @@
 import { Hono } from "hono";
 import { ApiError } from "../lib/errors.js";
 import { requireAuth, type AuthVars } from "../middleware/auth.js";
-import { validateLocationInput } from "../lib/locationInput.js";
+import { validateCoordinates } from "../lib/locationInput.js";
 import {
   listMutedZones,
   createMutedZone,
@@ -36,7 +36,7 @@ mutedZonesRoutes.post("/", async (c) => {
   }>().catch(() => null);
   if (!body) throw new ApiError("invalid_request", "Request body must be JSON.");
 
-  const { lat, lng } = validateLocationInput(body.lat, body.lng, undefined);
+  const { lat, lng } = validateCoordinates(body.lat, body.lng);
 
   const rawRadius = body.radius_m;
   if (rawRadius === undefined || rawRadius === null) {

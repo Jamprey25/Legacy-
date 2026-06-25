@@ -9,18 +9,12 @@ import SwiftUI
 /// Full-screen muted zones manager. Shows existing zones as red circles on a map,
 /// lets the user add a new zone at their current location or a map tap, and adjust
 /// the radius with a slider.
-///
-/// Cursor TODO:
-///  - Wire up map tap gesture to place a pin at an arbitrary location (currently
-///    defaults to device location). Add a `@State var pendingCoordinate` and set
-///    it from an `onTapGesture` on the Map.
-///  - Polish the red circle overlay — consider adding a subtle pulsing animation
-///    on newly added zones.
 public struct MutedZonesView: View {
     @Bindable var coordinator: MutedZonesCoordinator
 
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
     @State private var showAddSheet = false
+    @State private var pendingCoordinate: CLLocationCoordinate2D?
     @State private var locationManager = CLLocationManager()
 
     public init(coordinator: MutedZonesCoordinator) {
@@ -33,6 +27,9 @@ public struct MutedZonesView: View {
 
             VStack(spacing: 0) {
                 Spacer()
+                tapHint
+                    .padding(.horizontal, LegacySpacing.lg)
+                    .padding(.bottom, LegacySpacing.sm)
                 addButton
                     .padding(.horizontal, LegacySpacing.lg)
                     .padding(.bottom, LegacySpacing.lg)
@@ -48,10 +45,18 @@ public struct MutedZonesView: View {
             }
         }
         .sheet(isPresented: $showAddSheet) {
-            AddMutedZoneSheet(coordinator: coordinator, currentLocation: currentLocation)
+            AddMutedZoneSheet(
+                coordinator: coordinator,
+                currentLocation: pendingCoordinate ?? currentLocation
+            )
         }
         .task { await coordinator.load() }
         .onAppear { locationManager.requestWhenInUseAuthorization() }
+        .onChange(of: showAddSheet) { _, isPresented in
+            if !isPresented {
+                pendingCoordinate = nil
+            }
+        }
         .overlay(alignment: .top) {
             if let error = coordinator.errorMessage {
                 Text(error)
@@ -67,29 +72,43 @@ public struct MutedZonesView: View {
     }
 
     private var map: some View {
-        Map(position: $position) {
-            UserAnnotation()
-            ForEach(coordinator.zones) { zone in
-                MapCircle(
-                    center: CLLocationCoordinate2D(latitude: zone.lat, longitude: zone.lng),
-                    radius: CLLocationDistance(zone.radiusM)
-                )
-                .foregroundStyle(LegacyColor.danger.opacity(0.18))
-                .stroke(LegacyColor.danger.opacity(0.7), lineWidth: 2)
+        MapReader { proxy in
+            Map(position: $position) {
+                UserAnnotation()
+                ForEach(coordinator.zones) { zone in
+                    MapCircle(
+                        center: CLLocationCoordinate2D(latitude: zone.lat, longitude: zone.lng),
+                        radius: CLLocationDistance(zone.radiusM)
+                    )
+                    .foregroundStyle(LegacyColor.danger.opacity(0.18))
+                    .stroke(LegacyColor.danger.opacity(0.7), lineWidth: 2)
 
-                Annotation(zone.label ?? "Muted", coordinate: CLLocationCoordinate2D(latitude: zone.lat, longitude: zone.lng)) {
-                    MutedZonePin(label: zone.label) {
-                        Task { await coordinator.deleteZone(id: zone.id) }
+                    Annotation(zone.label ?? "Muted", coordinate: CLLocationCoordinate2D(latitude: zone.lat, longitude: zone.lng)) {
+                        MutedZonePin(label: zone.label) {
+                            Task { await coordinator.deleteZone(id: zone.id) }
+                        }
+                    }
+                }
+
+                if showAddSheet, let pendingCoordinate {
+                    Annotation("New muted zone", coordinate: pendingCoordinate) {
+                        PendingMutedZonePin()
                     }
                 }
             }
+            .onTapGesture(coordinateSpace: .local) { point in
+                guard let tappedCoordinate = proxy.convert(point, from: .local) else { return }
+                pendingCoordinate = tappedCoordinate
+                showAddSheet = true
+            }
+            .mapStyle(.standard(elevation: .realistic))
+            .ignoresSafeArea(edges: .top)
         }
-        .mapStyle(.standard(elevation: .realistic))
-        .ignoresSafeArea(edges: .top)
     }
 
     private var addButton: some View {
         Button {
+            pendingCoordinate = nil
             showAddSheet = true
         } label: {
             Label("Add muted zone", systemImage: "plus.circle.fill")
@@ -99,12 +118,40 @@ public struct MutedZonesView: View {
         .disabled(coordinator.zones.count >= 10 || coordinator.isLoading)
     }
 
+    private var tapHint: some View {
+        Text("Tip: Tap anywhere on the map to place a zone there.")
+            .font(LegacyFont.caption)
+            .foregroundStyle(LegacyColor.textSecondary)
+            .padding(.horizontal, LegacySpacing.md)
+            .padding(.vertical, LegacySpacing.xs)
+            .frame(maxWidth: .infinity)
+            .background(LegacyColor.surface.opacity(0.92))
+            .clipShape(Capsule())
+    }
+
     private var currentLocation: CLLocationCoordinate2D? {
         locationManager.location?.coordinate
     }
 }
 
 // MARK: - Zone pin
+
+private struct PendingMutedZonePin: View {
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(LegacyColor.accent.opacity(0.92))
+                .frame(width: 28, height: 28)
+            Image(systemName: "plus")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(.white)
+        }
+        .overlay {
+            Circle()
+                .stroke(.white.opacity(0.8), lineWidth: 2)
+        }
+    }
+}
 
 private struct MutedZonePin: View {
     let label: String?
