@@ -21,6 +21,9 @@ public struct MemorySection: Identifiable, Equatable {
 #if os(iOS)
 import MapKit
 import CoreLocation
+#if canImport(WidgetKit)
+import WidgetKit
+#endif
 #endif
 
 @MainActor
@@ -113,7 +116,8 @@ public final class MemoryLaneCoordinator {
     public var uniquePlaceCount: Int { placeClusters.count }
 
     public var statsLabel: String {
-        "\(uniquePlaceCount) \(uniquePlaceCount == 1 ? "place" : "places") · \(items.count) \(items.count == 1 ? "memory" : "memories")"
+        guard !items.isEmpty else { return "" }
+        return "\(uniquePlaceCount) \(uniquePlaceCount == 1 ? "place" : "places") · \(items.count) \(items.count == 1 ? "memory" : "memories")"
     }
 
     /// Items grouped into year sections for browsing. Section order follows the
@@ -214,7 +218,7 @@ public final class MemoryLaneCoordinator {
     }
 
     private func updateWidgetDefaults() {
-        guard let defaults = UserDefaults(suiteName: "group.app.legacy.shared") else { return }
+        guard let defaults = LegacyAppGroup.sharedDefaults else { return }
         let matches = onThisDayItems
         if let first = matches.first {
             defaults.set("On this day", forKey: "widget.onThisDay.title")
@@ -223,6 +227,9 @@ public final class MemoryLaneCoordinator {
             defaults.set("On this day", forKey: "widget.onThisDay.title")
             defaults.set("Open Legacy to browse your map", forKey: "widget.onThisDay.subtitle")
         }
+        #if canImport(WidgetKit)
+        WidgetCenter.shared.reloadTimelines(ofKind: "OnThisDayWidget")
+        #endif
     }
     #endif
 
@@ -530,15 +537,23 @@ public struct MemoryLaneFeatureRootView: View {
                         case .grid:
                             gridContent
                         case .places:
-                            MemoryPlacesAtlasView(clusters: coordinator.placeClusters) { cluster in
-                                coordinator.selectedPlaceCluster = cluster
+                            if coordinator.placeClusters.isEmpty {
+                                MemoryPlacesEmptyState(isFiltered: coordinator.mediaTypeFilter != .all || !coordinator.searchQuery.isEmpty)
+                            } else {
+                                MemoryPlacesAtlasView(clusters: coordinator.placeClusters) { cluster in
+                                    coordinator.selectedPlaceCluster = cluster
+                                }
+                                .padding(.vertical, LegacySpacing.md)
                             }
-                            .padding(.vertical, LegacySpacing.md)
                         case .map:
-                            MemoryPlacesMapView(clusters: coordinator.placeClusters) { cluster in
-                                coordinator.selectedPlaceCluster = cluster
+                            if coordinator.placeClusters.isEmpty {
+                                MemoryPlacesEmptyState(isFiltered: coordinator.mediaTypeFilter != .all || !coordinator.searchQuery.isEmpty)
+                            } else {
+                                MemoryPlacesMapView(clusters: coordinator.placeClusters) { cluster in
+                                    coordinator.selectedPlaceCluster = cluster
+                                }
+                                .padding(.vertical, LegacySpacing.md)
                             }
-                            .padding(.vertical, LegacySpacing.md)
                         }
                         #else
                         gridContent

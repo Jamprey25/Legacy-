@@ -1,6 +1,12 @@
 import WidgetKit
 import SwiftUI
 
+private enum WidgetKeys {
+    static let appGroup = "group.app.legacy.shared"
+    static let title = "widget.onThisDay.title"
+    static let subtitle = "widget.onThisDay.subtitle"
+}
+
 /// Home-screen widget — owner "on this day" teaser (no coordinates).
 struct OnThisDayWidgetEntry: TimelineEntry {
     let date: Date
@@ -24,9 +30,9 @@ struct OnThisDayWidgetProvider: TimelineProvider {
     }
 
     private func loadEntry() -> OnThisDayWidgetEntry {
-        let defaults = UserDefaults(suiteName: "group.app.legacy.shared")
-        let title = defaults?.string(forKey: "widget.onThisDay.title") ?? "On this day"
-        let subtitle = defaults?.string(forKey: "widget.onThisDay.subtitle") ?? "Return to places that remember you"
+        let defaults = UserDefaults(suiteName: WidgetKeys.appGroup)
+        let title = defaults?.string(forKey: WidgetKeys.title) ?? "On this day"
+        let subtitle = defaults?.string(forKey: WidgetKeys.subtitle) ?? "Return to places that remember you"
         return OnThisDayWidgetEntry(date: .now, title: title, subtitle: subtitle)
     }
 }
@@ -35,15 +41,33 @@ struct OnThisDayWidgetView: View {
     let entry: OnThisDayWidgetEntry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(entry.title)
-                .font(.headline)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color(red: 0.72, green: 0.55, blue: 0.98))
+                Text(entry.title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+            }
             Text(entry.subtitle)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .lineLimit(3)
+                .minimumScaleFactor(0.85)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .padding()
+        .padding(14)
+        .containerBackground(for: .widget) {
+            LinearGradient(
+                colors: [
+                    Color(red: 0.08, green: 0.07, blue: 0.12),
+                    Color(red: 0.14, green: 0.10, blue: 0.18),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
     }
 }
 

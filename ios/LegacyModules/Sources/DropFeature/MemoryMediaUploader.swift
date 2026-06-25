@@ -44,6 +44,7 @@ public struct MemoryMediaUploader: Sendable {
             }
             let type = uploadHeaders["Content-Type"] ?? contentType
             try await presignedUploader.upload(data: data, to: url, contentType: type)
+            await uploadThumbnailIfNeeded(memoryID: memoryID, data: data, contentType: contentType, position: position)
             return nil
         }
 
@@ -58,17 +59,26 @@ public struct MemoryMediaUploader: Sendable {
         )
 
         // Client-side grid thumbnail — best-effort, never blocks the main upload.
-        if contentType.hasPrefix("image/"), let thumb = try? EXIFStripper.thumbnailJPEG(from: data) {
-            _ = try? await apiClient.uploadMemoryMediaDirect(
-                memoryID: memoryID,
-                data: thumb,
-                contentType: "image/jpeg",
-                position: position,
-                mediaRole: "thumbnail"
-            )
-        }
+        await uploadThumbnailIfNeeded(memoryID: memoryID, data: data, contentType: contentType, position: position)
 
         return url
+    }
+
+    private func uploadThumbnailIfNeeded(
+        memoryID: String,
+        data: Data,
+        contentType: String,
+        position: Int
+    ) async {
+        guard contentType.hasPrefix("image/"),
+              let thumb = try? EXIFStripper.thumbnailJPEG(from: data) else { return }
+        _ = try? await apiClient.uploadMemoryMediaDirect(
+            memoryID: memoryID,
+            data: thumb,
+            contentType: "image/jpeg",
+            position: position,
+            mediaRole: "thumbnail"
+        )
     }
 
     private static func isPlaceholderUploadURL(_ url: String) -> Bool {

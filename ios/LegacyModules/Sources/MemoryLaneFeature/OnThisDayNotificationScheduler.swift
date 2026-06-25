@@ -14,6 +14,13 @@ public enum OnThisDayNotificationScheduler {
         let matches = items.filter { MemoryLaneFormatting.isOnThisDayWindow(dropDate: $0.dropDate, windowDays: 3) }
         guard !matches.isEmpty else { return }
 
+        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            scheduleNotification(center: center, matches: matches)
+        }
+    }
+
+    private static func scheduleNotification(center: UNUserNotificationCenter, matches: [MemoryLaneItem]) {
         let count = matches.count
         let body = count == 1
             ? "One memory from this week, years ago, is waiting in Memory Lane."

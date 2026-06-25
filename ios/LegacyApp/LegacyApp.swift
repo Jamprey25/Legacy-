@@ -318,7 +318,6 @@ private struct MainTabView: View {
                         selectedTab = .lane
                     }
                 }
-                if !pins.isEmpty { celebratePins(pins) }
             }
         }
         .task {
@@ -433,7 +432,7 @@ private struct MainTabView: View {
         ProfileView(
             apiClient: appModel.apiClient,
             onSignOut: { appModel.signOut() },
-            statsLabel: memoryLaneCoordinator.items.isEmpty ? nil : memoryLaneCoordinator.statsLabel
+            statsLabel: memoryLaneCoordinator.statsLabel
         )
         .tabItem { Label("Profile", systemImage: "person.circle") }
         .tag(MainTab.profile)

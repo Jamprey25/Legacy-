@@ -28,6 +28,22 @@ public enum MemoryLaneViewMode: String, CaseIterable, Identifiable {
     }
 }
 
+struct MemoryPlacesEmptyState: View {
+    let isFiltered: Bool
+
+    var body: some View {
+        ContentUnavailableView {
+            Label("No places yet", systemImage: "mappin.slash")
+        } description: {
+            Text(isFiltered
+                 ? "No located memories match your current filter or search."
+                 : "Drop or import memories with location to group them by place here.")
+        }
+        .padding(.horizontal, LegacySpacing.lg)
+        .padding(.vertical, LegacySpacing.xl)
+    }
+}
+
 struct MemoryPlacesAtlasView: View {
     let clusters: [MemoryPlaceCluster]
     let onSelect: (MemoryPlaceCluster) -> Void

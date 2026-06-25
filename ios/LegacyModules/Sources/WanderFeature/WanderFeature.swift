@@ -54,6 +54,7 @@ public final class WanderCoordinator {
 
     /// Active dwell countdown task — cancelled when unlock succeeds or user dismisses.
     private var dwellCountdownTask: Task<Void, Never>?
+    private var pendingDwellTeaser: Teaser?
 
     /// Own-memory pins unlocked in range — safe to render offline (never stores others' coords).
     public private(set) var cachedOwnPins: [CachedOwnPin]
@@ -110,6 +111,7 @@ public final class WanderCoordinator {
         dwellCountdownTask?.cancel()
         dwellCountdownTask = nil
         dwellRemainingSeconds = nil
+        pendingDwellTeaser = nil
         unlockedMedia = []
         unlockedCaption = nil
         unlockedReturnCount = 0
@@ -187,6 +189,7 @@ public final class WanderCoordinator {
         unlockedCaption = nil
         dwellCountdownTask?.cancel()
         dwellRemainingSeconds = nil
+        pendingDwellTeaser = nil
         defer { isUnlocking = false }
 
         do {
@@ -208,10 +211,12 @@ public final class WanderCoordinator {
                     position: item.position ?? index
                 )
             }
+            .sorted { $0.position < $1.position }
             unlockedCaption = response.caption
             unlockedReturnCount = response.returnCount
             unlockedDropDate = response.dropDate
             statusMessage = nil
+            pendingDwellTeaser = nil
 
             LegacyHaptics.unlockCeremony(isFirstReturn: response.returnCount <= 1)
 
@@ -230,8 +235,9 @@ public final class WanderCoordinator {
                 statusMessage = message.isEmpty
                     ? "Stay here a moment longer."
                     : message
+                pendingDwellTeaser = teaser
                 if let seconds = info.retryAfterSeconds {
-                    startDwellCountdown(seconds: seconds)
+                    startDwellCountdown(seconds: seconds, teaser: teaser)
                 }
             case "not_in_range":
                 statusMessage = "Walk closer to open this memory."
@@ -251,9 +257,10 @@ public final class WanderCoordinator {
         }
     }
 
-    private func startDwellCountdown(seconds: Int) {
+    private func startDwellCountdown(seconds: Int, teaser: Teaser) {
         dwellCountdownTask?.cancel()
         dwellRemainingSeconds = seconds
+        pendingDwellTeaser = teaser
         dwellCountdownTask = Task { [weak self] in
             guard let self else { return }
             var remaining = seconds
@@ -264,9 +271,10 @@ public final class WanderCoordinator {
                     self.dwellRemainingSeconds = max(remaining, 0)
                 }
             }
-            if !Task.isCancelled {
-                self.dwellRemainingSeconds = nil
-            }
+            guard !Task.isCancelled else { return }
+            self.dwellRemainingSeconds = nil
+            guard self.pendingDwellTeaser?.memoryID == teaser.memoryID else { return }
+            await self.unlock(teaser: teaser)
         }
     }
 
