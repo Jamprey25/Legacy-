@@ -53,6 +53,13 @@ public final class MemoryLaneCoordinator {
     public private(set) var detail: MemoryDetail?
     public private(set) var isLoadingDetail = false
     public private(set) var isDeletingDetail = false
+    #if os(iOS)
+    public var isSelecting = false
+    public var selectedMemoryIDs: Set<String> = []
+    public private(set) var isDeletingSelection = false
+
+    public var selectedCount: Int { selectedMemoryIDs.count }
+    #endif
     public private(set) var isUnlocking = false
     public private(set) var ownerMediaURL: URL?
     public private(set) var unlockedMediaURL: URL?
@@ -340,27 +347,112 @@ public final class MemoryLaneCoordinator {
         }
     }
 
+    #if os(iOS)
+    public func enterSelectionMode() {
+        isSelecting = true
+        selectedMemoryIDs = []
+    }
+
+    public func exitSelectionMode() {
+        isSelecting = false
+        selectedMemoryIDs = []
+    }
+
+    public func toggleSelection(memoryID: String) {
+        if selectedMemoryIDs.contains(memoryID) {
+            selectedMemoryIDs.remove(memoryID)
+        } else {
+            selectedMemoryIDs.insert(memoryID)
+        }
+    }
+
+    public func selectAllFiltered() {
+        selectedMemoryIDs = Set(filteredItems.map(\.memoryID))
+    }
+
+    public func deselectAll() {
+        selectedMemoryIDs = []
+    }
+
+    @discardableResult
+    public func deleteSelectedMemories() async -> Int {
+        await deleteMemories(memoryIDs: selectedMemoryIDs)
+    }
+    #endif
+
+    @discardableResult
+    public func deleteMemories(memoryIDs: Set<String>) async -> Int {
+        guard !memoryIDs.isEmpty else { return 0 }
+
+        #if os(iOS)
+        let batch = isSelecting && !isDeletingDetail
+        if batch {
+            guard !isDeletingSelection else { return 0 }
+            isDeletingSelection = true
+            defer { isDeletingSelection = false }
+        }
+        #endif
+
+        var deletedIDs: [String] = []
+        var hadFailure = false
+
+        for memoryID in memoryIDs {
+            do {
+                try await apiClient.deleteMemory(id: memoryID)
+                deletedIDs.append(memoryID)
+            } catch LegacyAPIError.notFound {
+                deletedIDs.append(memoryID)
+            } catch {
+                hadFailure = true
+            }
+        }
+
+        if !deletedIDs.isEmpty {
+            let removed = Set(deletedIDs)
+            items.removeAll { removed.contains($0.memoryID) }
+            highlightedMemoryIDs.subtract(removed)
+            if let detailID = detail?.memoryID, removed.contains(detailID) {
+                detail = nil
+                ownerMediaURL = nil
+                unlockedMediaURL = nil
+                unlockMessage = nil
+                detailReturnCount = nil
+                detailLastFoundAt = nil
+            }
+        }
+
+        #if os(iOS)
+        selectedMemoryIDs.subtract(deletedIDs)
+        if isSelecting, selectedMemoryIDs.isEmpty {
+            isSelecting = false
+        }
+        #endif
+
+        if hadFailure {
+            if deletedIDs.isEmpty {
+                errorMessage = "Could not remove memories. Try again."
+            } else {
+                errorMessage = "\(deletedIDs.count) removed. Some memories could not be deleted."
+            }
+        }
+
+        return deletedIDs.count
+    }
+
     @discardableResult
     public func deleteMemory(memoryID: String) async -> Bool {
         guard !isDeletingDetail else { return false }
         isDeletingDetail = true
         defer { isDeletingDetail = false }
 
-        do {
-            try await apiClient.deleteMemory(id: memoryID)
-            items.removeAll { $0.memoryID == memoryID }
-            detail = nil
-            ownerMediaURL = nil
-            unlockedMediaURL = nil
-            unlockMessage = nil
-            return true
-        } catch LegacyAPIError.notFound {
-            errorMessage = "Memory no longer exists."
-            return false
-        } catch {
-            errorMessage = "Could not remove memory. Try again."
+        let deleted = await deleteMemories(memoryIDs: [memoryID])
+        if deleted == 0 {
+            if errorMessage == nil {
+                errorMessage = "Could not remove memory. Try again."
+            }
             return false
         }
+        return true
     }
 }
 
@@ -378,6 +470,10 @@ public struct MemoryLaneFeatureRootView: View {
     @Bindable private var coordinator: MemoryLaneCoordinator
     private let onStartDropping: (() -> Void)?
     private let onStartImporting: (() -> Void)?
+
+    #if os(iOS)
+    @State private var showBatchDeleteConfirm = false
+    #endif
 
     private let columns = [
         GridItem(.flexible(), spacing: LegacySpacing.md),
@@ -427,7 +523,7 @@ public struct MemoryLaneFeatureRootView: View {
                             .padding(.top, LegacySpacing.sm)
 
                         if !coordinator.onThisDayItems.isEmpty {
-                            OnThisDaySection(items: coordinator.onThisDayItems)
+                            OnThisDaySection(items: coordinator.onThisDayItems, coordinator: coordinator)
                         }
 
                         switch coordinator.viewMode {
@@ -455,9 +551,42 @@ public struct MemoryLaneFeatureRootView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
+                #if os(iOS)
+                ToolbarItem(placement: .topBarLeading) {
+                    if coordinator.isSelecting {
+                        Button("Cancel") {
+                            coordinator.exitSelectionMode()
+                        }
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: LegacySpacing.md) {
+                        if coordinator.isSelecting {
+                            if coordinator.selectedCount == coordinator.filteredItems.count,
+                               !coordinator.filteredItems.isEmpty {
+                                Button("Deselect all") {
+                                    coordinator.deselectAll()
+                                }
+                            } else if !coordinator.filteredItems.isEmpty {
+                                Button("Select all") {
+                                    coordinator.selectAllFiltered()
+                                }
+                            }
+                        } else if !coordinator.items.isEmpty {
+                            Button("Select") {
+                                coordinator.enterSelectionMode()
+                            }
+                        }
+                        if !coordinator.isSelecting {
+                            MemoryLaneFilterMenu(coordinator: coordinator)
+                        }
+                    }
+                }
+                #else
                 ToolbarItem(placement: .topBarTrailing) {
                     MemoryLaneFilterMenu(coordinator: coordinator)
                 }
+                #endif
             }
             .navigationDestination(for: MemoryLaneItem.self) { item in
                 MemoryLaneDetailView(item: item, coordinator: coordinator)
@@ -469,17 +598,52 @@ public struct MemoryLaneFeatureRootView: View {
             #endif
             .task { await coordinator.loadInitial() }
             .refreshable { await coordinator.loadInitial() }
-            .safeAreaInset(edge: .bottom) {
-                if let message = coordinator.errorMessage {
-                    Text(message)
-                        .font(LegacyFont.caption)
-                        .foregroundStyle(LegacyColor.danger)
-                        .padding(LegacySpacing.md)
-                        .frame(maxWidth: .infinity)
-                        .background(LegacyColor.background)
+            #if os(iOS)
+            .confirmationDialog(
+                batchDeleteTitle,
+                isPresented: $showBatchDeleteConfirm,
+                titleVisibility: .visible
+            ) {
+                Button(batchDeleteButtonTitle, role: .destructive) {
+                    Task { await coordinator.deleteSelectedMemories() }
                 }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text(batchDeleteMessage)
+            }
+            #endif
+            .safeAreaInset(edge: .bottom) {
+                memoryLaneBottomInset
             }
         }
+    }
+
+    @ViewBuilder
+    private var memoryLaneBottomInset: some View {
+        #if os(iOS)
+        if coordinator.isSelecting, coordinator.selectedCount > 0 {
+            MemoryLaneSelectionBar(
+                selectedCount: coordinator.selectedCount,
+                isDeleting: coordinator.isDeletingSelection,
+                onDelete: { showBatchDeleteConfirm = true }
+            )
+        } else if let message = coordinator.errorMessage {
+            memoryLaneErrorBanner(message)
+        }
+        #else
+        if let message = coordinator.errorMessage {
+            memoryLaneErrorBanner(message)
+        }
+        #endif
+    }
+
+    private func memoryLaneErrorBanner(_ message: String) -> some View {
+        Text(message)
+            .font(LegacyFont.caption)
+            .foregroundStyle(LegacyColor.danger)
+            .padding(LegacySpacing.md)
+            .frame(maxWidth: .infinity)
+            .background(LegacyColor.background)
     }
 
     @ViewBuilder
@@ -489,16 +653,10 @@ public struct MemoryLaneFeatureRootView: View {
                 Section {
                     LazyVGrid(columns: columns, spacing: LegacySpacing.md) {
                         ForEach(section.items) { item in
-                            NavigationLink(value: item) {
-                                MemoryLaneCard(
-                                    item: item,
-                                    isHighlighted: coordinator.highlightedMemoryIDs.contains(item.memoryID)
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .onAppear {
-                                Task { await coordinator.loadMoreIfNeeded(current: item) }
-                            }
+                            memoryGridCell(for: item)
+                                .onAppear {
+                                    Task { await coordinator.loadMoreIfNeeded(current: item) }
+                                }
                         }
                     }
                     .padding(.horizontal, LegacySpacing.lg)
@@ -515,6 +673,58 @@ public struct MemoryLaneFeatureRootView: View {
                 .padding(.bottom, LegacySpacing.lg)
         }
     }
+
+    @ViewBuilder
+    private func memoryGridCell(for item: MemoryLaneItem) -> some View {
+        #if os(iOS)
+        let isSelected = coordinator.selectedMemoryIDs.contains(item.memoryID)
+        if coordinator.isSelecting {
+            Button {
+                coordinator.toggleSelection(memoryID: item.memoryID)
+            } label: {
+                MemoryLaneCard(
+                    item: item,
+                    isHighlighted: coordinator.highlightedMemoryIDs.contains(item.memoryID),
+                    isSelected: isSelected
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isSelected ? "Deselect memory" : "Select memory")
+        } else {
+            NavigationLink(value: item) {
+                MemoryLaneCard(
+                    item: item,
+                    isHighlighted: coordinator.highlightedMemoryIDs.contains(item.memoryID)
+                )
+            }
+            .buttonStyle(.plain)
+        }
+        #else
+        NavigationLink(value: item) {
+            MemoryLaneCard(
+                item: item,
+                isHighlighted: coordinator.highlightedMemoryIDs.contains(item.memoryID)
+            )
+        }
+        .buttonStyle(.plain)
+        #endif
+    }
+
+    #if os(iOS)
+    private var batchDeleteTitle: String {
+        coordinator.selectedCount == 1
+            ? "Remove this memory?"
+            : "Remove \(coordinator.selectedCount) memories?"
+    }
+
+    private var batchDeleteButtonTitle: String {
+        coordinator.selectedCount == 1 ? "Remove memory" : "Remove memories"
+    }
+
+    private var batchDeleteMessage: String {
+        "This permanently removes the selected memories and their photos from your account."
+    }
+    #endif
 
     @ViewBuilder
     private var emptyState: some View {
@@ -669,10 +879,40 @@ private struct MemoryLaneSkeletonGallery: View {
 }
 
 #if os(iOS)
+private struct MemoryLaneSelectionBar: View {
+    let selectedCount: Int
+    let isDeleting: Bool
+    let onDelete: () -> Void
+
+    var body: some View {
+        HStack(spacing: LegacySpacing.md) {
+            Text(selectedCount == 1 ? "1 selected" : "\(selectedCount) selected")
+                .font(LegacyFont.headline)
+                .foregroundStyle(LegacyColor.textPrimary)
+            Spacer()
+            Button(role: .destructive, action: onDelete) {
+                if isDeleting {
+                    ProgressView()
+                        .tint(LegacyColor.danger)
+                } else {
+                    Label("Remove", systemImage: "trash")
+                }
+            }
+            .disabled(isDeleting)
+            .buttonStyle(.borderedProminent)
+            .tint(LegacyColor.danger)
+        }
+        .padding(.horizontal, LegacySpacing.lg)
+        .padding(.vertical, LegacySpacing.md)
+        .background(.ultraThinMaterial)
+    }
+}
+
 /// "On this day" resurfacing strip — a horizontal carousel of memories from
 /// today's date in previous years. Taps open the same detail destination.
 private struct OnThisDaySection: View {
     let items: [MemoryLaneItem]
+    @Bindable var coordinator: MemoryLaneCoordinator
 
     var body: some View {
         VStack(alignment: .leading, spacing: LegacySpacing.sm) {
@@ -688,10 +928,7 @@ private struct OnThisDaySection: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: LegacySpacing.md) {
                     ForEach(items) { item in
-                        NavigationLink(value: item) {
-                            OnThisDayCard(item: item)
-                        }
-                        .buttonStyle(.plain)
+                        onThisDayCell(for: item)
                     }
                 }
                 .padding(.horizontal, LegacySpacing.lg)
@@ -700,10 +937,29 @@ private struct OnThisDaySection: View {
         .padding(.top, LegacySpacing.md)
         .padding(.bottom, LegacySpacing.xs)
     }
+
+    @ViewBuilder
+    private func onThisDayCell(for item: MemoryLaneItem) -> some View {
+        let isSelected = coordinator.selectedMemoryIDs.contains(item.memoryID)
+        if coordinator.isSelecting {
+            Button {
+                coordinator.toggleSelection(memoryID: item.memoryID)
+            } label: {
+                OnThisDayCard(item: item, isSelected: isSelected)
+            }
+            .buttonStyle(.plain)
+        } else {
+            NavigationLink(value: item) {
+                OnThisDayCard(item: item)
+            }
+            .buttonStyle(.plain)
+        }
+    }
 }
 
 private struct OnThisDayCard: View {
     let item: MemoryLaneItem
+    var isSelected: Bool = false
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -744,8 +1000,20 @@ private struct OnThisDayCard: View {
         .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.md))
         .overlay(
             RoundedRectangle(cornerRadius: LegacyRadius.md)
-                .stroke(LegacyColor.accent.opacity(0.4), lineWidth: 1)
+                .stroke(
+                    isSelected ? LegacyColor.accent : LegacyColor.accent.opacity(0.4),
+                    lineWidth: isSelected ? 3 : 1
+                )
         )
+        .overlay(alignment: .topTrailing) {
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(LegacyColor.accent)
+                    .background(Circle().fill(LegacyColor.background))
+                    .padding(LegacySpacing.xs)
+            }
+        }
     }
 
     private var placeholderIcon: some View {
@@ -759,6 +1027,7 @@ private struct OnThisDayCard: View {
 struct MemoryLaneCard: View {
     let item: MemoryLaneItem
     var isHighlighted: Bool = false
+    var isSelected: Bool = false
 
     private var isTextNote: Bool { item.mediaType == "text" }
 
@@ -844,8 +1113,20 @@ struct MemoryLaneCard: View {
             .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.sm))
             .overlay(
                 RoundedRectangle(cornerRadius: LegacyRadius.sm)
-                    .stroke(isHighlighted ? LegacyColor.accent : LegacyColor.separator, lineWidth: isHighlighted ? 2 : 1)
+                    .stroke(
+                        isSelected ? LegacyColor.accent : (isHighlighted ? LegacyColor.accent : LegacyColor.separator),
+                        lineWidth: isSelected ? 3 : (isHighlighted ? 2 : 1)
+                    )
             )
+            .overlay(alignment: .topLeading) {
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(LegacyColor.accent)
+                        .background(Circle().fill(LegacyColor.background))
+                        .padding(LegacySpacing.xs)
+                }
+            }
             .accessibilityLabel(accessibilitySummary)
 
             if let label = item.displayLabel {
@@ -877,6 +1158,7 @@ struct MemoryLaneCard: View {
         if let label = item.displayLabel { parts.append(label) }
         if item.isMultiPhoto, let count = item.photoCount { parts.append("\(count) photos") }
         if isHighlighted { parts.append("newly imported") }
+        if isSelected { parts.append("selected") }
         return parts.joined(separator: ", ")
     }
 }

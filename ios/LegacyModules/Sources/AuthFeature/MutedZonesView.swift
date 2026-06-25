@@ -25,15 +25,15 @@ public struct MutedZonesView: View {
         ZStack(alignment: .bottom) {
             map
 
-            VStack(spacing: 0) {
-                Spacer()
+            VStack(spacing: LegacySpacing.sm) {
+                if !coordinator.zones.isEmpty {
+                    mutedZonesList
+                }
                 tapHint
-                    .padding(.horizontal, LegacySpacing.lg)
-                    .padding(.bottom, LegacySpacing.sm)
                 addButton
-                    .padding(.horizontal, LegacySpacing.lg)
-                    .padding(.bottom, LegacySpacing.lg)
             }
+            .padding(.horizontal, LegacySpacing.lg)
+            .padding(.bottom, LegacySpacing.lg)
         }
         .navigationTitle("Muted zones")
         .navigationBarTitleDisplayMode(.inline)
@@ -106,6 +106,37 @@ public struct MutedZonesView: View {
         }
     }
 
+    private var mutedZonesList: some View {
+        VStack(alignment: .leading, spacing: LegacySpacing.xs) {
+            Text("Your muted zones")
+                .font(LegacyFont.caption)
+                .foregroundStyle(LegacyColor.textSecondary)
+                .padding(.horizontal, LegacySpacing.xs)
+
+            List {
+                ForEach(coordinator.zones) { zone in
+                    MutedZoneListRow(zone: zone) {
+                        Task { await coordinator.deleteZone(id: zone.id) }
+                    }
+                    .listRowBackground(LegacyColor.surface.opacity(0.92))
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            Task { await coordinator.deleteZone(id: zone.id) }
+                        } label: {
+                            Label("Remove", systemImage: "trash")
+                        }
+                    }
+                }
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .frame(maxHeight: min(CGFloat(coordinator.zones.count) * 58 + 8, 240))
+        }
+        .padding(LegacySpacing.sm)
+        .background(LegacyColor.background.opacity(0.94))
+        .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.md, style: .continuous))
+    }
+
     private var addButton: some View {
         Button {
             pendingCoordinate = nil
@@ -131,6 +162,52 @@ public struct MutedZonesView: View {
 
     private var currentLocation: CLLocationCoordinate2D? {
         locationManager.location?.coordinate
+    }
+}
+
+// MARK: - Zone list row
+
+private struct MutedZoneListRow: View {
+    let zone: MutedZone
+    let onRemove: () -> Void
+
+    @State private var showDeleteConfirm = false
+
+    var body: some View {
+        HStack(spacing: LegacySpacing.md) {
+            Image(systemName: "bell.slash.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(LegacyColor.danger)
+                .frame(width: 28, height: 28)
+                .background(LegacyColor.danger.opacity(0.12))
+                .clipShape(Circle())
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(zone.label ?? "Muted zone")
+                    .font(LegacyFont.body)
+                    .foregroundStyle(LegacyColor.textPrimary)
+                Text("\(zone.radiusM)m radius")
+                    .font(LegacyFont.caption)
+                    .foregroundStyle(LegacyColor.textSecondary)
+            }
+
+            Spacer(minLength: LegacySpacing.sm)
+
+            Button(role: .destructive) {
+                showDeleteConfirm = true
+            } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 15, weight: .semibold))
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel("Remove muted zone")
+        }
+        .confirmationDialog(zone.label ?? "Muted zone", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+            Button("Remove zone", role: .destructive, action: onRemove)
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Notifications near this location will be re-enabled.")
+        }
     }
 }
 
