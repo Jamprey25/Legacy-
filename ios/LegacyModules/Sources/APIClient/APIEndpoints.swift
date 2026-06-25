@@ -268,6 +268,9 @@ public struct MemoryLaneItem: Decodable, Sendable, Equatable, Identifiable, Hash
     public let memoryID: String
     public let dropDate: String
     public let createdAt: String
+    /// Owner-only coordinates for Places atlas grouping. Optional for older servers.
+    public let lat: Double?
+    public let lng: Double?
     public let mediaType: String
     public let scanStatus: String
     public let thumbnailURL: String?
@@ -301,6 +304,7 @@ public struct MemoryLaneItem: Decodable, Sendable, Equatable, Identifiable, Hash
         case memoryID = "memory_id"
         case dropDate = "drop_date"
         case createdAt = "created_at"
+        case lat, lng
         case mediaType = "media_type"
         case scanStatus = "scan_status"
         case thumbnailURL = "thumbnail_url"
@@ -724,6 +728,44 @@ extension LegacyAPIClient {
     /// Batch-create private memories from on-device clusters (contract §5).
     public func importMemories(_ body: ImportMemoriesRequest) async throws -> ImportMemoriesResponse {
         try await send(request(.post, "/v1/memories/import", body), as: ImportMemoriesResponse.self)
+    }
+
+    // MARK: - Summons preview (Phase 2)
+
+    public func sendPhoneVerification(phone: String) async throws {
+        struct Body: Encodable { let phone: String }
+        struct Resp: Decodable { let ok: Bool }
+        _ = try await send(request(.post, "/v1/summons/phone/send", Body(phone: phone)), as: Resp.self)
+    }
+
+    public func verifyPhone(phone: String, code: String) async throws -> String {
+        struct Body: Encodable { let phone: String; let code: String }
+        struct Resp: Decodable {
+            let phoneE164: String
+            enum CodingKeys: String, CodingKey { case phoneE164 = "phone_e164" }
+        }
+        let resp: Resp = try await send(
+            request(.post, "/v1/summons/phone/verify", Body(phone: phone, code: code)),
+            as: Resp.self
+        )
+        return resp.phoneE164
+    }
+
+    public func sendSummons(memoryID: String, recipients: [String], placeLabel: String?) async throws {
+        struct Body: Encodable {
+            let recipients: [String]
+            let placeLabel: String?
+            enum CodingKeys: String, CodingKey {
+                case recipients
+                case placeLabel = "place_label"
+            }
+        }
+        struct Item: Decodable { let phone: String; let status: String }
+        struct Resp: Decodable { let summons: [Item] }
+        _ = try await send(
+            request(.post, "/v1/summons/memories/\(memoryID)/summons", Body(recipients: recipients, placeLabel: placeLabel)),
+            as: Resp.self
+        )
     }
 
     /// Returns `nil` when the server responds `204` (nothing eligible nearby).

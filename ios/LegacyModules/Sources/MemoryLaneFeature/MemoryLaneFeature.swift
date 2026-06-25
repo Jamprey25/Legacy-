@@ -549,7 +549,7 @@ private struct OnThisDayCard: View {
 }
 #endif
 
-private struct MemoryLaneCard: View {
+struct MemoryLaneCard: View {
     let item: MemoryLaneItem
 
     var body: some View {

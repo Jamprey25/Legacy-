@@ -269,6 +269,10 @@ public struct DropFeatureRootView: View {
         await coordinator.retryDraft(draft, context: modelContext)
     }
 
+    private func deleteDraft(_ draft: DropDraft) {
+        try? DropDraftStore.delete(draft, context: modelContext)
+    }
+
     private func handlePickedPhoto(_ data: Data) {
         coordinator.selectPhoto(data)
         // Quick Pin should feel instant: pick -> drop, without an extra confirmation tap.
