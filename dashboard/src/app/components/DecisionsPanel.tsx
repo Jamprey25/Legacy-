@@ -2,11 +2,14 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Task, Decision, DecisionOption, ThreadResponse } from "../types";
 
-const SECRET_KEY = "legacy-dashboard-secret";
+import {
+  clearStoredDashboardSecret,
+  getStoredDashboardSecret,
+  setStoredDashboardSecret,
+} from "@/lib/dashboardAuth";
 
-function getStoredSecret(): string {
-  if (typeof window === "undefined") return "";
-  return sessionStorage.getItem(SECRET_KEY) ?? "";
+function resolveSecret(explicit?: string): string {
+  return (explicit ?? getStoredDashboardSecret()).trim();
 }
 
 function DecisionCard({
@@ -200,9 +203,14 @@ function OpenDecisionCard({
       setSubmitting(true);
       setError(null);
       try {
+        const stored = resolveSecret(secret);
+        if (!stored) {
+          setNeedsSecret(true);
+          setError("Save your dashboard PIN at the top of the page first.");
+          return;
+        }
         const headers: Record<string, string> = { "Content-Type": "application/json" };
-        const stored = secret ?? getStoredSecret();
-        if (stored) headers["X-Decisions-Secret"] = stored;
+        headers["X-Decisions-Secret"] = stored;
 
         const res = await fetch("/api/decisions/resolve", {
           method: "POST",
@@ -210,20 +218,21 @@ function OpenDecisionCard({
           body: JSON.stringify({
             decisionId: d.id,
             optionId,
-            secret: stored || undefined,
+            secret: stored,
           }),
         });
 
         const json = (await res.json()) as { error?: string };
 
         if (res.status === 401) {
+          clearStoredDashboardSecret();
           setNeedsSecret(true);
-          setError("Enter your decision PIN to lock in choices on the live dashboard.");
+          setError("PIN didn't match. Re-enter at the top bar (check Vercel DECISIONS_SECRET).");
           return;
         }
         if (!res.ok) throw new Error(json.error ?? `Request failed (${res.status})`);
 
-        if (secret) sessionStorage.setItem(SECRET_KEY, secret);
+        setStoredDashboardSecret(stored);
         setNeedsSecret(false);
         onResolved();
       } catch (err) {
@@ -237,11 +246,14 @@ function OpenDecisionCard({
 
   const handleConfirm = () => {
     if (!selectedId) return;
-    if (needsSecret && !secretInput.trim()) {
-      setError("PIN required");
+    const inline = secretInput.trim();
+    const stored = resolveSecret(inline || undefined);
+    if (!stored) {
+      setNeedsSecret(true);
+      setError("Save your dashboard PIN at the top of the page first.");
       return;
     }
-    void submit(selectedId, needsSecret ? secretInput.trim() : undefined);
+    void submit(selectedId, inline || undefined);
   };
 
   return (
@@ -371,26 +383,33 @@ function ThreadCard({
     setSubmitting(true);
     setError(null);
     try {
+      const stored = resolveSecret(secret);
+      if (!stored) {
+        setNeedsSecret(true);
+        setError("Save your dashboard PIN at the top of the page first.");
+        setSubmitting(false);
+        return;
+      }
       const headers: Record<string, string> = { "Content-Type": "application/json" };
-      const stored = secret ?? getStoredSecret();
-      if (stored) headers["X-Decisions-Secret"] = stored;
+      headers["X-Decisions-Secret"] = stored;
 
       const res = await fetch("/api/discussions/respond", {
         method: "POST",
         headers,
-        body: JSON.stringify({ itemId: d.id, author: "joseph", text: replyText.trim(), secret: stored || undefined }),
+        body: JSON.stringify({ itemId: d.id, author: "joseph", text: replyText.trim(), secret: stored }),
       });
       const json = (await res.json()) as { error?: string };
 
       if (res.status === 401) {
+        clearStoredDashboardSecret();
         setNeedsSecret(true);
-        setError("Enter your decision PIN to post replies.");
+        setError("PIN didn't match. Re-enter at the top bar (check Vercel DECISIONS_SECRET).");
         setSubmitting(false);
         return;
       }
       if (!res.ok) throw new Error(json.error ?? `Request failed (${res.status})`);
 
-      if (secret) sessionStorage.setItem(SECRET_KEY, secret);
+      setStoredDashboardSecret(stored);
       setReplyText("");
       setNeedsSecret(false);
       onResponded();
@@ -403,11 +422,14 @@ function ThreadCard({
 
   const handleReplyClick = () => {
     if (!replyText.trim()) return;
-    if (needsSecret && !secretInput.trim()) {
-      setError("PIN required");
+    const inline = secretInput.trim();
+    const stored = resolveSecret(inline || undefined);
+    if (!stored) {
+      setNeedsSecret(true);
+      setError("Save your dashboard PIN at the top of the page first.");
       return;
     }
-    void submit(needsSecret ? secretInput.trim() : undefined);
+    void submit(inline || undefined);
   };
 
   return (

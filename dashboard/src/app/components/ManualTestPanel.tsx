@@ -2,13 +2,14 @@
 import { useCallback, useState } from "react";
 import type { ManualTest, ManualTestStatus } from "../types";
 import {
+  clearStoredDashboardSecret,
   DASHBOARD_SECRET_HEADER,
-  DASHBOARD_SECRET_STORAGE_KEY,
+  getStoredDashboardSecret,
+  setStoredDashboardSecret,
 } from "@/lib/dashboardAuth";
 
-function getStoredSecret(): string {
-  if (typeof window === "undefined") return "";
-  return sessionStorage.getItem(DASHBOARD_SECRET_STORAGE_KEY) ?? "";
+function resolveSecret(explicit?: string): string {
+  return (explicit ?? getStoredDashboardSecret()).trim();
 }
 
 function authorLabel(by: string) {
@@ -44,9 +45,15 @@ function TestRow({
       setError(null);
       setOptimisticStatus(status);
       try {
-        const stored = secret ?? getStoredSecret();
+        const stored = resolveSecret(secret);
+        if (!stored) {
+          setOptimisticStatus(null);
+          setNeedsSecret(true);
+          setError("Save your dashboard PIN at the top of the page first.");
+          return;
+        }
         const headers: Record<string, string> = { "Content-Type": "application/json" };
-        if (stored) headers[DASHBOARD_SECRET_HEADER] = stored;
+        headers[DASHBOARD_SECRET_HEADER] = stored;
 
         const res = await fetch("/api/manual-tests/update", {
           method: "POST",
@@ -54,20 +61,21 @@ function TestRow({
           body: JSON.stringify({
             testId: test.id,
             status,
-            secret: stored || undefined,
+            secret: stored,
           }),
         });
         const json = (await res.json()) as { error?: string; test?: ManualTest };
 
         if (res.status === 401) {
           setOptimisticStatus(null);
+          clearStoredDashboardSecret();
           setNeedsSecret(true);
-          setError("Enter your dashboard PIN to save QA results.");
+          setError("PIN didn't match. Re-enter at the top bar (check Vercel DECISIONS_SECRET).");
           return;
         }
         if (!res.ok) throw new Error(json.error ?? `Request failed (${res.status})`);
 
-        if (secret) sessionStorage.setItem(DASHBOARD_SECRET_STORAGE_KEY, secret);
+        setStoredDashboardSecret(stored);
         setNeedsSecret(false);
         if (json.test) {
           setOptimisticStatus(null);
@@ -83,12 +91,15 @@ function TestRow({
     [test.id, onUpdate]
   );
 
-  const handlePass = () => {
-    if (needsSecret && !secretInput.trim()) {
-      setError("PIN required");
+  const handleStatus = (status: ManualTestStatus) => {
+    const inline = secretInput.trim();
+    const stored = resolveSecret(inline || undefined);
+    if (!stored) {
+      setNeedsSecret(true);
+      setError("Save your dashboard PIN at the top of the page first.");
       return;
     }
-    void setStatus("passed", needsSecret ? secretInput.trim() : undefined);
+    void setStatus(status, inline || undefined);
   };
 
   const isPassed = displayStatus === "passed";
@@ -108,7 +119,7 @@ function TestRow({
         <button
           type="button"
           disabled={busy}
-          onClick={() => (isPassed ? void setStatus("pending") : handlePass())}
+          onClick={() => (isPassed ? handleStatus("pending") : handleStatus("passed"))}
           title={isPassed ? "Mark pending again" : "Mark passed"}
           style={{
             width: 22,
@@ -246,7 +257,7 @@ function TestRow({
             <button
               type="button"
               disabled={busy}
-              onClick={() => void setStatus("passed")}
+              onClick={() => handleStatus("passed")}
               style={{
                 padding: "4px 10px",
                 fontSize: 11,
@@ -265,7 +276,7 @@ function TestRow({
             <button
               type="button"
               disabled={busy}
-              onClick={() => void setStatus("failed")}
+              onClick={() => handleStatus("failed")}
               style={{
                 padding: "4px 10px",
                 fontSize: 11,
@@ -284,7 +295,7 @@ function TestRow({
             <button
               type="button"
               disabled={busy}
-              onClick={() => void setStatus("pending")}
+              onClick={() => handleStatus("pending")}
               style={{
                 padding: "4px 10px",
                 fontSize: 11,
