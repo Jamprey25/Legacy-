@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-29T17:55:13.985Z"
+    "lastUpdated": "2026-06-29T17:55:27.903Z"
   },
   "decisions": [
     {
@@ -1330,7 +1330,7 @@
     {
       "id": "qa-roadmap-import-lane-handoff",
       "title": "Import completes → Lane tab highlights new memories",
-      "status": "pending",
+      "status": "passed",
       "addedBy": "ios",
       "platform": "device",
       "milestone": "M5",
@@ -1339,7 +1339,8 @@
         "Import a batch of clusters",
         "After celebration, confirm app switches to Memory Lane",
         "New items show accent border highlight until opened"
-      ]
+      ],
+      "verifiedAt": "2026-06-29"
     },
     {
       "id": "qa-testflight-screenshots",
