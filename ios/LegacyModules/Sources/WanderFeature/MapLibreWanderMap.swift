@@ -521,29 +521,30 @@ private final class LegacyUserPuckView: MLNUserLocationAnnotationView {
     /// Orb sits below the canvas centre (cone needs headroom above) — shift the view
     /// up so the orb, not the cone tip, lands on the actual coordinate.
     private let orbCenterYRatio: CGFloat = 0.66
-    private var built = false
 
     override init(reuseIdentifier: String?) {
         super.init(reuseIdentifier: reuseIdentifier)
         backgroundColor = .clear
         // Fixed screen size — never grow/shrink with zoom or the tilted camera.
         scalesWithViewingDistance = false
+
+        bounds = CGRect(origin: .zero, size: puckSize)
+        let orbOffset = puckSize.height * (orbCenterYRatio - 0.5)
+        centerOffset = CGVector(dx: 0, dy: -orbOffset)
+
+        imageView.frame = bounds
+        imageView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        imageView.image = LegacyUserPuckArt.image(size: puckSize, orbCenterYRatio: orbCenterYRatio)
+        addSubview(imageView)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override func update() {
+        // Keep a non-null frame so MapLibre positions the puck; artwork is built in init.
         if frame.isNull {
             frame = CGRect(origin: .zero, size: puckSize)
-            let orbOffset = puckSize.height * (orbCenterYRatio - 0.5)
-            centerOffset = CGVector(dx: 0, dy: -orbOffset)
-            return setNeedsLayout()
         }
-        guard !built else { return }
-        built = true
-        imageView.image = LegacyUserPuckArt.image(size: puckSize, orbCenterYRatio: orbCenterYRatio)
-        imageView.frame = bounds
-        addSubview(imageView)
     }
 }
 
