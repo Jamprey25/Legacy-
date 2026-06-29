@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-29T17:55:03.775Z"
+    "lastUpdated": "2026-06-29T17:55:07.121Z"
   },
   "decisions": [
     {
@@ -1233,7 +1233,7 @@
     {
       "id": "qa-mt-muted-zones-create",
       "title": "Muted zones — create a zone with slider and optional label",
-      "status": "pending",
+      "status": "passed",
       "addedBy": "backend",
       "platform": "simulator",
       "milestone": "M4",
@@ -1250,7 +1250,8 @@
         "Confirm zone appears on map as a red translucent circle",
         "Confirm zone persists when you navigate away and return"
       ],
-      "notes": "Slider range 100–5000m, step 50m. Max 10 zones per user. Preview circle animates with slider. Blocked until backend redeploy with bug-muted-zones-accuracy-validation fix (was failing with spurious accuracy_m error)."
+      "notes": "Slider range 100–5000m, step 50m. Max 10 zones per user. Preview circle animates with slider. Blocked until backend redeploy with bug-muted-zones-accuracy-validation fix (was failing with spurious accuracy_m error).",
+      "verifiedAt": "2026-06-29"
     },
     {
       "id": "qa-mt-muted-zones-list-delete",
