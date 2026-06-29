@@ -516,12 +516,18 @@ private final class OffsetMLNMapView: MLNMapView {
 }
 
 private final class LegacyUserPuckView: MLNUserLocationAnnotationView {
-    private let puckSize = CGSize(width: 30, height: 36)
+    private let imageView = UIImageView()
+    private let puckSize = CGSize(width: 60, height: 68)
+    /// Orb sits below the canvas centre (cone needs headroom above) — shift the view
+    /// up so the orb, not the cone tip, lands on the actual coordinate.
+    private let orbCenterYRatio: CGFloat = 0.66
     private var built = false
 
     override init(reuseIdentifier: String?) {
         super.init(reuseIdentifier: reuseIdentifier)
         backgroundColor = .clear
+        // Fixed screen size — never grow/shrink with zoom or the tilted camera.
+        scalesWithViewingDistance = false
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -529,58 +535,102 @@ private final class LegacyUserPuckView: MLNUserLocationAnnotationView {
     override func update() {
         if frame.isNull {
             frame = CGRect(origin: .zero, size: puckSize)
+            let orbOffset = puckSize.height * (orbCenterYRatio - 0.5)
+            centerOffset = CGVector(dx: 0, dy: -orbOffset)
             return setNeedsLayout()
         }
         guard !built else { return }
         built = true
-        backgroundColor = .clear
+        imageView.image = LegacyUserPuckArt.image(size: puckSize, orbCenterYRatio: orbCenterYRatio)
+        imageView.frame = bounds
+        addSubview(imageView)
+    }
+}
 
-        let accent = UIColor(LegacyColor.accent)
-        let w = puckSize.width
-        let h = puckSize.height
-        let r: CGFloat = 5
+/// Premium location puck — gradient orb with a warm heading cone fanning forward.
+/// Because the Wander map heading-locks, "up" is always forward, so the cone is static.
+private enum LegacyUserPuckArt {
+    static func image(size: CGSize, orbCenterYRatio: CGFloat) -> UIImage {
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { ctx in
+            let cg = ctx.cgContext
+            let accent = UIColor(LegacyColor.accent)
+            let accentDeep = UIColor(LegacyColor.accentDeep)
+            let rgb = CGColorSpaceCreateDeviceRGB()
+            let orbCenter = CGPoint(x: size.width / 2, y: size.height * orbCenterYRatio)
+            let orbRadius: CGFloat = 10
 
-        // Soft ambient bloom behind the arrow
-        let bloom = CAShapeLayer()
-        let bloomR: CGFloat = 12
-        let cx = w / 2, cy = h * 0.6
-        bloom.path = UIBezierPath(
-            ovalIn: CGRect(x: cx - bloomR, y: cy - bloomR, width: bloomR * 2, height: bloomR * 2)
-        ).cgPath
-        bloom.fillColor = accent.withAlphaComponent(0.14).cgColor
-        bloom.shadowColor = accent.cgColor
-        bloom.shadowOpacity = 0.38
-        bloom.shadowRadius = 12
-        bloom.shadowOffset = .zero
-        layer.addSublayer(bloom)
+            // ── Heading cone — warm light fanning forward (up), fading to nothing ──
+            let coneTopY: CGFloat = 8
+            let coneHalfWidth: CGFloat = 19
+            let cone = CGMutablePath()
+            cone.move(to: orbCenter)
+            cone.addLine(to: CGPoint(x: orbCenter.x - coneHalfWidth, y: coneTopY))
+            cone.addQuadCurve(
+                to: CGPoint(x: orbCenter.x + coneHalfWidth, y: coneTopY),
+                control: CGPoint(x: orbCenter.x, y: coneTopY - 5)
+            )
+            cone.closeSubpath()
+            cg.saveGState()
+            cg.addPath(cone)
+            cg.clip()
+            if let grad = CGGradient(
+                colorsSpace: rgb,
+                colors: [
+                    accent.withAlphaComponent(0).cgColor,
+                    accent.withAlphaComponent(0.42).cgColor,
+                ] as CFArray,
+                locations: [0, 1]
+            ) {
+                cg.drawLinearGradient(
+                    grad,
+                    start: CGPoint(x: orbCenter.x, y: coneTopY),
+                    end: orbCenter,
+                    options: []
+                )
+            }
+            cg.restoreGState()
 
-        // Chevron arrow with rounded bottom corners — top point stays sharp for direction
-        let path = UIBezierPath()
-        path.move(to: CGPoint(x: w / 2, y: 0))
-        path.addLine(to: CGPoint(x: w - r, y: h - r))
-        path.addQuadCurve(
-            to: CGPoint(x: w / 2 + r, y: h * 0.72),
-            controlPoint: CGPoint(x: w, y: h)
-        )
-        path.addLine(to: CGPoint(x: w / 2, y: h * 0.68))
-        path.addLine(to: CGPoint(x: w / 2 - r, y: h * 0.72))
-        path.addQuadCurve(
-            to: CGPoint(x: r, y: h - r),
-            controlPoint: CGPoint(x: 0, y: h)
-        )
-        path.close()
+            // ── Outer bloom behind the orb ──
+            cg.setShadow(offset: .zero, blur: 12, color: accent.withAlphaComponent(0.6).cgColor)
+            cg.setFillColor(accent.withAlphaComponent(0.22).cgColor)
+            cg.fillEllipse(in: CGRect(
+                x: orbCenter.x - orbRadius - 4, y: orbCenter.y - orbRadius - 4,
+                width: (orbRadius + 4) * 2, height: (orbRadius + 4) * 2
+            ))
+            cg.setShadow(offset: .zero, blur: 0, color: nil)
 
-        let shape = CAShapeLayer()
-        shape.path = path.cgPath
-        shape.fillColor = accent.cgColor
-        shape.strokeColor = UIColor.white.withAlphaComponent(0.60).cgColor
-        shape.lineWidth = 1.5
-        shape.lineJoin = .round
-        shape.shadowColor = accent.cgColor
-        shape.shadowOpacity = 0.70
-        shape.shadowRadius = 7
-        shape.shadowOffset = .zero
-        layer.addSublayer(shape)
+            // ── Orb body — radial gradient with an off-centre highlight ──
+            let orbRect = CGRect(
+                x: orbCenter.x - orbRadius, y: orbCenter.y - orbRadius,
+                width: orbRadius * 2, height: orbRadius * 2
+            )
+            cg.setShadow(
+                offset: CGSize(width: 0, height: 2),
+                blur: 4,
+                color: UIColor.black.withAlphaComponent(0.4).cgColor
+            )
+            if let grad = CGGradient(
+                colorsSpace: rgb,
+                colors: [accent.cgColor, accentDeep.cgColor] as CFArray,
+                locations: [0, 1]
+            ) {
+                cg.drawRadialGradient(
+                    grad,
+                    startCenter: CGPoint(x: orbCenter.x - 3, y: orbCenter.y - 4),
+                    startRadius: 1,
+                    endCenter: orbCenter,
+                    endRadius: orbRadius,
+                    options: []
+                )
+            }
+            cg.setShadow(offset: .zero, blur: 0, color: nil)
+
+            // ── Crisp white ring ──
+            cg.setStrokeColor(UIColor.white.withAlphaComponent(0.9).cgColor)
+            cg.setLineWidth(2)
+            cg.strokeEllipse(in: orbRect.insetBy(dx: 1, dy: 1))
+        }
     }
 }
 
