@@ -390,6 +390,7 @@ public struct WanderFeatureRootView: View {
     /// time I go back to Wander").
     @AppStorage("legacyHasDismissedWalkHint") private var hasDismissedWalkHint = false
     @State private var discoveryToast: LegacyToast?
+    @State private var isFollowingUser = true
 
     private var inRangeTeasers: [Teaser] { coordinator.teasers.filter(\.inRange) }
 
@@ -415,7 +416,8 @@ public struct WanderFeatureRootView: View {
                     revealedOthersPins: coordinator.revealedOthersPins,
                     zoneGlows: coordinator.zoneGlows,
                     mutedZones: mutedZones,
-                    inRangeMemoryIDs: coordinator.inRangeMemoryIDs
+                    inRangeMemoryIDs: coordinator.inRangeMemoryIDs,
+                    isFollowingUser: $isFollowingUser
                 )
                 .ignoresSafeArea()
             } else {
@@ -523,7 +525,31 @@ public struct WanderFeatureRootView: View {
             WarmthCueOverlay(intensity: coordinator.effectiveWarmthIntensity)
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
+
+            if !isFollowingUser {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.3)) { isFollowingUser = true }
+                        } label: {
+                            Image(systemName: "location.north.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(LegacyColor.accent)
+                                .frame(width: 44, height: 44)
+                                .background(.ultraThinMaterial)
+                                .clipShape(Circle())
+                                .shadow(color: .black.opacity(0.2), radius: 8, y: 2)
+                        }
+                        .padding(.trailing, LegacySpacing.lg)
+                        .padding(.bottom, 160)
+                    }
+                }
+                .transition(.scale(scale: 0.85).combined(with: .opacity))
+            }
         }
+        .animation(.easeInOut(duration: 0.2), value: isFollowingUser)
         .animation(.easeInOut(duration: 0.35), value: coordinator.inRangeCount)
         .animation(.easeOut(duration: 0.45), value: showsWalkHint)
         .task(id: coordinator.teasers.isEmpty) {
@@ -538,6 +564,12 @@ public struct WanderFeatureRootView: View {
         }
         .task {
             await coordinator.scanIfNeeded(force: true)
+        }
+        .task(id: isFollowingUser) {
+            guard !isFollowingUser else { return }
+            try? await Task.sleep(for: .seconds(6))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeInOut(duration: 0.4)) { isFollowingUser = true }
         }
         #if os(iOS)
         .onChange(of: coordinator.isShowingUnlockedMedia) { wasShowing, isShowing in

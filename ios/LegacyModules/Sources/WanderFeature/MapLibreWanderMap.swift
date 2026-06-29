@@ -26,6 +26,7 @@ struct MapLibreWanderMap: UIViewRepresentable {
     let zoneGlows: [ZoneGlowOverlay]
     let mutedZones: [MutedZone]
     let inRangeMemoryIDs: Set<String>
+    @Binding var isFollowingUser: Bool
 
     // MARK: UIViewRepresentable
 
@@ -52,6 +53,12 @@ struct MapLibreWanderMap: UIViewRepresentable {
 
     func updateUIView(_ mapView: MLNMapView, context: Context) {
         context.coordinator.inRangeMemoryIDs = inRangeMemoryIDs
+        context.coordinator.onTrackingLost = {
+            withAnimation(.easeInOut(duration: 0.2)) { isFollowingUser = false }
+        }
+        if isFollowingUser && mapView.userTrackingMode == .none {
+            mapView.setUserTrackingMode(.followWithHeading, animated: true)
+        }
         context.coordinator.syncZoneGlows(zoneGlows, on: mapView)
         context.coordinator.syncMutedZones(mutedZones, on: mapView)
         context.coordinator.syncInRangeHalos(ownPins: ownPins, on: mapView)
@@ -73,6 +80,7 @@ struct MapLibreWanderMap: UIViewRepresentable {
         weak var mapView: MLNMapView?
         var pendingInitialPitch: CGFloat?
         var inRangeMemoryIDs: Set<String> = []
+        var onTrackingLost: (() -> Void)?
 
         private var zoneSource: MLNShapeSource?
         private var mutedZoneSource: MLNShapeSource?
@@ -132,6 +140,10 @@ struct MapLibreWanderMap: UIViewRepresentable {
             ensureMutedZoneLayer(on: style)
             ensureInRangeLayer(on: style)
             applyStoredOverlayState(on: mapView)
+        }
+
+        func mapView(_ mapView: MLNMapView, didChange mode: MLNUserTrackingMode, animated: Bool) {
+            if mode == .none { onTrackingLost?() }
         }
 
         func mapView(_ mapView: MLNMapView, didFailLoadingMapWithError error: Error) {
