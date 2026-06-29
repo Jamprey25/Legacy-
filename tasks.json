@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-29T17:55:07.121Z"
+    "lastUpdated": "2026-06-29T17:55:13.985Z"
   },
   "decisions": [
     {
@@ -1256,7 +1256,7 @@
     {
       "id": "qa-mt-muted-zones-list-delete",
       "title": "Muted zones — list and delete zones",
-      "status": "pending",
+      "status": "passed",
       "addedBy": "backend",
       "platform": "simulator",
       "milestone": "M4",
@@ -1271,7 +1271,8 @@
         "Confirm deletion and zone is removed from map",
         "Create multiple zones, confirm max-10 limit — 'Add muted zone' button disables at 10"
       ],
-      "notes": "Tap zone pin to delete. Zones sync via GET /v1/user/muted-zones on view load."
+      "notes": "Tap zone pin to delete. Zones sync via GET /v1/user/muted-zones on view load.",
+      "verifiedAt": "2026-06-29"
     },
     {
       "id": "qa-mt-muted-zones-notification-suppression",
