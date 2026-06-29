@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-29T17:55:27.903Z"
+    "lastUpdated": "2026-06-29T17:56:04.237Z"
   },
   "decisions": [
     {
@@ -1315,7 +1315,7 @@
     {
       "id": "qa-roadmap-places-atlas",
       "title": "Memory Lane Places + Map segments group memories by location",
-      "status": "pending",
+      "status": "passed",
       "addedBy": "ios",
       "platform": "simulator",
       "milestone": "M5",
@@ -1325,7 +1325,8 @@
         "Switch to Places — confirm named clusters and counts",
         "Tap a cluster — filtered grid opens",
         "Profile shows places · memories stats"
-      ]
+      ],
+      "verifiedAt": "2026-06-29"
     },
     {
       "id": "qa-roadmap-import-lane-handoff",
