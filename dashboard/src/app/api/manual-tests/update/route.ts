@@ -33,9 +33,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const current = await readTasksFile();
+    const { data: current, sha } = await readTasksFile();
     const { data, test } = updateManualTest(current, body.testId, body.status);
-    await writeTasksFile(data, `dashboard: QA ${body.testId} → ${body.status}`);
+    await writeTasksFile(data, `dashboard: QA ${body.testId} → ${body.status}`, sha);
     return NextResponse.json({ ok: true, test, meta: data.meta });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to update manual test";

@@ -34,13 +34,15 @@ async function readFromDisk(): Promise<TasksFile> {
   return JSON.parse(raw) as TasksFile;
 }
 
-export async function readTasksFile(): Promise<TasksFile> {
-  if (process.env.GITHUB_TOKEN) return (await readFromGitHub()).data;
-  return readFromDisk();
+export async function readTasksFile(): Promise<{ data: TasksFile; sha: string | null }> {
+  if (process.env.GITHUB_TOKEN) {
+    const { data, sha } = await readFromGitHub();
+    return { data, sha };
+  }
+  return { data: await readFromDisk(), sha: null };
 }
 
-async function writeToGitHub(data: TasksFile, message: string): Promise<void> {
-  const { sha } = await readFromGitHub();
+async function writeToGitHub(data: TasksFile, message: string, sha: string): Promise<void> {
   const content = Buffer.from(JSON.stringify(data, null, 2) + "\n").toString("base64");
   const url = `https://api.github.com/repos/${GITHUB_REPO}/contents/${TASKS_FILE}`;
   const res = await fetch(url, {
@@ -58,10 +60,11 @@ async function writeToDisk(data: TasksFile): Promise<void> {
   await fs.writeFile(tasksFilePath(), JSON.stringify(data, null, 2) + "\n", "utf-8");
 }
 
-export async function writeTasksFile(data: TasksFile, message: string): Promise<void> {
+export async function writeTasksFile(data: TasksFile, message: string, sha: string | null): Promise<void> {
   data.meta.lastUpdated = new Date().toISOString();
   if (process.env.GITHUB_TOKEN) {
-    await writeToGitHub(data, message);
+    if (!sha) throw new Error("GitHub write requires a SHA — pass the sha returned by readTasksFile()");
+    await writeToGitHub(data, message, sha);
   } else {
     await writeToDisk(data);
   }

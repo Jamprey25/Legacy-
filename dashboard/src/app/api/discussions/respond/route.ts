@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { checkDashboardSecret } from "@/lib/dashboardAuth";
 import { readTasksFile, addResponse, resolveDiscussion, writeTasksFile } from "@/lib/tasksFile";
 import type { ThreadResponse } from "@/app/types";
 
@@ -8,15 +9,8 @@ interface RespondBody {
   itemId: string;
   author: string;
   text: string;
-  resolve?: boolean;  // optionally mark the thread resolved
+  resolve?: boolean;
   secret?: string;
-}
-
-function checkSecret(request: Request, body: RespondBody): boolean {
-  const expected = process.env.DECISIONS_SECRET;
-  if (!expected) return true;
-  const provided = request.headers.get("x-decisions-secret") ?? body.secret ?? "";
-  return provided === expected;
 }
 
 export async function POST(request: Request) {
@@ -31,12 +25,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "itemId, author, and text are required" }, { status: 400 });
   }
 
-  if (!checkSecret(request, body)) {
+  if (!checkDashboardSecret(request as import("next/server").NextRequest, body.secret)) {
     return NextResponse.json({ error: "Invalid secret" }, { status: 401 });
   }
 
   try {
-    const current = await readTasksFile();
+    const { data: current, sha } = await readTasksFile();
 
     const response: ThreadResponse = {
       author: body.author as ThreadResponse["author"],
@@ -50,7 +44,7 @@ export async function POST(request: Request) {
       ({ data, decision } = resolveDiscussion(data, body.itemId));
     }
 
-    await writeTasksFile(data, `dashboard: ${body.author} replied to ${body.itemId}`);
+    await writeTasksFile(data, `dashboard: ${body.author} replied to ${body.itemId}`, sha);
     return NextResponse.json({ ok: true, decision });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to save response";

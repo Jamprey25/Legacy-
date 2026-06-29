@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { checkDashboardSecret } from "@/lib/dashboardAuth";
 import { readTasksFile, resolveDecision, writeTasksFile } from "@/lib/tasksFile";
 
 export const dynamic = "force-dynamic";
@@ -7,16 +8,6 @@ interface ResolveBody {
   decisionId: string;
   optionId: string;
   secret?: string;
-}
-
-function checkSecret(request: Request, body: ResolveBody): boolean {
-  const expected = process.env.DECISIONS_SECRET;
-  if (!expected) return true;
-  const provided =
-    request.headers.get("x-decisions-secret") ??
-    body.secret ??
-    "";
-  return provided === expected;
 }
 
 export async function POST(request: Request) {
@@ -31,17 +22,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "decisionId and optionId are required" }, { status: 400 });
   }
 
-  if (!checkSecret(request, body)) {
+  if (!checkDashboardSecret(request as import("next/server").NextRequest, body.secret)) {
     return NextResponse.json({ error: "Invalid decision secret" }, { status: 401 });
   }
 
   try {
-    const current = await readTasksFile();
+    const { data: current, sha } = await readTasksFile();
     const { data, decision } = resolveDecision(current, body.decisionId, body.optionId);
-    await writeTasksFile(
-      data,
-      `dashboard: decide ${body.decisionId} → ${body.optionId}`
-    );
+    await writeTasksFile(data, `dashboard: decide ${body.decisionId} → ${body.optionId}`, sha);
     return NextResponse.json({ ok: true, decision, meta: data.meta });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to resolve decision";
