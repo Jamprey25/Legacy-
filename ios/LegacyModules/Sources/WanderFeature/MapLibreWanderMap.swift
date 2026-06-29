@@ -143,7 +143,15 @@ struct MapLibreWanderMap: UIViewRepresentable {
         }
 
         func mapView(_ mapView: MLNMapView, didChange mode: MLNUserTrackingMode, animated: Bool) {
-            if mode == .none { onTrackingLost?() }
+            if mode == .none {
+                onTrackingLost?()
+            } else {
+                // setUserTrackingMode resets pitch to 0 — restore it after every re-lock.
+                let camera = mapView.camera
+                guard camera.pitch < WanderMapStyle.pitch - 1 else { return }
+                camera.pitch = WanderMapStyle.pitch
+                mapView.setCamera(camera, withDuration: 0.35, animationTimingFunction: nil)
+            }
         }
 
         func mapView(_ mapView: MLNMapView, didFailLoadingMapWithError error: Error) {
