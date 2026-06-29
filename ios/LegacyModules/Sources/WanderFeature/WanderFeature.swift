@@ -391,6 +391,8 @@ public struct WanderFeatureRootView: View {
     @AppStorage("legacyHasDismissedWalkHint") private var hasDismissedWalkHint = false
     @State private var discoveryToast: LegacyToast?
 
+    private var inRangeTeasers: [Teaser] { coordinator.teasers.filter(\.inRange) }
+
     private var showsDiscoveryHint: Bool {
         coordinator.teasers.isEmpty
             && showsWalkHint
@@ -491,9 +493,9 @@ public struct WanderFeatureRootView: View {
                 }
                 #endif
 
-                if !coordinator.teasers.isEmpty {
+                if !inRangeTeasers.isEmpty {
                     WanderTeaserTray(
-                        teasers: coordinator.teasers,
+                        teasers: inRangeTeasers,
                         isExpanded: $trayExpanded
                     ) { teaser in
                         Task { await coordinator.unlock(teaser: teaser) }
@@ -503,7 +505,7 @@ public struct WanderFeatureRootView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
-            .animation(.easeInOut(duration: 0.3), value: coordinator.teasers.isEmpty)
+            .animation(.easeInOut(duration: 0.3), value: inRangeTeasers.isEmpty)
             .overlay(alignment: .bottom) {
                 if let celebration = pinCelebration,
                    let message = celebration.overlayMessage,
@@ -752,8 +754,6 @@ private struct WanderTeaserTray: View {
     @Binding var isExpanded: Bool
     let onUnlock: (Teaser) -> Void
 
-    private var inRangeCount: Int { teasers.filter(\.inRange).count }
-
     var body: some View {
         VStack(spacing: 0) {
             Button {
@@ -766,7 +766,7 @@ private struct WanderTeaserTray: View {
                         .padding(.top, LegacySpacing.sm)
 
                     HStack(spacing: LegacySpacing.sm) {
-                        Image(systemName: inRangeCount > 0 ? "location.fill" : "sparkles")
+                        Image(systemName: "location.fill")
                             .foregroundStyle(LegacyColor.accent)
                         Text(summary)
                             .font(LegacyFont.headline)
@@ -809,10 +809,7 @@ private struct WanderTeaserTray: View {
     }
 
     private var summary: String {
-        if inRangeCount > 0 {
-            return inRangeCount == 1 ? "1 memory in range" : "\(inRangeCount) memories in range"
-        }
-        return teasers.count == 1 ? "1 memory nearby" : "\(teasers.count) memories nearby"
+        teasers.count == 1 ? "1 memory in range" : "\(teasers.count) memories in range"
     }
 }
 
@@ -832,18 +829,13 @@ private struct TeaserCard: View {
                     .font(LegacyFont.caption)
                     .foregroundStyle(LegacyColor.textSecondary)
                 HStack {
-                    Label(
-                        statusLabel,
-                        systemImage: statusIcon
-                    )
-                    .font(LegacyFont.caption)
-                    .foregroundStyle(teaser.inRange ? LegacyColor.accent : LegacyColor.textSecondary)
+                    Label("In range", systemImage: "location.fill")
+                        .font(LegacyFont.caption)
+                        .foregroundStyle(LegacyColor.accent)
                     Spacer()
-                    if teaser.inRange {
-                        Button("Open", action: onUnlock)
-                            .buttonStyle(.legacyPrimary)
-                            .frame(maxWidth: 100)
-                    }
+                    Button("Open", action: onUnlock)
+                        .buttonStyle(.legacyPrimary)
+                        .frame(maxWidth: 100)
                 }
             }
         }
@@ -855,29 +847,8 @@ private struct TeaserCard: View {
                 .stroke(LegacyColor.separator, lineWidth: 1)
         )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(teaser.ownerDisplay == "you" ? "Your memory" : teaser.ownerDisplay), dropped \(teaser.dropDate), \(warmthLabel)\(teaser.inRange ? ", in range to open" : "")")
-        .accessibilityHint(teaser.inRange ? "Double tap Open to unlock" : "Walk closer to unlock")
-    }
-
-    private var warmthLabel: String {
-        switch WarmthLevel(contractValue: teaser.warmth) {
-        case .inBubble: return "Very close"
-        case .approaching: return "Nearby"
-        case .coarse: return "In the area"
-        case .none: return "Nearby"
-        }
-    }
-
-    private var statusLabel: String {
-        if teaser.inRange { return "In range" }
-        if teaser.pinRevealed { return "On the map" }
-        return warmthLabel
-    }
-
-    private var statusIcon: String {
-        if teaser.inRange { return "location.fill" }
-        if teaser.pinRevealed { return "mappin.and.ellipse" }
-        return "sparkles"
+        .accessibilityLabel("\(teaser.ownerDisplay == "you" ? "Your memory" : teaser.ownerDisplay), dropped \(teaser.dropDate), in range to open")
+        .accessibilityHint("Double tap Open to unlock")
     }
 
     @ViewBuilder
