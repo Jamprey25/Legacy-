@@ -45,53 +45,29 @@ export interface MemoryRow {
 
 /** Insert a new memory. scan_status defaults to 'pending'. Returns the new row. */
 export async function createMemory(input: CreateMemoryInput): Promise<MemoryRow> {
-  const createdAt = input.createdAt?.toISOString();
-  const rows = createdAt
-    ? await sql`
-        INSERT INTO memories (
-          owner_id, lat, lng, geohash,
-          source, drop_method, media_type, media_key,
-          privacy_tier, teaser_text, caption,
-          discoverable_after, created_at
-        ) VALUES (
-          ${input.ownerId},
-          ${input.lat},
-          ${input.lng},
-          ${input.geohash},
-          ${input.source},
-          ${input.dropMethod},
-          ${input.mediaType},
-          ${input.mediaKey},
-          ${input.privacyTier ?? "private"},
-          ${input.teaserText ?? null},
-          ${input.caption ?? null},
-          ${input.discoverableAfter.toISOString()},
-          ${createdAt}
-        )
-        RETURNING *
-      `
-    : await sql`
-        INSERT INTO memories (
-          owner_id, lat, lng, geohash,
-          source, drop_method, media_type, media_key,
-          privacy_tier, teaser_text, caption,
-          discoverable_after
-        ) VALUES (
-          ${input.ownerId},
-          ${input.lat},
-          ${input.lng},
-          ${input.geohash},
-          ${input.source},
-          ${input.dropMethod},
-          ${input.mediaType},
-          ${input.mediaKey},
-          ${input.privacyTier ?? "private"},
-          ${input.teaserText ?? null},
-          ${input.caption ?? null},
-          ${input.discoverableAfter.toISOString()}
-        )
-        RETURNING *
-      `;
+  const rows = await sql`
+    INSERT INTO memories (
+      owner_id, lat, lng, geohash,
+      source, drop_method, media_type, media_key,
+      privacy_tier, teaser_text, caption,
+      discoverable_after, created_at
+    ) VALUES (
+      ${input.ownerId},
+      ${input.lat},
+      ${input.lng},
+      ${input.geohash},
+      ${input.source},
+      ${input.dropMethod},
+      ${input.mediaType},
+      ${input.mediaKey},
+      ${input.privacyTier ?? "private"},
+      ${input.teaserText ?? null},
+      ${input.caption ?? null},
+      ${input.discoverableAfter.toISOString()},
+      COALESCE(${input.createdAt?.toISOString() ?? null}::timestamptz, NOW())
+    )
+    RETURNING *
+  `;
   return rows[0] as unknown as MemoryRow;
 }
 
