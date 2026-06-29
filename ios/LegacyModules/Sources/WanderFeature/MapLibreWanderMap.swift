@@ -496,7 +496,7 @@ private final class OffsetMLNMapView: MLNMapView {
 }
 
 private final class LegacyUserPuckView: MLNUserLocationAnnotationView {
-    private let puckSize = CGSize(width: 40, height: 48)
+    private let puckSize = CGSize(width: 30, height: 36)
     private var built = false
 
     override init(reuseIdentifier: String?) {
@@ -516,43 +516,49 @@ private final class LegacyUserPuckView: MLNUserLocationAnnotationView {
         backgroundColor = .clear
 
         let accent = UIColor(LegacyColor.accent)
-        let cx = puckSize.width / 2
-        let cy = puckSize.height / 2
+        let w = puckSize.width
+        let h = puckSize.height
+        let r: CGFloat = 5
 
-        // Diffuse bloom behind the diamond
+        // Soft ambient bloom behind the arrow
         let bloom = CAShapeLayer()
-        let bloomRadius: CGFloat = 13
+        let bloomR: CGFloat = 12
+        let cx = w / 2, cy = h * 0.6
         bloom.path = UIBezierPath(
-            ovalIn: CGRect(
-                x: cx - bloomRadius, y: cy - bloomRadius,
-                width: bloomRadius * 2, height: bloomRadius * 2
-            )
+            ovalIn: CGRect(x: cx - bloomR, y: cy - bloomR, width: bloomR * 2, height: bloomR * 2)
         ).cgPath
-        bloom.fillColor = accent.withAlphaComponent(0.13).cgColor
+        bloom.fillColor = accent.withAlphaComponent(0.14).cgColor
         bloom.shadowColor = accent.cgColor
         bloom.shadowOpacity = 0.38
-        bloom.shadowRadius = 14
+        bloom.shadowRadius = 12
         bloom.shadowOffset = .zero
         layer.addSublayer(bloom)
 
-        // Slim vertical diamond — top point is forward (map heading-locks to you)
-        let halfW: CGFloat = 7
-        let halfH: CGFloat = 18
-        let diamond = UIBezierPath()
-        diamond.move(to: CGPoint(x: cx,          y: cy - halfH))
-        diamond.addLine(to: CGPoint(x: cx + halfW, y: cy))
-        diamond.addLine(to: CGPoint(x: cx,          y: cy + halfH))
-        diamond.addLine(to: CGPoint(x: cx - halfW, y: cy))
-        diamond.close()
+        // Chevron arrow with rounded bottom corners — top point stays sharp for direction
+        let path = UIBezierPath()
+        path.move(to: CGPoint(x: w / 2, y: 0))
+        path.addLine(to: CGPoint(x: w - r, y: h - r))
+        path.addQuadCurve(
+            to: CGPoint(x: w / 2 + r, y: h * 0.72),
+            controlPoint: CGPoint(x: w, y: h)
+        )
+        path.addLine(to: CGPoint(x: w / 2, y: h * 0.68))
+        path.addLine(to: CGPoint(x: w / 2 - r, y: h * 0.72))
+        path.addQuadCurve(
+            to: CGPoint(x: r, y: h - r),
+            controlPoint: CGPoint(x: 0, y: h)
+        )
+        path.close()
 
         let shape = CAShapeLayer()
-        shape.path = diamond.cgPath
+        shape.path = path.cgPath
         shape.fillColor = accent.cgColor
-        shape.strokeColor = UIColor.white.withAlphaComponent(0.55).cgColor
-        shape.lineWidth = 1
+        shape.strokeColor = UIColor.white.withAlphaComponent(0.60).cgColor
+        shape.lineWidth = 1.5
+        shape.lineJoin = .round
         shape.shadowColor = accent.cgColor
-        shape.shadowOpacity = 0.75
-        shape.shadowRadius = 6
+        shape.shadowOpacity = 0.70
+        shape.shadowRadius = 7
         shape.shadowOffset = .zero
         layer.addSublayer(shape)
     }
