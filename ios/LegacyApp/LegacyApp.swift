@@ -214,6 +214,7 @@ private struct MainTabView: View {
     @State private var importCoordinator: ImportCoordinator
     @State private var memoryLaneCoordinator: MemoryLaneCoordinator
     @State private var pinCelebration = PinDropCelebrationCoordinator()
+    @State private var mutedZonesCoordinator: MutedZonesCoordinator
     @State private var showBackgroundDiscoveryPrompt = false
     @State private var selectedTab: MainTab = .wander
     @AppStorage("legacyHasCompletedFirstDrop") private var hasCompletedFirstDrop = false
@@ -248,6 +249,7 @@ private struct MainTabView: View {
             apiClient: appModel.apiClient,
             locationEngine: locationEngine
         ))
+        _mutedZonesCoordinator = State(initialValue: MutedZonesCoordinator(apiClient: appModel.apiClient))
     }
 
     private var shouldOfferBackgroundDiscovery: Bool {
@@ -313,10 +315,8 @@ private struct MainTabView: View {
                 let memoryIDs = pins.map(\.memoryID)
                 if !memoryIDs.isEmpty {
                     memoryLaneCoordinator.highlightImportedMemories(memoryIDs)
-                    Task {
-                        await memoryLaneCoordinator.loadInitial()
-                        selectedTab = .lane
-                    }
+                    celebratePins(pins)
+                    Task { await memoryLaneCoordinator.loadInitial() }
                 }
             }
         }
@@ -344,6 +344,7 @@ private struct MainTabView: View {
                 _ = await APNsRegistrationService.requestAuthorizationAndRegister()
             }
             await APNsRegistrationService.uploadTokenIfNeeded(apiClient: appModel.apiClient)
+            await mutedZonesCoordinator.load()
             let pending = ProximityPushNotifications.consumePending()
             if pending.refresh {
                 if pending.openWander { selectedTab = .wander }
@@ -395,6 +396,7 @@ private struct MainTabView: View {
     private var wanderTab: some View {
         WanderFeatureRootView(
             coordinator: wanderCoordinator,
+            mutedZones: mutedZonesCoordinator.zones,
             pinCelebration: pinCelebration,
             onStartDropping: { selectedTab = .drop }
         )
@@ -431,6 +433,7 @@ private struct MainTabView: View {
     private var profileTab: some View {
         ProfileView(
             apiClient: appModel.apiClient,
+            mutedZonesCoordinator: mutedZonesCoordinator,
             onSignOut: { appModel.signOut() },
             statsLabel: memoryLaneCoordinator.statsLabel
         )

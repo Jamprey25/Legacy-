@@ -22,7 +22,6 @@ public final class BackgroundLocationCoordinator: NSObject {
 
     private let manager: CLLocationManager
     private var regionService: CLMonitorRegionService?
-    private var eventTask: Task<Void, Never>?
     private var isStartingMonitoring = false
 
     public override init() {
@@ -77,9 +76,12 @@ public final class BackgroundLocationCoordinator: NSObject {
     @available(iOS 17.0, *)
     private func ensureRegionService() async -> CLMonitorRegionService? {
         if let regionService { return regionService }
-        let service = await CLMonitorRegionService()
+        let service = await CLMonitorRegionService.shared()
+        await service.setOnSatisfied { [weak self] id in
+            await MainActor.run { self?.phase = .regionEntered(identifier: id) }
+            if let self { await self.onRegionEntered?(id) }
+        }
         regionService = service
-        startEventLoopIfNeeded()
         return service
     }
 
@@ -88,8 +90,6 @@ public final class BackgroundLocationCoordinator: NSObject {
         #if !targetEnvironment(simulator)
         manager.stopMonitoringVisits()
         #endif
-        eventTask?.cancel()
-        eventTask = nil
         phase = .idle
         armedRegionCount = 0
     }
@@ -127,24 +127,6 @@ public final class BackgroundLocationCoordinator: NSObject {
     func handleVisit(coordinate: CLLocationCoordinate2D, isArrival: Bool) async {
         phase = .visitTriggered(arrival: isArrival)
         await rotateRegions(around: coordinate)
-    }
-
-    @available(iOS 17.0, *)
-    private func startEventLoopIfNeeded() {
-        guard eventTask == nil, let regionService else { return }
-        let service = regionService
-        eventTask = Task { [weak self] in
-            for await event in await service.events() {
-                guard !Task.isCancelled else { break }
-                switch event {
-                case .satisfied(let id):
-                    await MainActor.run { self?.phase = .regionEntered(identifier: id) }
-                    if let self { await self.onRegionEntered?(id) }
-                case .unsatisfied:
-                    break
-                }
-            }
-        }
     }
 }
 

@@ -7,13 +7,20 @@ import UserNotifications
 #if os(iOS)
 
 public struct ProfileView: View {
-    public init(apiClient: LegacyAPIClient, onSignOut: @escaping () -> Void, statsLabel: String? = nil) {
+    public init(
+        apiClient: LegacyAPIClient,
+        mutedZonesCoordinator: MutedZonesCoordinator,
+        onSignOut: @escaping () -> Void,
+        statsLabel: String? = nil
+    ) {
         self.apiClient = apiClient
+        self.mutedZonesCoordinator = mutedZonesCoordinator
         self.onSignOut = onSignOut
         self.statsLabel = statsLabel
     }
 
     private let apiClient: LegacyAPIClient
+    @Bindable private var mutedZonesCoordinator: MutedZonesCoordinator
     private let onSignOut: () -> Void
     private let statsLabel: String?
 
@@ -26,8 +33,6 @@ public struct ProfileView: View {
     @State private var notificationStatus = "Checking…"
     @State private var showEditName = false
     @State private var displayName = AccountProfileStore.displayName
-    @State private var mutedZonesCoordinator: MutedZonesCoordinator?
-
     public var body: some View {
         NavigationStack {
             ZStack {
@@ -41,9 +46,7 @@ public struct ProfileView: View {
                             ProfileSectionLabel("Notifications")
                             ProfileActionCard {
                                 NavigationLink {
-                                    if let coordinator = mutedZonesCoordinator {
-                                        MutedZonesView(coordinator: coordinator)
-                                    }
+                                    MutedZonesView(coordinator: mutedZonesCoordinator)
                                 } label: {
                                     HStack(spacing: LegacySpacing.md) {
                                         Image(systemName: "bell.slash")
@@ -188,9 +191,6 @@ public struct ProfileView: View {
             }
             .task {
                 await refreshPermissionStatuses()
-                if mutedZonesCoordinator == nil {
-                    mutedZonesCoordinator = MutedZonesCoordinator(apiClient: apiClient)
-                }
             }
             .onChange(of: scenePhase) { _, phase in
                 // Re-read after the user may have toggled permissions in Settings.

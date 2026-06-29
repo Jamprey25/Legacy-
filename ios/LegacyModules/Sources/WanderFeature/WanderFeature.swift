@@ -81,7 +81,20 @@ public final class WanderCoordinator {
         return cachedOwnPins.filter { filter.contains($0.memoryID) }
     }
 
-    /// Ambient warmth intensity 0…1. No directional component.
+    /// Memory IDs eligible to unlock from the latest scan (`in_range: true`).
+    public var inRangeMemoryIDs: Set<String> {
+        Set(teasers.filter(\.inRange).map(\.memoryID))
+    }
+
+    public var inRangeCount: Int { inRangeMemoryIDs.count }
+
+    /// Warmth with a floor when the user is physically in range — the API band can lag one scan.
+    public var effectiveWarmthIntensity: Double {
+        guard inRangeCount > 0 else { return warmthIntensity }
+        return max(warmthIntensity, WarmthLevel.inBubble.intensity)
+    }
+
+    private var hadInRangeMemories = false
     public var warmthIntensity: Double = 0
 
     /// Latest user fix for map display only — never used to infer teaser direction.
@@ -154,6 +167,7 @@ public final class WanderCoordinator {
             }
 
             applyWarmth(from: teasers)
+            notifyInRangeDiscoveryIfNeeded()
 
             locationEngine.recordScan(
                 at: CLLocation(latitude: fix.lat, longitude: fix.lng)
@@ -317,6 +331,7 @@ public final class WanderCoordinator {
             WanderScanCache.save(teasers: result.teasers)
         }
         applyWarmth(from: result.teasers)
+        notifyInRangeDiscoveryIfNeeded()
         if result.hasInRangeMemory {
             statusMessage = "You're near a memory — open it when you're ready."
         }
@@ -341,20 +356,31 @@ public final class WanderCoordinator {
         }
         CoarseZoneCache.merge(prefixes: records)
     }
+
+    private func notifyInRangeDiscoveryIfNeeded() {
+        let inRange = inRangeCount > 0
+        if inRange, !hadInRangeMemories {
+            LegacyHaptics.selection()
+        }
+        hadInRangeMemories = inRange
+    }
 }
 
 public struct WanderFeatureRootView: View {
     public init(
         coordinator: WanderCoordinator,
+        mutedZones: [MutedZone] = [],
         pinCelebration: PinDropCelebrationCoordinator? = nil,
         onStartDropping: (() -> Void)? = nil
     ) {
         self.coordinator = coordinator
+        self.mutedZones = mutedZones
         self.pinCelebration = pinCelebration
         self.onStartDropping = onStartDropping
     }
 
     @Bindable private var coordinator: WanderCoordinator
+    private let mutedZones: [MutedZone]
     private var pinCelebration: PinDropCelebrationCoordinator?
     private let onStartDropping: (() -> Void)?
     @State private var showsWalkHint = true
@@ -385,7 +411,9 @@ public struct WanderFeatureRootView: View {
                     coordinate: coordinate,
                     ownPins: coordinator.mapOwnPins,
                     revealedOthersPins: coordinator.revealedOthersPins,
-                    zoneGlows: coordinator.zoneGlows
+                    zoneGlows: coordinator.zoneGlows,
+                    mutedZones: mutedZones,
+                    inRangeMemoryIDs: coordinator.inRangeMemoryIDs
                 )
                 .ignoresSafeArea()
             } else {
@@ -394,19 +422,25 @@ public struct WanderFeatureRootView: View {
             }
             #endif
 
-            LegacyColor.background
-                .opacity(backgroundOverlayOpacity)
+            WanderMapAtmosphere(showsWalkHint: showsWalkHint)
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
 
             VStack(spacing: 0) {
                 WanderHeaderBar(
-                    warmthLevel: WarmthLevel(intensity: coordinator.warmthIntensity),
+                    warmthLevel: WarmthLevel(intensity: coordinator.effectiveWarmthIntensity),
                     isScanning: coordinator.isScanning,
                     showsDiscoveryHint: showsDiscoveryHint
                 )
                 .padding(.horizontal, LegacySpacing.lg)
                 .padding(.top, LegacySpacing.sm)
+
+                if coordinator.inRangeCount > 0, !coordinator.isShowingUnlockedMedia {
+                    InRangePresenceBanner(count: coordinator.inRangeCount)
+                        .padding(.horizontal, LegacySpacing.lg)
+                        .padding(.top, LegacySpacing.xs)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
 
                 if showsDiscoveryHint {
                     WanderEmptyState(
@@ -484,10 +518,11 @@ public struct WanderFeatureRootView: View {
             }
             .animation(.easeInOut(duration: 0.35), value: pinCelebration?.isActive ?? false)
 
-            WarmthCueOverlay(intensity: coordinator.warmthIntensity)
+            WarmthCueOverlay(intensity: coordinator.effectiveWarmthIntensity)
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
         }
+        .animation(.easeInOut(duration: 0.35), value: coordinator.inRangeCount)
         .animation(.easeOut(duration: 0.45), value: showsWalkHint)
         .task(id: coordinator.teasers.isEmpty) {
             guard coordinator.teasers.isEmpty, !hasDismissedWalkHint else {
@@ -516,6 +551,11 @@ public struct WanderFeatureRootView: View {
                 Task { await coordinator.scanIfNeeded(force: true) }
             }
         }
+        .onChange(of: coordinator.inRangeCount) { wasInRange, isInRange in
+            if wasInRange == 0, isInRange > 0 {
+                withAnimation(.easeInOut(duration: 0.28)) { trayExpanded = true }
+            }
+        }
         .legacyToast($discoveryToast)
         .sheet(isPresented: Binding(
             get: { coordinator.isShowingUnlockedMedia },
@@ -533,11 +573,41 @@ public struct WanderFeatureRootView: View {
         #endif
     }
 
-    private var backgroundOverlayOpacity: Double {
-        // Map-first when memories are nearby: don't dim the map — the tray carries
-        // its own surface. Only dim heavily for the walk-to-discover hint.
-        if !coordinator.teasers.isEmpty { return 0 }
-        return showsWalkHint ? 0.94 : 0.35
+}
+
+/// Edge vignette + warm ground glow — lets the map breathe instead of a flat dark wash.
+private struct WanderMapAtmosphere: View {
+    let showsWalkHint: Bool
+
+    var body: some View {
+        GeometryReader { proxy in
+            let maxDim = max(proxy.size.width, proxy.size.height)
+            ZStack {
+                if showsWalkHint {
+                    LegacyColor.background.opacity(0.94)
+                } else {
+                    RadialGradient(
+                        colors: [
+                            .clear,
+                            LegacyColor.background.opacity(0.18),
+                            LegacyColor.background.opacity(0.52),
+                        ],
+                        center: .center,
+                        startRadius: maxDim * 0.22,
+                        endRadius: maxDim * 0.78
+                    )
+                    LinearGradient(
+                        colors: [
+                            LegacyColor.background.opacity(0.28),
+                            .clear,
+                            LegacyColor.accent.opacity(0.07),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -574,6 +644,48 @@ private struct WanderHeaderBar: View {
         case .approaching: return "Getting warmer"
         case .inBubble: return "Very close"
         }
+    }
+}
+
+/// Shown when `/scan` reports `in_range` — the pin may sit under the user puck, so the map
+/// needs an explicit “you’re here” signal beyond the bottom teaser tray.
+private struct InRangePresenceBanner: View {
+    let count: Int
+    @State private var glow = false
+
+    var body: some View {
+        HStack(spacing: LegacySpacing.sm) {
+            Image(systemName: "location.circle.fill")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(LegacyColor.accent)
+                .symbolEffect(.pulse, options: .repeating, value: glow)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(headline)
+                    .font(LegacyFont.headline)
+                    .foregroundStyle(LegacyColor.textPrimary)
+                Text("Tap Open below — the pin is right under you.")
+                    .font(LegacyFont.caption)
+                    .foregroundStyle(LegacyColor.textSecondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, LegacySpacing.md)
+        .padding(.vertical, LegacySpacing.sm)
+        .background(LegacyColor.surface.opacity(0.94))
+        .clipShape(RoundedRectangle(cornerRadius: LegacyRadius.md))
+        .overlay(
+            RoundedRectangle(cornerRadius: LegacyRadius.md)
+                .stroke(LegacyColor.accent.opacity(glow ? 0.55 : 0.25), lineWidth: 1.5)
+        )
+        .shadow(color: LegacyColor.accent.opacity(0.2), radius: glow ? 14 : 6)
+        .onAppear { glow = true }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(headline)
+        .accessibilityHint("Expand nearby memories and tap Open to unlock.")
+    }
+
+    private var headline: String {
+        count == 1 ? "You're standing on a memory" : "\(count) memories underfoot"
     }
 }
 
