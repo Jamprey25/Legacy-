@@ -3,19 +3,49 @@ import CoreLocation
 import Foundation
 
 /// iOS 17+ `CLMonitor` wrapper for circular geographic conditions.
+///
+/// **One process-wide instance only.** Core Location allows a single open `CLMonitor`
+/// per name; concurrent or repeated `CLMonitor("legacyRegions")` calls abort with
+/// `NSInternalInconsistencyException` ("already in use"). Use `shared()` everywhere.
 @available(iOS 17.0, *)
 public actor CLMonitorRegionService {
-    public enum Event: Sendable {
-        case satisfied(identifier: String)
-        case unsatisfied(identifier: String)
+    /// Serializes first-time monitor creation across concurrent callers.
+    private actor SharedAccess {
+        static let shared = SharedAccess()
+
+        private var cached: CLMonitorRegionService?
+        private var pending: Task<CLMonitorRegionService, Never>?
+
+        func instance() async -> CLMonitorRegionService {
+            if let cached { return cached }
+            if let pending { return await pending.value }
+            let task = Task { await CLMonitorRegionService() }
+            pending = task
+            let service = await task.value
+            cached = service
+            pending = nil
+            return service
+        }
+    }
+
+    public static func shared() async -> CLMonitorRegionService {
+        await SharedAccess.shared.instance()
     }
 
     private let monitor: CLMonitor
     private var armedIDs: Set<String> = []
+    private var eventsTask: Task<Void, Never>?
+    private var onSatisfied: (@Sendable (String) async -> Void)?
 
     /// Monitor names must be alphanumeric (WWDC23 — no `.`, `:`, or `-`).
-    public init(name: String = "legacyRegions") async {
+    private init(name: String = "legacyRegions") async {
         monitor = await CLMonitor(name)
+        startEventsIfNeeded()
+    }
+
+    /// Wire region-entry handling. Safe to call whenever the coordinator (re)appears.
+    public func setOnSatisfied(_ handler: (@Sendable (String) async -> Void)?) {
+        onSatisfied = handler
     }
 
     public func syncRegions(_ slots: [RegionSlot]) async {
@@ -38,27 +68,18 @@ public actor CLMonitorRegionService {
         armedIDs = desired
     }
 
-    public func events() -> AsyncStream<Event> {
-        AsyncStream { continuation in
-            let task = Task {
-                do {
-                    for try await event in await monitor.events {
-                        switch event.state {
-                        case .satisfied:
-                            continuation.yield(.satisfied(identifier: event.identifier))
-                        case .unsatisfied:
-                            continuation.yield(.unsatisfied(identifier: event.identifier))
-                        default:
-                            break
-                        }
+    private func startEventsIfNeeded() {
+        guard eventsTask == nil else { return }
+        eventsTask = Task {
+            do {
+                for try await event in await monitor.events {
+                    guard !Task.isCancelled else { break }
+                    if event.state == .satisfied {
+                        await onSatisfied?(event.identifier)
                     }
-                    continuation.finish()
-                } catch {
-                    continuation.finish()
                 }
-            }
-            continuation.onTermination = { _ in
-                task.cancel()
+            } catch {
+                // Monitor cancelled or torn down.
             }
         }
     }
