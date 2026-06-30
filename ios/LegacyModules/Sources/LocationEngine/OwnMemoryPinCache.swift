@@ -53,6 +53,29 @@ public enum OwnMemoryPinCache {
 
     public static func remove(memoryID: String) {
         let pins = load().filter { $0.memoryID != memoryID }
+        persist(pins)
+    }
+
+    /// Reconcile the local cache against the authoritative owner list from the server.
+    ///
+    /// The map must show *every* own memory, not just the ones dropped/unlocked on this
+    /// device — so a fresh install or new sign-in seeds from here. Server coordinates win
+    /// (authoritative). A pin the server no longer returns is dropped (deleted elsewhere),
+    /// *unless* it was cached within `graceInterval` — those are just-dropped pins the list
+    /// endpoint may not have caught up to yet, so we keep them to avoid a flicker.
+    public static func reconcile(serverPins: [CachedOwnPin], graceInterval: TimeInterval = 600) {
+        let now = Date()
+        let serverIDs = Set(serverPins.map(\.memoryID))
+        var result = serverPins
+        for pin in load() where !serverIDs.contains(pin.memoryID) {
+            if now.timeIntervalSince(pin.cachedAt) < graceInterval {
+                result.append(pin)
+            }
+        }
+        persist(Array(result.prefix(maxPins)))
+    }
+
+    private static func persist(_ pins: [CachedOwnPin]) {
         guard let data = try? JSONEncoder().encode(pins) else { return }
         UserDefaults.standard.set(data, forKey: storageKey)
     }

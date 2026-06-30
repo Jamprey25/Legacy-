@@ -72,6 +72,41 @@ public final class WanderCoordinator {
         cachedOwnPins = OwnMemoryPinCache.load()
     }
 
+    /// Seed the map from the authoritative owner list so *every* memory is always visible —
+    /// even on a fresh install or new device, where the local drop/unlock cache is empty.
+    /// Owner coordinates are returned by `GET /v1/memories`; DEC-15 governs others' pins only.
+    public func hydrateOwnPins() async {
+        var collected: [CachedOwnPin] = []
+        var cursor: String?
+        var pagesRemaining = 20  // defensive cap (~1000 memories at limit 50)
+        do {
+            repeat {
+                let response = try await apiClient.listMemories(cursor: cursor)
+                for item in response.memories {
+                    guard let lat = item.lat, let lng = item.lng else { continue }
+                    collected.append(
+                        CachedOwnPin(
+                            memoryID: item.memoryID,
+                            lat: lat,
+                            lng: lng,
+                            dropDate: item.dropDate,
+                            thumbnailURL: item.thumbnailURL,
+                            cachedAt: Date()
+                        )
+                    )
+                }
+                cursor = response.nextCursor
+                pagesRemaining -= 1
+            } while cursor != nil && pagesRemaining > 0
+        } catch {
+            // Offline or transient failure — keep whatever is already cached so the map
+            // still shows previously-seen pins. The next appear retries.
+            return
+        }
+        OwnMemoryPinCache.reconcile(serverPins: collected)
+        cachedOwnPins = OwnMemoryPinCache.load()
+    }
+
     public func setMapPinFilter(_ ids: Set<String>?) {
         mapPinFilter = ids
     }
@@ -564,6 +599,14 @@ public struct WanderFeatureRootView: View {
         }
         .task {
             await coordinator.scanIfNeeded(force: true)
+        }
+        .task {
+            // Belt-and-braces: if a prior pin-drop celebration was interrupted, its filter
+            // could still be hiding pins. Clear it unless a celebration is currently running.
+            if !(pinCelebration?.isActive ?? false) {
+                coordinator.setMapPinFilter(nil)
+            }
+            await coordinator.hydrateOwnPins()
         }
         .task(id: isFollowingUser) {
             guard !isFollowingUser else { return }

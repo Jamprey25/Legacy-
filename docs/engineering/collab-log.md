@@ -1895,6 +1895,28 @@ Verification:
 - Added `validateCoordinates(lat, lng)` in `backend/src/lib/locationInput.ts` — lat/lng range only, no accuracy.
 - `backend/src/routes/mutedZones.ts` now uses `validateCoordinates` instead of `validateLocationInput`.
 - `radius_m` validation unchanged: integer 100–5000.
+
+---
+
+## [backend → all] 2026-06-30 — Wander map user puck: color + zoom-stability fix
+
+**User report:** Puck looked identical to memory beacons; scaled/drifted when zooming.
+
+**Shipped (ios/LegacyModules/Sources/WanderFeature/MapLibreWanderMap.swift):**
+- **Color separation:** User puck now renders in **cool location-blue** (not warm amber like memory beacons). Blue is the universal "you are here" cue; memory pins stay amber. Strong hue separation fixes readability at a glance.
+- **Zoom stability (two layers):**
+  1. **Per-frame transform guard** — On pitched maps MapLibre re-applies a 3D perspective transform to annotation layers every frame, and `scalesWithViewingDistance = false` wasn't holding for the user-location view. A `CADisplayLink` on `LegacyUserPuckView` now re-asserts the flag and flattens `layer.transform` to identity every frame (a one-shot reset in `update()` lost a race with MapLibre and jittered).
+  2. **Zoom→pitch ramp** — The remaining glitch on far zoom-out was the real root cause: at 58° pitch a zoomed-out coordinate projects near the horizon, where tiny camera deltas swing its screen position wildly (the puck "swims"). `WanderMapStyle.pitch(forZoom:)` ramps tilt from full 58° at street level (zoom ≥ 15.0) to flat top-down (zoom ≤ 12.5). Applied live in `mapViewRegionIsChanging` (threshold-guarded) and on tracking re-lock. Same pattern as Google Maps / PoGo at region scale.
+
+**Code changes:**
+- `LegacyUserPuckArt.image()` — accent colors swapped from amber gradient to cool blue (RGB 0.34/0.66/1.0 → 0.13/0.40/0.92).
+- `LegacyUserPuckView` — `CADisplayLink` transform guard (`startTransformGuard` / `assertIdentityTransform`, invalidated in `deinit`).
+- `WanderMapStyle.pitch(forZoom:)` + `fullPitchZoom`/`flatPitchZoom` constants.
+- `mapViewRegionIsChanging` (new delegate method) + zoom-aware re-lock pitch in `didChange mode`.
+
+**Caveat:** Verified by code inspection, not on device (no iOS simulator this session). Ramp thresholds (15.0 / 12.5) are first-guess — Joseph may want to tune where flattening kicks in. If `mapViewRegionIsChanging` fights the pinch gesture on device, fall back to applying pitch only in `regionDidChangeAnimated` (settles after gesture, slightly less smooth).
+
+**Cursor:** No changes needed — this is a visual fix to the map render layer. Pass to Joseph for device QA if needed.
 - Tests added in `backend/test/locationInput.test.ts`.
 
 **No iOS change needed** — `CreateMutedZoneRequest` and `MutedZonesView` slider were already correct.
@@ -1905,3 +1927,69 @@ Verification:
 
 Verification:
 - `npm run typecheck && npm test test/locationInput.test.ts` in `backend/` → passing.
+
+---
+
+## [ios → all] 2026-06-29 — Collab-log Cursor backlog triage + background-upload hook
+
+**Session start:** Read collab-log + `tasks.json`. All open `decisions[]` threads with `needs: "ios"` are already resolved with iOS replies.
+
+**Shipped (iOS):**
+- **`LegacyApp.swift`** — added SwiftUI `.backgroundTask(.urlSession("app.legacy.ios.upload"))` on `WindowGroup` (complements existing UIKit `handleEventsForBackgroundURLSession` in `LegacyAppDelegate`). Closes the `import-background-upload-followup` note-for-Cursor item.
+- **Wander map art pass** (prior in session): Fiord dark base + `applyLegacyTheme` warm tint, `WanderMapAtmosphere` vignette (replaces flat 35% wash), custom memory beacon pins. Blue user puck from backend 2026-06-30 entry preserved (hue separation from amber memory pins).
+
+**Collab-log Cursor items — status:**
+
+| Item | Status |
+|------|--------|
+| Background upload scene hook | ✅ Done (UIKit + SwiftUI) |
+| Multi-photo gallery (`memory-lane-gallery-multimedia`) | ✅ Done (Claude) |
+| Muted zones tap-to-place | ✅ Done (iOS 2026-06-24) |
+| Map puck color + zoom stability | ✅ Done (backend 2026-06-30); no Cursor action |
+| Import UI polish / pin animation / scan perf | ✅ Done (iOS 2026-06-23) |
+| Summons preview UI | ✅ Wired (`RecipientSummonSection` + APIClient); needs Joseph QA + backend migration 0014 |
+| 1280px compression verify | ⏳ Joseph device QA after blob store purge |
+| CLMonitor lazy-init crash fix | ⏳ Joseph on-device: launch with Always permission + first background region rotation (iOS 26) |
+| Widget Extension target + App Group | ⏳ Manual Xcode step (`LegacyWidget/OnThisDayWidget.swift` exists) |
+| TestFlight screenshots (`qa-testflight-screenshots`) | ⏳ Joseph |
+| Optional: muted-zone pulse on create | 🔲 Not started (low priority polish) |
+
+**Blocked on Joseph:** device QA for compression, CLMonitor, muted-zone push suppression (`qa-mt-muted-zones-notification-suppression`), unlock ceremony QA.
+
+**Process:** Recommend `git pull` before next iOS session — shared tree has backend + Claude commits on main.
+
+---
+
+## [backend → ios] 2026-06-30 — In-app path to "Always" location (Profile row)
+
+**Why:** Joseph reported the first-launch location prompt never offers "Always Allow." That's expected iOS 13+ behavior — the first prompt is When-In-Use only; "Always" requires a second `requestAlwaysAuthorization()` call or a manual Settings change. The only in-app upgrade path was `BackgroundDiscoveryPermissionSheet`, gated behind `hasCompletedFirstDrop` **and** `hadWhenInUseAtLaunch` (a later session) — so users couldn't reach Always without quitting/relaunching or hand-editing Settings.
+
+**Shipped (touched iOS — flagging since Cursor owns `ios/**`):**
+- **`AuthFeature/ProfileView.swift`** — the **Profile → App permissions → Location** row was a status-only link that just deep-linked to Settings. Upgraded it:
+  - When status is `.authorizedWhenInUse` / `.notDetermined` → fires `requestAlwaysAuthorization()` (native in-app "Change to Always Allow" prompt).
+  - When `.denied` / `.restricted` / `.authorizedAlways` → unchanged (opens Settings).
+  - Added a retained `LocationPermissionRequester` (NSObject + CLLocationManagerDelegate) held as `@State` — the manager must outlive the call for the prompt to present. Status text refreshes via its `onChange` callback.
+  - Subtitle now hints the action ("While using — tap to enable Always").
+- Did **not** touch the deferred upsell gates in `LegacyApp.swift` — left the contextual sheet as-is.
+
+**Verification:** `xcodebuild build -scheme AuthFeature` for iOS Simulator → **BUILD SUCCEEDED**. Not yet exercised on-device (prompt presentation + status refresh).
+
+**iOS/Cursor action:** Sanity-check on a device — tap Profile → Location while in When-In-Use and confirm the native Always prompt appears and the subtitle updates after granting. Heads-up for shared-tree: `git pull` before next iOS session.
+
+---
+
+## [backend → ios] 2026-06-30 — Own memories now always visible on Wander map (cache seeded from server)
+
+**Why:** Joseph reported his own memories should *always* be visible to him on the map. They weren't: the Wander map draws own-pins only from `OwnMemoryPinCache` (local UserDefaults), which is filled solely by **local** actions on the current device — drop (`DropCoordinator`), import (`ImportCoordinator`), or unlocking your own pin while physically in range (`WanderCoordinator.unlock`). So after a reinstall / new device / sign-in elsewhere, or for any memory not created on this phone, pins vanished from the map until the user walked to each one and re-unlocked it. Nothing ever seeded the map from the authoritative owner list.
+
+**Key finding — backend already exposes what's needed:** `GET /v1/memories` already returns owner `lat`/`lng` (`backend/src/routes/memories.ts:98`), and the iOS `MemoryLaneItem` already decodes them. No backend/contract change required — DEC-15 governs *others'* coordinates only; the owner is always allowed their own.
+
+**Shipped (touched iOS — flagging since Cursor owns `ios/**`):**
+- **`LocationEngine/OwnMemoryPinCache.swift`** — added `reconcile(serverPins:graceInterval:)`: server list is authoritative (coords win); prunes pins the server no longer returns, but keeps any cached within the last 10 min (just-dropped pins the list may not reflect yet) to avoid flicker. Refactored `remove` onto a shared `persist` helper (behavior unchanged).
+- **`WanderFeature/WanderFeature.swift`** — added `WanderCoordinator.hydrateOwnPins()`: paginates `listMemories` (20-page safety cap), maps every item with coords into `CachedOwnPin`, calls `reconcile`, refreshes `cachedOwnPins`. Fails closed on offline/transient errors (keeps existing cache). Wired into the root view's `.task` on appear.
+- **`WanderFeature/WanderFeature.swift`** (same `.task`) — clears a stale `mapPinFilter` on appear when no celebration is active.
+- **`WanderFeature/PinDropCelebration.swift`** — `celebrate(...)` now resets the pin filter / phase via `defer`, so an interrupted reveal can't leave own pins filtered out (previously only reset on the normal happy path).
+
+**Verification:** `xcodebuild build -scheme WanderFeature` (iOS 26.5 sim) → **BUILD SUCCEEDED**. `swift test --filter OwnMemoryPinCacheTests` → 2/2 passed. Not yet exercised on-device.
+
+**iOS/Cursor action:** Sanity-check on device — fresh install / signed-in account with existing memories should show all own pins on Wander without walking to them. New unit test for `reconcile` (prune + grace window) would be worth adding. Heads-up for shared tree: `git pull` before next iOS session.

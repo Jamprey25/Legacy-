@@ -68,6 +68,14 @@ public final class PinDropCelebrationCoordinator {
     public func celebrate(pins newPins: [CachedOwnPin], wander: WanderCoordinator) async {
         guard !newPins.isEmpty else { return }
 
+        // However this exits — normal finish, early return, or task cancellation — restore the
+        // full-pin view. Otherwise an interrupted reveal could leave own pins filtered out.
+        defer {
+            wander.setMapPinFilter(nil)
+            phase = .idle
+            pins = []
+        }
+
         pins = newPins
         for pin in newPins {
             OwnMemoryPinCache.save(pin)
@@ -99,9 +107,7 @@ public final class PinDropCelebrationCoordinator {
         }
 
         try? await Task.sleep(for: .milliseconds(900))
-        wander.setMapPinFilter(nil)
-        phase = .idle
-        pins = []
+        // Final reset handled by `defer` above.
     }
 
     public func cancel() {
