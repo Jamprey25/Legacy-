@@ -332,7 +332,8 @@ extension LegacyAPIClient {
     /// A client wired to offline stubs — one-liner for SwiftUI previews and tests.
     public static func stubbed(
         transport: StubHTTPTransport = .happyPath(),
-        token: String? = "stub-token"
+        token: String? = "stub-token",
+        onSessionInvalidated: (@Sendable () -> Void)? = nil
     ) -> LegacyAPIClient {
         LegacyAPIClient(
             configuration: LegacyAPIConfiguration(
@@ -341,7 +342,8 @@ extension LegacyAPIClient {
                 deviceID: "preview-device"
             ),
             transport: transport,
-            tokenProvider: { token }
+            tokenProvider: { token },
+            onSessionInvalidated: onSessionInvalidated
         )
     }
 }

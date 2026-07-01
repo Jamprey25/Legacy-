@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { checkDashboardSecret } from "@/lib/dashboardAuth";
+import { authorizeDashboardWrite } from "@/lib/dashboardWriteGuard";
 import { readTasksFile, resolveDecision, writeTasksFile } from "@/lib/tasksFile";
 
 export const dynamic = "force-dynamic";
@@ -22,8 +22,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "decisionId and optionId are required" }, { status: 400 });
   }
 
-  if (!checkDashboardSecret(request as import("next/server").NextRequest, body.secret)) {
-    return NextResponse.json({ error: "Invalid decision secret" }, { status: 401 });
+  const auth = authorizeDashboardWrite(request as import("next/server").NextRequest, body.secret);
+  if (!auth.ok) {
+    return NextResponse.json(
+      { error: auth.error, retry_after_s: auth.retryAfterS },
+      { status: auth.status },
+    );
   }
 
   try {

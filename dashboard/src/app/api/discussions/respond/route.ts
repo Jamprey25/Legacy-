@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { checkDashboardSecret } from "@/lib/dashboardAuth";
+import {
+  isValidThreadAuthor,
+  replyTextTooLarge,
+} from "@/lib/dashboardAuth";
+import { authorizeDashboardWrite } from "@/lib/dashboardWriteGuard";
 import { readTasksFile, addResponse, resolveDiscussion, writeTasksFile } from "@/lib/tasksFile";
 import type { ThreadResponse } from "@/app/types";
 
@@ -25,15 +29,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "itemId, author, and text are required" }, { status: 400 });
   }
 
-  if (!checkDashboardSecret(request as import("next/server").NextRequest, body.secret)) {
-    return NextResponse.json({ error: "Invalid secret" }, { status: 401 });
+  if (!isValidThreadAuthor(body.author)) {
+    return NextResponse.json({ error: "Invalid author" }, { status: 400 });
+  }
+
+  if (replyTextTooLarge(body.text)) {
+    return NextResponse.json({ error: "Reply text too large" }, { status: 413 });
+  }
+
+  const auth = authorizeDashboardWrite(request as import("next/server").NextRequest, body.secret);
+  if (!auth.ok) {
+    return NextResponse.json(
+      { error: auth.error, retry_after_s: auth.retryAfterS },
+      { status: auth.status },
+    );
   }
 
   try {
     const { data: current, sha } = await readTasksFile();
 
     const response: ThreadResponse = {
-      author: body.author as ThreadResponse["author"],
+      author: body.author,
       text: body.text,
       date: new Date().toISOString().slice(0, 10),
     };

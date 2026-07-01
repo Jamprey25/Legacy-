@@ -47,12 +47,9 @@ public final class AppAttestCoordinator {
         }
     }
 
-    /// Base64 CBOR assertion for sensitive requests; `nil` on simulator / unsupported hardware.
-    public func currentAssertionBase64() async -> String? {
+    /// Base64 CBOR assertion + challenge for sensitive requests; `nil` on simulator / unsupported hardware.
+    public func currentAssertion() async -> AppAttestAssertionPayload? {
         guard isSupported, apiClient != nil else { return nil }
-        // Opportunistically self-heal registration before protected requests.
-        // This prevents first-request failures when auth succeeded but register
-        // has not completed yet (e.g. fresh install, keychain reset).
         if !AppAttestKeyStore.isRegistered {
             await ensureRegistered()
         }
@@ -64,10 +61,18 @@ public final class AppAttestCoordinator {
             let challenge = try await apiClient.fetchAttestChallenge()
             let clientDataHash = try AppAttestChallenge.clientDataHash(for: challenge.challengeToken)
             let assertion = try await generateAssertion(keyId: keyId, clientDataHash: clientDataHash)
-            return assertion.base64EncodedString()
+            return AppAttestAssertionPayload(
+                attestation: assertion.base64EncodedString(),
+                challengeToken: challenge.challengeToken
+            )
         } catch {
             return nil
         }
+    }
+
+    /// Legacy helper — prefer `currentAssertion()` so the server receives `challenge_token`.
+    public func currentAssertionBase64() async -> String? {
+        await currentAssertion()?.attestation
     }
 
     private func existingOrNewKeyId() async throws -> String {

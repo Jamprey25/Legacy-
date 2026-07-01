@@ -18,7 +18,7 @@ public final class AuthCoordinator {
 
     public enum PendingAuth: Equatable {
         case email
-        case social(provider: String, identityToken: String)
+        case social(provider: String)
     }
 
     public private(set) var route: Route = .welcome
@@ -129,12 +129,19 @@ public final class AuthCoordinator {
         switch pending {
         case .email:
             await verifyEmailCode()
-        case let .social(provider, identityToken):
+        case let .social(provider):
+            guard let identityToken = try? PendingOAuthTokenStore.load(provider: provider) else {
+                errorMessage = "Sign-in expired. Please try again."
+                PendingOAuthTokenStore.clear()
+                route = .welcome
+                return
+            }
             await exchangeSocial(
                 provider: provider,
                 identityToken: identityToken,
                 dob: AuthFormatting.dobString(from: dob)
             )
+            PendingOAuthTokenStore.clear()
         }
     }
 
@@ -248,6 +255,7 @@ public final class AuthCoordinator {
         otpCode = ""
         cooldownTask?.cancel()
         resendCooldown = 0
+        PendingOAuthTokenStore.clear()
         route = .welcome
     }
 
@@ -268,8 +276,13 @@ public final class AuthCoordinator {
                 )
             )
             try await finishAuth(response)
-        } catch let LegacyAPIError.invalidRequest(code, message) where code == "dob_required" {
-            route = .dobGate(pending: .social(provider: provider, identityToken: identityToken))
+        } catch let LegacyAPIError.invalidRequest(code, _) where code == "dob_required" {
+            do {
+                try PendingOAuthTokenStore.save(provider: provider, identityToken: identityToken)
+                route = .dobGate(pending: .social(provider: provider))
+            } catch {
+                errorMessage = "Could not secure your sign-in. Please try again."
+            }
         } catch let LegacyAPIError.forbidden(code, _) where code == "age_restricted" {
             route = .ageRestricted
         } catch LegacyAPIError.unauthorized where provider == "google" {
@@ -281,6 +294,7 @@ public final class AuthCoordinator {
     }
 
     private func finishAuth(_ response: AuthResponse) async throws {
+        PendingOAuthTokenStore.clear()
         try KeychainSessionStore.save(token: response.sessionToken)
         let savedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
         AccountProfileStore.save(

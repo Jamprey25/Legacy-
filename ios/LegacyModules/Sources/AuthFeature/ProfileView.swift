@@ -31,6 +31,7 @@ public struct ProfileView: View {
     @State private var exportShareURL: URL?
     @State private var locationStatus = "Checking…"
     @State private var notificationStatus = "Checking…"
+    @State private var locationPermission = LocationPermissionRequester()
     @State private var showEditName = false
     @State private var displayName = AccountProfileStore.displayName
     public var body: some View {
@@ -96,7 +97,7 @@ public struct ProfileView: View {
                                     title: "Location",
                                     subtitle: locationStatus,
                                     icon: "location",
-                                    action: openSystemSettings
+                                    action: handleLocationTap
                                 )
                                 ProfileActionRow(
                                     title: "Notifications",
@@ -205,8 +206,24 @@ public struct ProfileView: View {
         UIApplication.shared.open(url)
     }
 
+    /// Location row behavior. iOS never offers "Always" on the first prompt; the in-app
+    /// `requestAlwaysAuthorization()` upgrade is a one-shot the system shows at most once
+    /// per install (and may silently defer), so it can't be relied on. We try it exactly
+    /// once from `.notDetermined`, and for every other state — including When-In-Use, where
+    /// the one-shot is typically already spent — deep-link to Settings, which always works.
+    private func handleLocationTap() {
+        if locationPermission.status == .notDetermined, !locationPermission.hasRequestedAlways {
+            locationPermission.requestAlways()
+        } else {
+            openSystemSettings()
+        }
+    }
+
     private func refreshPermissionStatuses() async {
-        locationStatus = Self.locationStatusText(CLLocationManager().authorizationStatus)
+        locationPermission.onChange = { status in
+            locationStatus = Self.locationStatusText(status)
+        }
+        locationStatus = Self.locationStatusText(locationPermission.status)
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         notificationStatus = Self.notificationStatusText(settings.authorizationStatus)
     }
@@ -214,10 +231,10 @@ public struct ProfileView: View {
     private static func locationStatusText(_ status: CLAuthorizationStatus) -> String {
         switch status {
         case .authorizedAlways: return "Always — full background discovery"
-        case .authorizedWhenInUse: return "While using the app"
+        case .authorizedWhenInUse: return "While using — tap to set Always in Settings"
         case .denied: return "Off — tap to enable in Settings"
         case .restricted: return "Restricted"
-        case .notDetermined: return "Not set yet"
+        case .notDetermined: return "Not set yet — tap to enable"
         @unknown default: return "Unknown"
         }
     }
@@ -230,6 +247,39 @@ public struct ProfileView: View {
         case .denied: return "Off — tap to enable in Settings"
         case .notDetermined: return "Not set yet"
         @unknown default: return "Unknown"
+        }
+    }
+
+    /// Retained CLLocationManager wrapper. The manager must outlive the call for the
+    /// system prompt to appear, so it's held as view `@State` rather than created ad hoc.
+    @MainActor
+    final class LocationPermissionRequester: NSObject, CLLocationManagerDelegate {
+        private let manager = CLLocationManager()
+        /// Fired on the main actor whenever the authorization status changes.
+        var onChange: ((CLAuthorizationStatus) -> Void)?
+
+        override init() {
+            super.init()
+            manager.delegate = self
+        }
+
+        private static let requestedAlwaysKey = "legacyHasRequestedAlwaysLocation"
+
+        var status: CLAuthorizationStatus { manager.authorizationStatus }
+
+        /// True once we've fired the one-shot Always prompt. iOS only presents it once per
+        /// install, so after this the row routes to Settings instead of a dead no-op.
+        var hasRequestedAlways: Bool {
+            UserDefaults.standard.bool(forKey: Self.requestedAlwaysKey)
+        }
+
+        func requestAlways() {
+            UserDefaults.standard.set(true, forKey: Self.requestedAlwaysKey)
+            manager.requestAlwaysAuthorization()
+        }
+
+        nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+            Task { @MainActor in onChange?(manager.authorizationStatus) }
         }
     }
 
@@ -336,8 +386,16 @@ public struct ProfileView: View {
         errorMessage = nil
         defer { isBusy = false }
 
-        try? await apiClient.logout()
+        var serverLogoutFailed = false
+        do {
+            try await apiClient.logout()
+        } catch {
+            serverLogoutFailed = true
+        }
         onSignOut()
+        if serverLogoutFailed {
+            errorMessage = "Signed out on this device. We couldn't reach the server — sign in again when online to fully invalidate your session."
+        }
     }
 
     private func deleteAccount() async {

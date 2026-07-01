@@ -122,13 +122,13 @@ public final class DropCoordinator {
             fixLng = fix.lng
 
             state = .creating
-            let attestation = await AppAttestBridge.currentAssertionBase64()
+            let appAttest = await AppAttestBridge.currentAssertion()
             let body = makeCreateRequest(
                 fix: fix,
                 mediaType: "photo",
                 dropMethod: dropMethod,
                 compose: compose,
-                attestation: attestation
+                appAttest: appAttest
             )
             let response = try await apiClient.createMemory(body)
             memoryID = response.memoryID
@@ -219,14 +219,14 @@ public final class DropCoordinator {
 
         do {
             let fix = try await locationEngine.acquireFix()
-            let attestation = await AppAttestBridge.currentAssertionBase64()
+            let appAttest = await AppAttestBridge.currentAssertion()
             let body = makeCreateRequest(
                 fix: fix,
                 mediaType: "text",
                 dropMethod: "note_bottle",
                 compose: compose,
                 caption: trimmed,
-                attestation: attestation
+                appAttest: appAttest
             )
             let response = try await apiClient.createMemory(body)
             let dropDay = Self.dropDateString()
@@ -267,7 +267,7 @@ public final class DropCoordinator {
         dropMethod: String,
         compose: DropComposeDraft,
         caption: String? = nil,
-        attestation: String? = nil
+        appAttest: AppAttestAssertionPayload? = nil
     ) -> CreateMemoryRequest {
         let teaser = compose.teaserText.trimmingCharacters(in: .whitespacesAndNewlines)
         return CreateMemoryRequest(
@@ -281,7 +281,8 @@ public final class DropCoordinator {
             caption: caption,
             seal: DropComposeMapping.sealPayload(from: compose.seal),
             condition: compose.condition.map(DropComposeMapping.conditionPayload(from:)),
-            attestation: attestation
+            attestation: appAttest?.attestation,
+            challengeToken: appAttest?.challengeToken
         )
     }
 

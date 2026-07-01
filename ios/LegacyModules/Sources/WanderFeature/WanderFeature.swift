@@ -3,6 +3,7 @@ import CoreLocation
 import DesignSystem
 import LocationEngine
 import MemoryLaneFeature
+import os
 import SwiftUI
 
 #if os(iOS)
@@ -18,6 +19,7 @@ public enum WanderFeature {
 @MainActor
 @Observable
 public final class WanderCoordinator {
+    private static let log = Logger(subsystem: "app.legacy.ios", category: "wander")
     public init(
         apiClient: LegacyAPIClient,
         locationEngine: LocationEngine,
@@ -190,7 +192,14 @@ public final class WanderCoordinator {
                 return
             }
 
-            let body = LocationRequest(lat: fix.lat, lng: fix.lng, accuracyM: fix.accuracyM)
+            let appAttest = await AppAttestBridge.currentAssertion()
+            let body = LocationRequest(
+                lat: fix.lat,
+                lng: fix.lng,
+                accuracyM: fix.accuracyM,
+                attestation: appAttest?.attestation,
+                challengeToken: appAttest?.challengeToken
+            )
 
             if let response = try await apiClient.scan(body) {
                 applyScanResult(response)
@@ -222,9 +231,8 @@ public final class WanderCoordinator {
                 ? "You need a signal to open this."
                 : "No connection. Try again when you're back online."
         } catch {
-            // Surface the real error so we can diagnose (network, decode, etc.).
             statusMessage = "Scan failed: \(error.localizedDescription)"
-            print("[Wander] scan failed:", error)
+            Self.log.error("scan failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -243,12 +251,13 @@ public final class WanderCoordinator {
 
         do {
             let fix = try await locationEngine.acquireFix()
-            let attestation = await AppAttestBridge.currentAssertionBase64()
+            let appAttest = await AppAttestBridge.currentAssertion()
             let body = LocationRequest(
                 lat: fix.lat,
                 lng: fix.lng,
                 accuracyM: fix.accuracyM,
-                attestation: attestation
+                attestation: appAttest?.attestation,
+                challengeToken: appAttest?.challengeToken
             )
             let response = try await apiClient.unlock(memoryID: teaser.memoryID, body)
 
@@ -608,12 +617,8 @@ public struct WanderFeatureRootView: View {
             }
             await coordinator.hydrateOwnPins()
         }
-        .task(id: isFollowingUser) {
-            guard !isFollowingUser else { return }
-            try? await Task.sleep(for: .seconds(6))
-            guard !Task.isCancelled else { return }
-            withAnimation(.easeInOut(duration: 0.4)) { isFollowingUser = true }
-        }
+        // Auto-relock is owned by the map coordinator now (idle-debounced: 6 s after the
+        // *last* gesture, not 6 s after follow was first lost). See MapLibreWanderMap.
         #if os(iOS)
         .onChange(of: coordinator.isShowingUnlockedMedia) { wasShowing, isShowing in
             if !wasShowing, isShowing, coordinator.unlockedReturnCount <= 1 {

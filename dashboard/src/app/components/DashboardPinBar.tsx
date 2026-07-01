@@ -59,11 +59,11 @@ export default function DashboardPinBar() {
     >
       <div style={{ flex: "1 1 220px", minWidth: 0 }}>
         <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "#d97706" }}>
-          Dashboard PIN {saved ? "· saved this session" : "· required for writes"}
+          Dashboard PIN {saved ? "· saved this session" : "· required for reads and writes"}
         </p>
         <p style={{ margin: "4px 0 0", fontSize: 11, color: "#888", lineHeight: 1.45 }}>
           Must match <code style={{ color: "#aaa" }}>DECISIONS_SECRET</code> on Vercel (Production).
-          Enter once here, then Pass / decide / reply.
+          Enter once here, then browse, pass QA, decide, or reply.
         </p>
       </div>
       <input

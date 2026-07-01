@@ -31,7 +31,18 @@ public struct CachedOwnPin: Codable, Sendable, Equatable, Identifiable {
 
 public enum OwnMemoryPinCache {
     private static let storageKey = "legacy.own-memory-pins.v1"
+    private static let sessionStartKey = "legacy.session.startedAt"
     private static let maxPins = 200
+
+    /// Marks the start of the current authenticated session. Grace pins from `reconcile`
+    /// must be cached after this time so a prior account's pins cannot leak on switch.
+    public static func markSessionStart() {
+        UserDefaults.standard.set(Date(), forKey: sessionStartKey)
+    }
+
+    public static func clear() {
+        UserDefaults.standard.removeObject(forKey: storageKey)
+    }
 
     public static func load() -> [CachedOwnPin] {
         guard
@@ -65,10 +76,13 @@ public enum OwnMemoryPinCache {
     /// endpoint may not have caught up to yet, so we keep them to avoid a flicker.
     public static func reconcile(serverPins: [CachedOwnPin], graceInterval: TimeInterval = 600) {
         let now = Date()
+        let sessionStart = UserDefaults.standard.object(forKey: sessionStartKey) as? Date ?? .distantPast
         let serverIDs = Set(serverPins.map(\.memoryID))
         var result = serverPins
         for pin in load() where !serverIDs.contains(pin.memoryID) {
-            if now.timeIntervalSince(pin.cachedAt) < graceInterval {
+            let withinGrace = now.timeIntervalSince(pin.cachedAt) < graceInterval
+            let fromCurrentSession = pin.cachedAt >= sessionStart
+            if withinGrace, fromCurrentSession {
                 result.append(pin)
             }
         }

@@ -91,5 +91,21 @@ public enum DropDraftStore {
         context.delete(draft)
         try context.save()
     }
+
+    /// Wipe all interrupted-drop drafts and photo files (sign-out / account delete).
+    public static func purgeAll(context: ModelContext) throws {
+        let descriptor = FetchDescriptor<DropDraft>()
+        let drafts = try context.fetch(descriptor)
+        for draft in drafts {
+            let url = draftsDirectory.appendingPathComponent(draft.imageFileName)
+            try? FileManager.default.removeItem(at: url)
+            context.delete(draft)
+        }
+        if !drafts.isEmpty {
+            try context.save()
+        }
+        try? FileManager.default.removeItem(at: draftsDirectory)
+        try? FileManager.default.createDirectory(at: draftsDirectory, withIntermediateDirectories: true)
+    }
 }
 #endif

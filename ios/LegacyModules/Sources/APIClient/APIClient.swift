@@ -58,15 +58,19 @@ public struct LegacyAPIClient: LegacyAPIClientProtocol {
     private let transport: HTTPTransport
     /// Reads the session token from the Keychain on each request. Injectable for tests.
     private let tokenProvider: @Sendable () -> String?
+    /// Called when the server rejects the session (`401` unauthorized / token_expired).
+    private let onSessionInvalidated: (@Sendable () -> Void)?
 
     public init(
         configuration: LegacyAPIConfiguration,
-        transport: HTTPTransport = URLSession.shared,
-        tokenProvider: @escaping @Sendable () -> String? = { try? KeychainSessionStore.read() }
+        transport: HTTPTransport = LegacyPinnedURLSession.session(),
+        tokenProvider: @escaping @Sendable () -> String? = { try? KeychainSessionStore.read() },
+        onSessionInvalidated: (@Sendable () -> Void)? = nil
     ) {
         self.configuration = configuration
         self.transport = transport
         self.tokenProvider = tokenProvider
+        self.onSessionInvalidated = onSessionInvalidated
     }
 
     // MARK: - Public send variants
@@ -101,6 +105,13 @@ public struct LegacyAPIClient: LegacyAPIClientProtocol {
 
         guard let http = response as? HTTPURLResponse else {
             throw LegacyAPIError.invalidResponse(statusCode: -1)
+        }
+
+        if http.statusCode == 401, let onSessionInvalidated {
+            let code = Self.errorCode(in: data) ?? "unauthorized"
+            if code == "token_expired" || code == "unauthorized" {
+                onSessionInvalidated()
+            }
         }
 
         try Self.validate(status: http.statusCode, data: data, headers: http)
@@ -193,6 +204,12 @@ public struct LegacyAPIClient: LegacyAPIClientProtocol {
         }
         guard let http = response as? HTTPURLResponse else {
             throw LegacyAPIError.invalidResponse(statusCode: -1)
+        }
+        if http.statusCode == 401, let onSessionInvalidated {
+            let code = Self.errorCode(in: respData) ?? "unauthorized"
+            if code == "token_expired" || code == "unauthorized" {
+                onSessionInvalidated()
+            }
         }
         try Self.validate(status: http.statusCode, data: respData, headers: http)
         return try decode(respData, as: DirectUploadResponse.self).url

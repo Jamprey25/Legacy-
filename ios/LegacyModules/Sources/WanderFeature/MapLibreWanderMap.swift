@@ -4,6 +4,7 @@ import CoreLocation
 import DesignSystem
 import LocationEngine
 import MapLibre
+import os
 import SwiftUI
 import UIKit
 
@@ -56,6 +57,9 @@ struct MapLibreWanderMap: UIViewRepresentable {
         context.coordinator.onTrackingLost = {
             withAnimation(.easeInOut(duration: 0.2)) { isFollowingUser = false }
         }
+        context.coordinator.onRelock = {
+            withAnimation(.easeInOut(duration: 0.4)) { isFollowingUser = true }
+        }
         if isFollowingUser && mapView.userTrackingMode == .none {
             mapView.setUserTrackingMode(.followWithHeading, animated: true)
         }
@@ -77,10 +81,15 @@ struct MapLibreWanderMap: UIViewRepresentable {
     // MARK: Coordinator
 
     final class Coordinator: NSObject, MLNMapViewDelegate {
+        private static let log = Logger(subsystem: "app.legacy.ios", category: "wander-map")
         weak var mapView: MLNMapView?
         var pendingInitialPitch: CGFloat?
         var inRangeMemoryIDs: Set<String> = []
         var onTrackingLost: (() -> Void)?
+        var onRelock: (() -> Void)?
+        private var relockTimer: Timer?
+        private var lastInteractionTime: CFTimeInterval = 0
+        private static let relockAfterIdle: TimeInterval = 6
 
         private var zoneSource: MLNShapeSource?
         private var mutedZoneSource: MLNShapeSource?
@@ -109,6 +118,7 @@ struct MapLibreWanderMap: UIViewRepresentable {
         private static let mutedZoneFillLayerID = "legacy.muted-zones.fill"
         private static let inRangeSourceID = "legacy.inrange"
         private static let inRangeFillLayerID = "legacy.inrange.fill"
+        private static let inRangeRingLayerID = "legacy.inrange.ring"
 
         private struct PinRenderState: Equatable {
             let memoryID: String
@@ -118,11 +128,56 @@ struct MapLibreWanderMap: UIViewRepresentable {
 
         deinit {
             pulseTimer?.invalidate()
+            relockTimer?.invalidate()
         }
 
         func stopPulse() {
             pulseTimer?.invalidate()
             pulseTimer = nil
+        }
+
+        // MARK: Auto-relock (re-follow after the user goes idle)
+
+        /// Mark "the user just did something." Cheap (timestamp only) so it's safe to call
+        /// every frame from `mapViewRegionIsChanging` without the per-frame timer churn that
+        /// was contributing to the pan stutter.
+        private func noteInteraction() {
+            lastInteractionTime = CACurrentMediaTime()
+        }
+
+        /// Arm the idle→relock clock (called once when follow is first lost). A single
+        /// self-rescheduling timer measures time since the *last* interaction, so the map
+        /// only re-follows after you actually stop touching for 6 s — not 6 s after follow
+        /// was first lost, and never mid-gesture even on a long continuous drag.
+        private func scheduleRelock(on mapView: MLNMapView) {
+            noteInteraction()
+            guard relockTimer == nil else { return }
+            armRelockTimer(on: mapView, after: Self.relockAfterIdle)
+        }
+
+        private func armRelockTimer(on mapView: MLNMapView, after interval: TimeInterval) {
+            relockTimer?.invalidate()
+            relockTimer = Timer.scheduledTimer(
+                withTimeInterval: interval,
+                repeats: false
+            ) { [weak self, weak mapView] _ in
+                guard let self, let mapView else { return }
+                self.relockTimer = nil
+                guard mapView.userTrackingMode == .none else { return }
+                let idle = CACurrentMediaTime() - self.lastInteractionTime
+                if idle >= Self.relockAfterIdle - 0.1 {
+                    mapView.setUserTrackingMode(.followWithHeading, animated: true)
+                    self.onRelock?()
+                } else {
+                    // Interaction happened while waiting — wait out the remainder.
+                    self.armRelockTimer(on: mapView, after: Self.relockAfterIdle - idle)
+                }
+            }
+        }
+
+        private func cancelRelock() {
+            relockTimer?.invalidate()
+            relockTimer = nil
         }
 
         // MARK: Style lifecycle
@@ -145,17 +200,43 @@ struct MapLibreWanderMap: UIViewRepresentable {
         func mapView(_ mapView: MLNMapView, didChange mode: MLNUserTrackingMode, animated: Bool) {
             if mode == .none {
                 onTrackingLost?()
+                scheduleRelock(on: mapView)
             } else {
-                // setUserTrackingMode resets pitch to 0 — restore it after every re-lock.
+                cancelRelock()
+                // setUserTrackingMode resets pitch to 0 — restore the zoom-appropriate
+                // tilt after every re-lock (full tilt at street level, flatter when zoomed out).
+                let target = WanderMapStyle.pitch(forZoom: mapView.zoomLevel)
                 let camera = mapView.camera
-                guard camera.pitch < WanderMapStyle.pitch - 1 else { return }
-                camera.pitch = WanderMapStyle.pitch
+                guard abs(camera.pitch - target) > 1 else { return }
+                camera.pitch = target
                 mapView.setCamera(camera, withDuration: 0.35, animationTimingFunction: nil)
             }
         }
 
+        /// Continuously ramp camera tilt to match zoom while the map moves. Flattening the
+        /// pitch as the user zooms out is what stops the puck swimming near the horizon.
+        func mapViewRegionIsChanging(_ mapView: MLNMapView) {
+            // While the map is un-followed, every move resets the idle countdown (cheap
+            // timestamp write — the timer itself was armed when follow was lost).
+            if mapView.userTrackingMode == .none {
+                noteInteraction()
+            }
+
+            // Only manage tilt within/below the ramp band. Above street zoom the target is a
+            // constant 58°, so re-issuing setCamera mid-pan there just fights the gesture and
+            // judders the whole map — leave the camera alone when zoomed in tight.
+            guard mapView.zoomLevel < WanderMapStyle.fullPitchZoom else { return }
+            let target = WanderMapStyle.pitch(forZoom: mapView.zoomLevel)
+            let camera = mapView.camera
+            // Threshold guard: only nudge pitch on a meaningful delta so we don't re-enter
+            // this callback in a feedback loop.
+            guard abs(camera.pitch - target) > 0.5 else { return }
+            camera.pitch = target
+            mapView.setCamera(camera, animated: false)
+        }
+
         func mapView(_ mapView: MLNMapView, didFailLoadingMapWithError error: Error) {
-            print("[WanderMap] style load failed:", error.localizedDescription)
+            Self.log.error("style load failed: \(error.localizedDescription, privacy: .public)")
         }
 
         private func resetOverlaySources() {
@@ -260,6 +341,15 @@ struct MapLibreWanderMap: UIViewRepresentable {
             fill.fillColor = NSExpression(forConstantValue: UIColor(LegacyColor.accent))
             fill.fillOpacity = NSExpression(forKeyPath: "opacity")
             style.addLayer(fill)
+
+            // Crisp pulsing ring at the catchment edge — the PoGo "you've stepped into
+            // range" bloom. Drawn on the same source so it tracks the soft glow's circle.
+            let ring = MLNLineStyleLayer(identifier: Self.inRangeRingLayerID, source: source)
+            ring.lineColor = NSExpression(forConstantValue: UIColor(LegacyColor.accent))
+            ring.lineWidth = NSExpression(forConstantValue: 2.5)
+            ring.lineOpacity = NSExpression(forKeyPath: "ringOpacity")
+            ring.lineCap = NSExpression(forConstantValue: "round")
+            style.addLayer(ring)
         }
 
         func syncInRangeHalos(ownPins: [CachedOwnPin], on mapView: MLNMapView) {
@@ -273,7 +363,7 @@ struct MapLibreWanderMap: UIViewRepresentable {
                 let center = CLLocationCoordinate2D(latitude: pin.lat, longitude: pin.lng)
                 var ring = Self.geodesicCircle(center: center, radiusMeters: Self.inRangeHaloRadiusMeters)
                 let polygon = MLNPolygonFeature(coordinates: &ring, count: UInt(ring.count))
-                polygon.attributes = ["opacity": 0.34]
+                polygon.attributes = ["opacity": 0.34, "ringOpacity": 0.7]
                 return polygon
             }
             source.shape = MLNShapeCollectionFeature(shapes: polygons)
@@ -298,11 +388,13 @@ struct MapLibreWanderMap: UIViewRepresentable {
 
         private func tickInRangePulse() {
             pulsePhase += 0.07
-            let opacity = 0.18 + 0.22 * (0.5 + 0.5 * sin(pulsePhase))
+            let wave = 0.5 + 0.5 * sin(pulsePhase)
+            let opacity = 0.18 + 0.22 * wave        // soft interior glow
+            let ringOpacity = 0.55 + 0.30 * wave    // crisp catchment ring, breathes brighter
             guard let source = inRangeSource,
                   let collection = source.shape as? MLNShapeCollectionFeature else { return }
             for case let polygon as MLNPolygonFeature in collection.shapes ?? [] {
-                polygon.attributes = ["opacity": opacity]
+                polygon.attributes = ["opacity": opacity, "ringOpacity": ringOpacity]
             }
             source.shape = collection
         }
@@ -521,6 +613,7 @@ private final class LegacyUserPuckView: MLNUserLocationAnnotationView {
     /// Orb sits below the canvas centre (cone needs headroom above) — shift the view
     /// up so the orb, not the cone tip, lands on the actual coordinate.
     private let orbCenterYRatio: CGFloat = 0.66
+    private var displayLink: CADisplayLink?
 
     override init(reuseIdentifier: String?) {
         super.init(reuseIdentifier: reuseIdentifier)
@@ -536,6 +629,8 @@ private final class LegacyUserPuckView: MLNUserLocationAnnotationView {
         imageView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         imageView.image = LegacyUserPuckArt.image(size: puckSize, orbCenterYRatio: orbCenterYRatio)
         addSubview(imageView)
+
+        startTransformGuard()
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -545,6 +640,28 @@ private final class LegacyUserPuckView: MLNUserLocationAnnotationView {
         if frame.isNull {
             frame = CGRect(origin: .zero, size: puckSize)
         }
+        scalesWithViewingDistance = false
+        assertIdentityTransform()
+    }
+
+    private func startTransformGuard() {
+        displayLink = CADisplayLink(
+            target: self,
+            selector: #selector(assertIdentityTransform)
+        )
+        displayLink?.add(to: .main, forMode: .common)
+    }
+
+    @objc private func assertIdentityTransform() {
+        scalesWithViewingDistance = false
+        if !CATransform3DIsIdentity(layer.transform) {
+            layer.transform = CATransform3DIdentity
+        }
+    }
+
+    deinit {
+        displayLink?.invalidate()
+        displayLink = nil
     }
 }
 
@@ -555,8 +672,11 @@ private enum LegacyUserPuckArt {
         let renderer = UIGraphicsImageRenderer(size: size)
         return renderer.image { ctx in
             let cg = ctx.cgContext
-            let accent = UIColor(LegacyColor.accent)
-            let accentDeep = UIColor(LegacyColor.accentDeep)
+            // Cool location-blue, deliberately OFF the warm accent palette: memory
+            // beacons are amber orbs, so the user puck must not share their hue or it
+            // reads as just another memory. Blue is also the universal "you are here."
+            let accent = UIColor(red: 0.34, green: 0.66, blue: 1.0, alpha: 1)
+            let accentDeep = UIColor(red: 0.13, green: 0.40, blue: 0.92, alpha: 1)
             let rgb = CGColorSpaceCreateDeviceRGB()
             let orbCenter = CGPoint(x: size.width / 2, y: size.height * orbCenterYRatio)
             let orbRadius: CGFloat = 10
@@ -720,6 +840,25 @@ enum WanderMapStyle {
     static let pitch: CGFloat = 58
     static let streetZoom: Double = 16.8
     static let userScreenBias: CGFloat = 0.40
+
+    /// Camera tilt as a function of zoom. The immersive 58° tilt holds at street level,
+    /// then ramps to a flat top-down view as you pull out. Rationale: at a steep pitch,
+    /// a zoomed-out coordinate projects up near the horizon where tiny camera deltas swing
+    /// its screen position wildly — that's what makes the user puck "swim"/glitch on
+    /// zoom-out. Flattening the camera removes the perspective foreshortening entirely, so
+    /// the puck stays pinned. (Also how Google Maps / PoGo behave at region scale.)
+    static let fullPitchZoom: Double = 15.0
+    static let flatPitchZoom: Double = 12.5
+
+    static func pitch(forZoom zoom: Double) -> CGFloat {
+        if zoom >= fullPitchZoom { return pitch }
+        if zoom <= flatPitchZoom { return 0 }
+        let t = (zoom - flatPitchZoom) / (fullPitchZoom - flatPitchZoom)
+        // Smoothstep — eases in/out at both ends so the tilt doesn't snap on or off as you
+        // cross the band, which reads smoother than a raw linear ramp.
+        let eased = t * t * (3 - 2 * t)
+        return pitch * CGFloat(eased)
+    }
 
     /// Retheme the stock vector style toward Legacy's warm, memory-atlas palette.
     static func applyLegacyTheme(to style: MLNStyle) {

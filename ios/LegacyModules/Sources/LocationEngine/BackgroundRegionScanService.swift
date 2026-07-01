@@ -26,7 +26,14 @@ public enum BackgroundRegionScanService {
         _ = regionIdentifier
         do {
             let fix = try await locationEngine.acquireFix()
-            let body = LocationRequest(lat: fix.lat, lng: fix.lng, accuracyM: fix.accuracyM)
+            let appAttest = await AppAttestBridge.currentAssertion()
+            let body = LocationRequest(
+                lat: fix.lat,
+                lng: fix.lng,
+                accuracyM: fix.accuracyM,
+                attestation: appAttest?.attestation,
+                challengeToken: appAttest?.challengeToken
+            )
 
             if let response = try await apiClient.scan(body) {
                 let inRange = response.teasers.contains { $0.inRange }

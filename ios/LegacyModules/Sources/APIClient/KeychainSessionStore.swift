@@ -1,7 +1,7 @@
 import Foundation
 import Security
 
-/// Keychain-backed session token storage. kSecAttrAccessibleAfterFirstUnlock.
+/// Keychain-backed session token storage. `WhenUnlockedThisDeviceOnly` (SEC-P5-2).
 public enum KeychainSessionStore {
     private static let service = "com.legacy.session"
     private static let account = "session_token"
@@ -24,7 +24,7 @@ public enum KeychainSessionStore {
 
         var attributes = query
         attributes[kSecValueData as String] = data
-        attributes[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        attributes[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
 
         let status = SecItemAdd(attributes as CFDictionary, nil)
         guard status == errSecSuccess else {

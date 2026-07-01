@@ -55,6 +55,12 @@ public final class BackgroundUploadSessionDelegate: NSObject, URLSessionDataDele
         }
     }
 
+    /// Remove all background-upload temp files (sign-out / account switch).
+    public static func purgeAllTempFiles() {
+        try? FileManager.default.removeItem(at: tempDirectory)
+        try? FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+    }
+
     private func cleanUp(taskIdentifier: Int) {
         lock.lock()
         let url = tempFiles.removeValue(forKey: taskIdentifier)
@@ -66,6 +72,14 @@ public final class BackgroundUploadSessionDelegate: NSObject, URLSessionDataDele
 
     public func setBackgroundCompletionHandler(_ handler: @escaping () -> Void) {
         backgroundCompletionHandler = handler
+    }
+
+    public func urlSession(
+        _ session: URLSession,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        LegacyCertificatePinning.handle(challenge: challenge, completionHandler: completionHandler)
     }
 
     public func urlSession(

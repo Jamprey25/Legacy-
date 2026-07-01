@@ -18,17 +18,39 @@ final class AppModel {
     var isAuthenticated = false
     private(set) var apiClient: LegacyAPIClient
 
+    private let appVersion: String
+    private let deviceID: String
+
     init(appVersion: String, deviceID: String) {
-        apiClient = Self.makeAPIClient(appVersion: appVersion, deviceID: deviceID)
+        self.appVersion = appVersion
+        self.deviceID = deviceID
+        wireSessionInvalidationHandler()
     }
 
-    static func makeAPIClient(appVersion: String, deviceID: String) -> LegacyAPIClient {
+    private func wireSessionInvalidationHandler() {
+        apiClient = Self.makeAPIClient(
+            appVersion: appVersion,
+            deviceID: deviceID,
+            onSessionInvalidated: { [weak self] in
+                Task { @MainActor in
+                    self?.signOutFromInvalidSession()
+                }
+            }
+        )
+    }
+
+    static func makeAPIClient(
+        appVersion: String,
+        deviceID: String,
+        onSessionInvalidated: (@Sendable () -> Void)? = nil
+    ) -> LegacyAPIClient {
         #if DEBUG
         if AccountProfileStore.isDevAdmin || Self.usesStubAPI {
             let transport: StubHTTPTransport = AccountProfileStore.isDevAdmin ? .happyPath() : .qaAuthFlow()
             return LegacyAPIClient.stubbed(
                 transport: transport,
-                token: (try? KeychainSessionStore.read()) ?? "stub-token"
+                token: (try? KeychainSessionStore.read()) ?? "stub-token",
+                onSessionInvalidated: onSessionInvalidated
             )
         }
         #endif
@@ -37,15 +59,31 @@ final class AppModel {
                 baseURL: URL(string: "https://legacy-backend-jamprey25s-projects.vercel.app")!,
                 appVersion: appVersion,
                 deviceID: deviceID
-            )
+            ),
+            onSessionInvalidated: onSessionInvalidated
         )
     }
 
     func refreshSession() {
         isAuthenticated = (try? KeychainSessionStore.read()) != nil
+        if isAuthenticated {
+            OwnMemoryPinCache.markSessionStart()
+        }
     }
 
-    func signOut() {
+    func signOut(modelContext: ModelContext? = nil) {
+        performLocalSignOut(modelContext: modelContext)
+    }
+
+    /// Server rejected the session token — skip another logout round-trip.
+    func signOutFromInvalidSession(modelContext: ModelContext? = nil) {
+        performLocalSignOut(modelContext: modelContext)
+    }
+
+    private func performLocalSignOut(modelContext: ModelContext? = nil) {
+        #if os(iOS)
+        SessionDataPurge.run(modelContext: modelContext)
+        #endif
         try? KeychainSessionStore.delete()
         AccountProfileStore.clear()
         #if os(iOS)
@@ -53,9 +91,13 @@ final class AppModel {
         #endif
         #if DEBUG
         apiClient = Self.makeAPIClient(
-            appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0",
-            deviceID: UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+            appVersion: appVersion,
+            deviceID: deviceID,
+            onSessionInvalidated: nil
         )
+        wireSessionInvalidationHandler()
+        #else
+        wireSessionInvalidationHandler()
         #endif
         isAuthenticated = false
     }
@@ -69,7 +111,9 @@ final class AppModel {
     func signInAsDevAdmin() {
         try? KeychainSessionStore.save(token: "stub-token")
         AccountProfileStore.saveDevAdmin()
+        OwnMemoryPinCache.markSessionStart()
         apiClient = LegacyAPIClient.stubbed(token: "stub-token")
+        wireSessionInvalidationHandler()
         isAuthenticated = true
     }
 
@@ -141,6 +185,12 @@ struct LegacyApp: App {
             }
         }
         .modelContainer(for: DropDraft.self)
+        #if os(iOS)
+        .backgroundTask(.urlSession("app.legacy.ios.upload")) {
+            // Lets the OS wake the app after relaunch to drain background import uploads.
+            // UIKit path also wired in LegacyAppDelegate.handleEventsForBackgroundURLSession.
+        }
+        #endif
     }
 }
 
@@ -177,6 +227,7 @@ private struct RootView: View {
                     googleClientID: googleClientID,
                     onAuthenticated: {
                         appModel.refreshSession()
+                        OwnMemoryPinCache.markSessionStart()
                         Task { await AppAttestCoordinator.shared.ensureRegistered() }
                     },
                     onDevAdminSignIn: { appModel.signInAsDevAdmin() }
@@ -190,6 +241,7 @@ private struct RootView: View {
                     googleClientID: googleClientID,
                     onAuthenticated: {
                         appModel.refreshSession()
+                        OwnMemoryPinCache.markSessionStart()
                         Task { await AppAttestCoordinator.shared.ensureRegistered() }
                     }
                 )
@@ -434,7 +486,7 @@ private struct MainTabView: View {
         ProfileView(
             apiClient: appModel.apiClient,
             mutedZonesCoordinator: mutedZonesCoordinator,
-            onSignOut: { appModel.signOut() },
+            onSignOut: { appModel.signOut(modelContext: modelContext) },
             statsLabel: memoryLaneCoordinator.statsLabel
         )
         .tabItem { Label("Profile", systemImage: "person.circle") }

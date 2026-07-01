@@ -129,4 +129,8 @@ public enum CoarseZoneCache {
         }
         save(Array(map.values))
     }
+
+    public static func clear() {
+        UserDefaults.standard.removeObject(forKey: storageKey)
+    }
 }

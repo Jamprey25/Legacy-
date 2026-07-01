@@ -10,6 +10,10 @@ import DecisionsPanel from "./components/DecisionsPanel";
 import ManualTestPanel from "./components/ManualTestPanel";
 import TechnicalArchitecturePanel from "./components/TechnicalArchitecturePanel";
 import DashboardPinBar from "./components/DashboardPinBar";
+import {
+  DASHBOARD_SECRET_HEADER,
+  getStoredDashboardSecret,
+} from "@/lib/dashboardAuth";
 
 const POLL_INTERVAL = 30;
 
@@ -80,7 +84,10 @@ export default function DashboardClient({ initialData }: { initialData: TasksFil
 
   const fetchTasks = useCallback(async () => {
     try {
-      const res = await fetch(`/api/tasks?t=${Date.now()}`, { cache: "no-store" });
+      const headers: Record<string, string> = {};
+      const pin = getStoredDashboardSecret();
+      if (pin) headers[DASHBOARD_SECRET_HEADER] = pin;
+      const res = await fetch(`/api/tasks?t=${Date.now()}`, { cache: "no-store", headers });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json: TasksFile = await res.json();
       setData(json);

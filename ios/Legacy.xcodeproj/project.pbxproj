@@ -23,6 +23,7 @@
 		B10000000000000000000013 /* APNsRegistrationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000006 /* APNsRegistrationService.swift */; };
 		B10000000000000000000014 /* ProximityPushNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000007 /* ProximityPushNotifications.swift */; };
 		B10000000000000000000015 /* OnThisDayWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000008 /* OnThisDayWidget.swift */; };
+		B10000000000000000000017 /* SessionDataPurge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000012 /* SessionDataPurge.swift */; };
 		B10000000000000000000016 /* LegacyWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F10000000000000000000009 /* LegacyWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -60,6 +61,7 @@
 		F10000000000000000000006 /* APNsRegistrationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APNsRegistrationService.swift; sourceTree = "<group>"; };
 		F10000000000000000000007 /* ProximityPushNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityPushNotifications.swift; sourceTree = "<group>"; };
 		F10000000000000000000008 /* OnThisDayWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnThisDayWidget.swift; sourceTree = "<group>"; };
+		F10000000000000000000012 /* SessionDataPurge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDataPurge.swift; sourceTree = "<group>"; };
 		F10000000000000000000009 /* LegacyWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LegacyWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		F10000000000000000000010 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		F10000000000000000000011 /* LegacyWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LegacyWidget.entitlements; sourceTree = "<group>"; };
@@ -105,6 +107,7 @@
 			isa = PBXGroup;
 			children = (
 				F10000000000000000000001 /* LegacyApp.swift */,
+				F10000000000000000000012 /* SessionDataPurge.swift */,
 				F10000000000000000000004 /* LegacyAppDelegate.swift */,
 				F10000000000000000000005 /* APNsTokenStore.swift */,
 				F10000000000000000000006 /* APNsRegistrationService.swift */,
@@ -240,6 +243,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B10000000000000000000001 /* LegacyApp.swift in Sources */,
+				B10000000000000000000017 /* SessionDataPurge.swift in Sources */,
 				B10000000000000000000011 /* LegacyAppDelegate.swift in Sources */,
 				B10000000000000000000012 /* APNsTokenStore.swift in Sources */,
 				B10000000000000000000013 /* APNsRegistrationService.swift in Sources */,

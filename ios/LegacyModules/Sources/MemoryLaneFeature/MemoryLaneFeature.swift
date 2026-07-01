@@ -322,12 +322,13 @@ public final class MemoryLaneCoordinator {
 
         do {
             let fix = try await locationEngine.acquireFix()
-            let attestation = await AppAttestBridge.currentAssertionBase64()
+            let appAttest = await AppAttestBridge.currentAssertion()
             let body = LocationRequest(
                 lat: fix.lat,
                 lng: fix.lng,
                 accuracyM: fix.accuracyM,
-                attestation: attestation
+                attestation: appAttest?.attestation,
+                challengeToken: appAttest?.challengeToken
             )
             let response = try await apiClient.unlock(memoryID: memoryID, body)
             if let urlString = response.media.first?.url, let url = URL(string: urlString) {

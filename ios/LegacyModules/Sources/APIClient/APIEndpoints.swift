@@ -117,6 +117,7 @@ public struct CreateMemoryRequest: Encodable, Sendable {
     public let seal: MemorySealPayload?
     public let condition: MemoryConditionPayload?
     public let attestation: String?
+    public let challengeToken: String?
 
     public init(
         lat: Double,
@@ -130,7 +131,8 @@ public struct CreateMemoryRequest: Encodable, Sendable {
         caption: String? = nil,
         seal: MemorySealPayload? = nil,
         condition: MemoryConditionPayload? = nil,
-        attestation: String? = nil
+        attestation: String? = nil,
+        challengeToken: String? = nil
     ) {
         self.lat = lat
         self.lng = lng
@@ -144,6 +146,7 @@ public struct CreateMemoryRequest: Encodable, Sendable {
         self.seal = seal
         self.condition = condition
         self.attestation = attestation
+        self.challengeToken = challengeToken
     }
 
     enum CodingKeys: String, CodingKey {
@@ -158,6 +161,7 @@ public struct CreateMemoryRequest: Encodable, Sendable {
         case seal
         case condition
         case attestation
+        case challengeToken = "challenge_token"
     }
 }
 
@@ -426,18 +430,27 @@ public struct LocationRequest: Encodable, Sendable {
     public let lng: Double
     public let accuracyM: Double
     public let attestation: String?
+    public let challengeToken: String?
 
-    public init(lat: Double, lng: Double, accuracyM: Double, attestation: String? = nil) {
+    public init(
+        lat: Double,
+        lng: Double,
+        accuracyM: Double,
+        attestation: String? = nil,
+        challengeToken: String? = nil
+    ) {
         self.lat = lat
         self.lng = lng
         self.accuracyM = accuracyM
         self.attestation = attestation
+        self.challengeToken = challengeToken
     }
 
     enum CodingKeys: String, CodingKey {
         case lat, lng
         case accuracyM = "accuracy_m"
         case attestation
+        case challengeToken = "challenge_token"
     }
 }
 
