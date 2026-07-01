@@ -4,6 +4,7 @@
 
 import { Hono } from "hono";
 import { put, del } from "@vercel/blob";
+import { EXPORT_GET_TTL_SECONDS, blobPutAccess, signedVercelBlobGetUrl } from "../lib/blobSignedGet.js";
 import { ApiError } from "../lib/errors.js";
 import { requireAuth, type AuthVars } from "../middleware/auth.js";
 import { audit } from "../lib/audit.js";
@@ -72,7 +73,6 @@ userRoutes.get("/export", exportLimit, async (c) => {
   const archive = {
     exported_at: new Date().toISOString(),
     user_id: userId,
-    email: user.email,
     memories: memories.map((m) => ({
       memory_id: m.id,
       lat: m.lat,
@@ -94,21 +94,30 @@ userRoutes.get("/export", exportLimit, async (c) => {
   const STORAGE = process.env.STORAGE_BACKEND ?? "stub";
 
   let archiveUrl: string;
+  let archiveExpiresAt: string;
   if (STORAGE === "vercel-blob") {
     const blob = await put(archiveKey, archiveBytes, {
-      access: "public",
+      access: blobPutAccess(),
       addRandomSuffix: true,
       contentType: "application/json",
     });
-    archiveUrl = blob.url;
+    const signed = await signedVercelBlobGetUrl(blob.url, EXPORT_GET_TTL_SECONDS);
+    archiveUrl = signed.url;
+    archiveExpiresAt = signed.expiresAt;
   } else {
     // Stub: return a deterministic placeholder so tests/CI can parse the shape.
     archiveUrl = `https://stub.storage.example/exports/${userId}/export.json`;
+    archiveExpiresAt = new Date(Date.now() + EXPORT_GET_TTL_SECONDS * 1000).toISOString();
   }
 
   audit(c, "user.export", { memory_count: memories.length });
 
-  return c.json({ archive_url: archiveUrl, memory_count: memories.length, exported_at: archive.exported_at });
+  return c.json({
+    archive_url: archiveUrl,
+    archive_expires_at: archiveExpiresAt,
+    memory_count: memories.length,
+    exported_at: archive.exported_at,
+  });
 });
 
 // ---------------------------------------------------------------------------

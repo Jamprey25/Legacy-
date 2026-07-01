@@ -11,6 +11,7 @@
 // scan_status — the original is already clear.
 
 import { put } from "@vercel/blob";
+import { blobPutAccess } from "./blobSignedGet.js";
 import { fetchAllowedStorageUrl } from "./storageUrl.js";
 
 // Lazy-loaded so a missing/broken native sharp binary cannot crash app startup.
@@ -57,7 +58,7 @@ export async function generateAndStoreThumbnail(
     const thumb = await resizeToThumbnail(input);
 
     const blob = await put(`thumbnails/${memoryId}.webp`, thumb, {
-      access: "public",
+      access: blobPutAccess(),
       addRandomSuffix: true,
       contentType: "image/webp",
     });

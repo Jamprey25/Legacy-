@@ -657,11 +657,13 @@ public struct CreateMutedZoneResponse: Decodable, Sendable {
 
 public struct ExportResponse: Decodable, Sendable, Equatable {
     public let archiveURL: String
+    public let archiveExpiresAt: String?
     public let memoryCount: Int
     public let exportedAt: String
 
     enum CodingKeys: String, CodingKey {
         case archiveURL = "archive_url"
+        case archiveExpiresAt = "archive_expires_at"
         case memoryCount = "memory_count"
         case exportedAt = "exported_at"
     }

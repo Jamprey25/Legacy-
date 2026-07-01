@@ -13,6 +13,7 @@
 // SEC-MED-4.
 
 import { put, del } from "@vercel/blob";
+import { blobPutAccess } from "./blobSignedGet.js";
 import { fetchAllowedStorageUrl } from "./storageUrl.js";
 
 // Lazy-loaded so a missing/broken native sharp binary cannot crash app startup.
@@ -73,7 +74,7 @@ export async function stripAndReplaceBlob(
     // Re-upload the clean bytes.
     const ext = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
     const blob = await put(`memories/${memoryId}/original.${ext}`, clean, {
-      access: "public",
+      access: blobPutAccess(),
       addRandomSuffix: true,
       contentType: contentType.startsWith("image/png") ? "image/png"
         : contentType.startsWith("image/webp") ? "image/webp"

@@ -24,7 +24,7 @@ public enum DropDraftRecovery {
                         contentType: draft.contentType,
                         signedPutURL: nil
                     )
-                } else if let url = URL(string: draft.signedPutURL) {
+                } else if let url = TrustedMediaURL.uploadURL(from: draft.signedPutURL) {
                     try await presignedUploader.upload(data: data, to: url, contentType: draft.contentType)
                 } else {
                     continue

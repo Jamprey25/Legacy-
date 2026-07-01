@@ -16,6 +16,7 @@ public struct PendingUploadRecovery: Sendable, Equatable {
 }
 
 #if os(iOS)
+import APIClient
 import SwiftData
 
 /// Persisted interrupted drop — photo bytes on disk, memory_id from POST /memories.
@@ -55,7 +56,7 @@ public enum DropDraftStore {
     public static let draftsDirectory: URL = {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let dir = base.appendingPathComponent("DropDrafts", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try? ProtectedFileIO.createProtectedDirectory(at: dir)
         return dir
     }()
 
@@ -68,7 +69,7 @@ public enum DropDraftStore {
     ) throws {
         let fileName = "\(memoryID).jpg"
         let fileURL = draftsDirectory.appendingPathComponent(fileName)
-        try strippedPhoto.write(to: fileURL, options: .atomic)
+        try ProtectedFileIO.write(strippedPhoto, to: fileURL)
 
         let draft = DropDraft(
             memoryID: memoryID,

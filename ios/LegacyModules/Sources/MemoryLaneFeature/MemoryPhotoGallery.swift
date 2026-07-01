@@ -18,7 +18,7 @@ public struct MemoryPhotoGallery: View {
         VStack(spacing: LegacySpacing.sm) {
             TabView(selection: $selection) {
                 ForEach(Array(photos.enumerated()), id: \.offset) { index, photo in
-                    AsyncImage(url: URL(string: photo.url)) { phase in
+                    AsyncImage(url: TrustedMediaURL.mediaURL(from: photo.url)) { phase in
                         switch phase {
                         case .success(let image):
                             image.resizable().scaledToFill()
@@ -57,7 +57,7 @@ public struct MemoryPhotoGallery: View {
                         Button {
                             withAnimation(.easeInOut(duration: 0.2)) { selection = index }
                         } label: {
-                            AsyncImage(url: URL(string: photo.thumbnailURL ?? photo.url)) { image in
+                            AsyncImage(url: TrustedMediaURL.mediaURL(from: photo.thumbnailURL ?? photo.url)) { image in
                                 image.resizable().scaledToFill()
                             } placeholder: {
                                 RoundedRectangle(cornerRadius: LegacyRadius.sm)

@@ -4,6 +4,7 @@ import { ApiError } from "./errors.js";
 
 const DEFAULT_ALLOWED_HOSTS = [
   "public.blob.vercel-storage.com",
+  "private.blob.vercel-storage.com",
   "blob.vercel-storage.com",
 ];
 

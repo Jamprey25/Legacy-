@@ -265,7 +265,7 @@ public final class MemoryLaneCoordinator {
 
         if item.scanStatus == "clear",
            let urlString = item.previewImageURL,
-           let url = URL(string: urlString) {
+           let url = TrustedMediaURL.mediaURL(from: urlString) {
             ownerMediaURL = url
         }
 
@@ -275,7 +275,7 @@ public final class MemoryLaneCoordinator {
             detailReturnCount = loaded.returnCount
             detailLastFoundAt = loaded.lastFoundAt
             if loaded.scanStatus == "clear", let urlString = loaded.mediaURL ?? loaded.thumbnailURL,
-               let url = URL(string: urlString) {
+               let url = TrustedMediaURL.mediaURL(from: urlString) {
                 ownerMediaURL = url
             }
             await pollLifecycleStatus(for: item.memoryID, initial: loaded)
@@ -302,7 +302,7 @@ public final class MemoryLaneCoordinator {
                 detail = refreshed
                 if refreshed.scanStatus == "clear",
                    let urlString = refreshed.mediaURL ?? refreshed.thumbnailURL,
-                   let url = URL(string: urlString) {
+                   let url = TrustedMediaURL.mediaURL(from: urlString) {
                     ownerMediaURL = url
                 }
                 if !shouldPollLifecycle(refreshed) { return }
@@ -331,7 +331,7 @@ public final class MemoryLaneCoordinator {
                 challengeToken: appAttest?.challengeToken
             )
             let response = try await apiClient.unlock(memoryID: memoryID, body)
-            if let urlString = response.media.first?.url, let url = URL(string: urlString) {
+            if let urlString = response.media.first?.url, let url = TrustedMediaURL.mediaURL(from: urlString) {
                 unlockedMediaURL = url
             }
             unlockMessage = response.caption
@@ -983,7 +983,7 @@ private struct OnThisDayCard: View {
                 .fill(LegacyColor.surface)
                 .frame(width: 160, height: 160)
 
-            if let urlString = item.previewImageURL, let url = URL(string: urlString) {
+            if let urlString = item.previewImageURL, let url = TrustedMediaURL.mediaURL(from: urlString) {
                 AsyncImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
@@ -1083,7 +1083,7 @@ struct MemoryLaneCard: View {
                     .padding(LegacySpacing.md)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 } else if let urlString = item.previewImageURL,
-                   let url = URL(string: urlString) {
+                   let url = TrustedMediaURL.mediaURL(from: urlString) {
                     AsyncImage(url: url) { phase in
                         switch phase {
                         case .success(let image):

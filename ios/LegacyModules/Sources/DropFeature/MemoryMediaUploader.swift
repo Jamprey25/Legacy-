@@ -36,7 +36,7 @@ public struct MemoryMediaUploader: Sendable {
             return "https://stub.legacy.app/\(VercelBlobUpload.pathname(memoryID: memoryID, contentType: contentType))"
         }
 
-        if let signedPutURL, let url = URL(string: signedPutURL) {
+        if let signedPutURL, let url = TrustedMediaURL.uploadURL(from: signedPutURL) {
             if Self.isPlaceholderUploadURL(signedPutURL) {
                 throw MediaUploadError.transport(
                     "Server storage isn't configured. Vercel needs STORAGE_BACKEND=vercel-blob and BLOB_READ_WRITE_TOKEN."

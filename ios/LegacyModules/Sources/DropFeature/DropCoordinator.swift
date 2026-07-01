@@ -333,7 +333,7 @@ public final class DropCoordinator {
                     contentType: draft.contentType,
                     signedPutURL: nil
                 )
-            } else if let url = URL(string: draft.signedPutURL) {
+            } else if let url = TrustedMediaURL.uploadURL(from: draft.signedPutURL) {
                 try await URLSessionMediaUploader().upload(
                     data: data,
                     to: url,

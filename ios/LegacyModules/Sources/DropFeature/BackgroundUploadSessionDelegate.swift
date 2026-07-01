@@ -1,4 +1,5 @@
 #if os(iOS)
+import APIClient
 import Foundation
 import os
 
@@ -28,9 +29,9 @@ public final class BackgroundUploadSessionDelegate: NSObject, URLSessionDataDele
     /// Write `data` to a unique temp file for a background upload task to stream from.
     public static func writeTempFile(_ data: Data) throws -> URL {
         let dir = tempDirectory
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try ProtectedFileIO.createProtectedDirectory(at: dir)
         let url = dir.appendingPathComponent(UUID().uuidString)
-        try data.write(to: url, options: .atomic)
+        try ProtectedFileIO.write(data, to: url)
         return url
     }
 
@@ -58,7 +59,7 @@ public final class BackgroundUploadSessionDelegate: NSObject, URLSessionDataDele
     /// Remove all background-upload temp files (sign-out / account switch).
     public static func purgeAllTempFiles() {
         try? FileManager.default.removeItem(at: tempDirectory)
-        try? FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+        try? ProtectedFileIO.createProtectedDirectory(at: tempDirectory)
     }
 
     private func cleanUp(taskIdentifier: Int) {

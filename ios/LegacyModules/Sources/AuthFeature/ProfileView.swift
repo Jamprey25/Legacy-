@@ -371,7 +371,7 @@ public struct ProfileView: View {
 
         do {
             let response = try await apiClient.exportUserData()
-            guard let url = URL(string: response.archiveURL) else {
+            guard let url = TrustedMediaURL.mediaURL(from: response.archiveURL) else {
                 errorMessage = "Export succeeded but the download link was invalid."
                 return
             }

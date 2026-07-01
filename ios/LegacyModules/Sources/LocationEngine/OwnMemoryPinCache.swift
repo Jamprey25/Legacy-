@@ -30,7 +30,6 @@ public struct CachedOwnPin: Codable, Sendable, Equatable, Identifiable {
 }
 
 public enum OwnMemoryPinCache {
-    private static let storageKey = "legacy.own-memory-pins.v1"
     private static let sessionStartKey = "legacy.session.startedAt"
     private static let maxPins = 200
 
@@ -41,15 +40,11 @@ public enum OwnMemoryPinCache {
     }
 
     public static func clear() {
-        UserDefaults.standard.removeObject(forKey: storageKey)
+        OwnPinSecureStore.clear()
     }
 
     public static func load() -> [CachedOwnPin] {
-        guard
-            let data = UserDefaults.standard.data(forKey: storageKey),
-            let pins = try? JSONDecoder().decode([CachedOwnPin].self, from: data)
-        else { return [] }
-        return pins
+        OwnPinSecureStore.load()
     }
 
     public static func save(_ pin: CachedOwnPin) {
@@ -58,8 +53,7 @@ public enum OwnMemoryPinCache {
         if pins.count > maxPins {
             pins = Array(pins.prefix(maxPins))
         }
-        guard let data = try? JSONEncoder().encode(pins) else { return }
-        UserDefaults.standard.set(data, forKey: storageKey)
+        OwnPinSecureStore.save(pins)
     }
 
     public static func remove(memoryID: String) {
@@ -90,7 +84,6 @@ public enum OwnMemoryPinCache {
     }
 
     private static func persist(_ pins: [CachedOwnPin]) {
-        guard let data = try? JSONEncoder().encode(pins) else { return }
-        UserDefaults.standard.set(data, forKey: storageKey)
+        OwnPinSecureStore.save(pins)
     }
 }

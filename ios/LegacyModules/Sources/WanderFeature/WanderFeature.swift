@@ -933,7 +933,7 @@ private struct TeaserCard: View {
 
     @ViewBuilder
     private var teaserThumbnail: some View {
-        if let urlString = teaser.thumbnailURL, let url = URL(string: urlString) {
+        if let urlString = teaser.thumbnailURL, let url = TrustedMediaURL.mediaURL(from: urlString) {
             AsyncImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
