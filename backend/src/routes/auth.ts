@@ -34,7 +34,7 @@ authRoutes.use("*", rateLimit({ name: "auth", limit: 20, windowSec: 600, keyBy: 
 /** Build the contract-shaped session response (§2). */
 async function sessionResponse(user: User, device: DeviceInfo | undefined) {
   if (device) await upsertSession(user.id, device);
-  const { token, expiresAt } = await signSession(user.id, user.age_tier);
+  const { token, expiresAt } = await signSession(user.id, user.age_tier, device?.device_id);
   return {
     session_token: token,
     expires_at: expiresAt.toISOString(),
@@ -123,8 +123,10 @@ authRoutes.post("/email/verify", async (c) => {
 });
 
 authRoutes.post("/logout", requireAuth, async (c) => {
-  const body = await c.req.json<{ device_id?: string }>().catch(() => ({ device_id: undefined }));
   const userId = c.get("userId");
-  if (userId && body.device_id) await revokeSession(userId, body.device_id);
+  // Prefer the device_id embedded in the JWT (did claim); fall back to body for old tokens.
+  const deviceId = c.get("deviceId")
+    ?? (await c.req.json<{ device_id?: string }>().catch(() => ({ device_id: undefined }))).device_id;
+  if (userId && deviceId) await revokeSession(userId, deviceId);
   return c.body(null, 204);
 });

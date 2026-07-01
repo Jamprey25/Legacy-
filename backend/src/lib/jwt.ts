@@ -45,13 +45,20 @@ async function verifyExternal(
 export interface SessionClaims extends JWTPayload {
   sub: string;            // user id
   age_tier: "adult" | "minor";
+  did?: string;           // device_id — present on tokens issued after 2026-07-01
 }
 
 /** Issue a session JWT. Expiry from SESSION_TTL_DAYS. */
-export async function signSession(userId: string, ageTier: "adult" | "minor"): Promise<{ token: string; expiresAt: Date }> {
+export async function signSession(
+  userId: string,
+  ageTier: "adult" | "minor",
+  deviceId?: string,
+): Promise<{ token: string; expiresAt: Date }> {
   const ttlDays = Number(process.env.SESSION_TTL_DAYS ?? "30");
   const expiresAt = new Date(Date.now() + ttlDays * 86_400_000);
-  const token = await new SignJWT({ age_tier: ageTier })
+  const extra: Record<string, string> = { age_tier: ageTier };
+  if (deviceId) extra.did = deviceId;
+  const token = await new SignJWT(extra)
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(userId)
     .setIssuedAt()

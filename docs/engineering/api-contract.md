@@ -30,7 +30,9 @@ Engineering rationale lives in `engineering-plan.md §3`. This file is the preci
 
 - On `401 unauthorized` or `401 token_expired`, the client surfaces `LegacyAPIError.unauthorized` and routes the user back to the auth flow. No silent refresh.
 - Rationale: a refresh-token rotation scheme is meaningful surface area for a solo builder and the UX cost of occasional re-auth (every ~30 days) is acceptable for Phase 1. Revisit if beta shows re-auth friction. Logged in `collab-log.md`.
-- The token is validated **statelessly** (signature + expiry + claims). No server-side session lookup on the hot path. The `sessions` table exists only for APNs token storage and explicit revocation, not per-request validation.
+- Tokens issued after 2026-07-01 embed a `did` (device_id) claim. On every authenticated request the backend checks `sessions.revoked_at` for that device — if revoked (or row absent), `401 token_expired` is returned. Old tokens without `did` are still accepted statelessly for the remainder of their 30-day TTL.
+- **Logout is now immediate**: calling `POST /v1/auth/logout` sets `revoked_at` on the session row; any subsequent request with the same token returns `401 token_expired`.
+- Tokens without a `did` claim (issued before this change) are validated statelessly and exempt from the revocation check until they expire naturally.
 
 ### 1.3 Error envelope
 

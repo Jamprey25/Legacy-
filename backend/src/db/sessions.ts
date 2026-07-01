@@ -42,6 +42,16 @@ export async function getApnsTokensForUser(userId: string): Promise<string[]> {
   return rows.map((r) => r.apns_token as string);
 }
 
+/** Check whether a session has been explicitly revoked. Returns true if revoked or row absent. */
+export async function isSessionRevoked(userId: string, deviceId: string): Promise<boolean> {
+  const rows = await sql`
+    SELECT revoked_at FROM sessions
+    WHERE user_id = ${userId} AND device_id = ${deviceId}
+  `;
+  const row = rows[0] as { revoked_at: Date | null } | undefined;
+  return !row || row.revoked_at !== null;
+}
+
 /** Remove a stale APNs token (Unregistered / BadDeviceToken response from APNs). */
 export async function clearApnsToken(userId: string, apnsToken: string): Promise<void> {
   await sql`

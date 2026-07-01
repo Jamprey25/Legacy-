@@ -2152,3 +2152,49 @@ P5 (backlog)   → as capacity allows
 **Still open (backend):** SEC-P1-1 JWT revocation, SEC-P2-1 CSAM prod gate, SEC-P2-2 webhook ownership + SSRF, SEC-P2-3 unlock gates, SEC-P2-4 rate-limit fail-closed, SEC-P2-6 (summons already guarded by `NODE_ENV !== "production"`), SEC-P2-7 split webhook/maintenance secret, SEC-P3 private blobs, SEC-P5-3/4/7/8.
 
 **No iOS/Cursor action needed this entry.**
+
+---
+
+## [ios → all] 2026-07-01 — Security remediation Phase 2 (backend hardening)
+
+**Read:** collab-log (last 2 entries). Phase 0 + Phase 1 (iOS) shipped earlier this session; Joseph confirmed Phase 2 scope.
+
+**Shipped (SEC-P2-1 through SEC-P2-6, SEC-P2-8 partial):**
+
+| ID | Change |
+|----|--------|
+| SEC-P2-1 | `backend/src/lib/csamPipeline.ts` — production + `CSAM_PIPELINE=stub` throws before any `scan_status → clear`; dev stub path unchanged. Wired in `webhook.ts`, `uploads.ts`. |
+| SEC-P2-2 | `backend/src/lib/storageUrl.ts` — HTTPS host allowlist + memory-id path check on webhook `media_key`; `fetchAllowedStorageUrl()` used in `exif.ts` + `thumbnail.ts`. Webhook verifies memory exists. |
+| SEC-P2-3 | `memories.ts` unlock — gates `privacy_tier`, `scan_status`, `discoverable_after` (non-owner), empty media; no `createFind()` when media array empty. |
+| SEC-P2-4 | `rateLimit.ts` — DB failure uses conservative in-memory fallback (50% limit) instead of fail-open. |
+| SEC-P2-5 | Already shipped (backend entry above). |
+| SEC-P2-6 | `summons.ts` dev log no longer prints OTP code. `email.ts` already clean. |
+| SEC-P2-7 | **N/A** — `purge-blobs` route already removed; script marked deprecated. No split secret needed until a maintenance route returns. |
+| SEC-P2-8 | `backend/src/lib/appAttestRequest.ts` — enforces assertion + `challenge_token` on drop/unlock/scan when `APP_ATTEST_REQUIRED=true`. |
+
+**Tests:** `test/csamPipeline.test.ts`, `test/storageUrl.test.ts` — 73/73 passing.
+
+### Backend → iOS
+
+- When flipping `APP_ATTEST_REQUIRED=true`, iOS must send **`challenge_token`** alongside `attestation` on `POST /memories`, `POST /memories/:id/unlock`, and `POST /discovery/scan` (same token used to build `clientDataHash`). Today only `attestation` is sent — add before enabling the flag.
+- Production deploy with default `CSAM_PIPELINE=stub` will block media clearing until a real pipeline is configured or env is set explicitly for staging.
+
+**Still open:** SEC-P1-1 JWT revocation, SEC-P3 private blobs, SEC-P4 dashboard, SEC-P5 iOS hardening, iOS `challenge_token` for App Attest.
+
+---
+
+## [backend → ios] 2026-07-01 — JWT revocation (SEC-P1-1)
+
+**Shipped:**
+- **`backend/src/lib/jwt.ts`** — `signSession` now accepts optional `deviceId`; embeds it as a `did` claim in the JWT. `SessionClaims` interface gains `did?: string`.
+- **`backend/src/db/sessions.ts`** — added `isSessionRevoked(userId, deviceId): Promise<boolean>`: queries `sessions.revoked_at`; returns `true` if row absent (treated as revoked).
+- **`backend/src/middleware/auth.ts`** — `requireAuth` now checks `isSessionRevoked` when the JWT carries a `did` claim. Returns `401 token_expired` if revoked. Tokens without `did` (old, pre-change) skip the check. Adds `deviceId: string | undefined` to `AuthVars`.
+- **`backend/src/routes/auth.ts`** — `sessionResponse` passes `device?.device_id` into `signSession`; `POST /v1/auth/logout` uses JWT's `did` with body `device_id` fallback for old tokens.
+- **`docs/engineering/api-contract.md` §1.2** — updated to document `did` claim, immediate-revocation behaviour, and backward-compat window for old tokens.
+- **`backend/test/sessionRevocation.test.ts`** — 5 unit tests: `did` embedded/omitted, active session passes, revoked session → `token_expired`, old token skips DB check.
+
+**Verification:** `npm run typecheck && npm test` → 78/78 passing.
+
+**iOS/Cursor note:** No iOS change needed. The `401 token_expired` path already routes to sign-in. New tokens arrive with `did` on next sign-in; old tokens expire naturally within 30 days.
+
+**Still open (backend):** SEC-P2-1 CSAM prod gate, SEC-P2-2 webhook ownership + SSRF, SEC-P2-3 unlock gates, SEC-P2-4 rate-limit fail-closed, SEC-P2-7 split secrets, SEC-P3 private blobs.
