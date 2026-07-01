@@ -23,6 +23,7 @@ import { requireAuth, type AuthVars } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { validateLocationInput } from "../lib/locationInput.js";
 import { audit } from "../lib/audit.js";
+import { verifyAppAttestForRequest } from "../lib/appAttestRequest.js";
 import { storeImportResult, findImportByKey } from "../db/imports.js";
 import {
   createMediaSlots,
@@ -130,6 +131,8 @@ interface PostMemoriesBody {
   cooldown_hours?: unknown;
   seal?: unknown;
   condition?: unknown;
+  attestation?: unknown;
+  challenge_token?: unknown;
 }
 
 const VALID_MEDIA_TYPES = ["photo", "video", "text"] as const;
@@ -239,6 +242,8 @@ function parseCondition(raw: unknown): {
 memoriesRoutes.post("/", dropLimit, async (c) => {
   const body = (await c.req.json().catch(() => null)) as PostMemoriesBody | null;
   if (!body) throw new ApiError("invalid_request", "Request body must be JSON.");
+
+  await verifyAppAttestForRequest(c, body);
 
   const { media_type } = body;
   const { lat, lng, accuracyM: accuracy_m } = validateLocationInput(body.lat, body.lng, body.accuracy_m);
@@ -642,8 +647,12 @@ memoriesRoutes.post("/:id/unlock", unlockLimit, async (c) => {
     lat: unknown;
     lng: unknown;
     accuracy_m: unknown;
+    attestation?: unknown;
+    challenge_token?: unknown;
   } | null;
   if (!body) throw new ApiError("invalid_request", "Request body must be JSON.");
+
+  await verifyAppAttestForRequest(c, body);
 
   const { lat, lng, accuracyM: accuracy_m } = validateLocationInput(body.lat, body.lng, body.accuracy_m);
 
@@ -651,6 +660,17 @@ memoriesRoutes.post("/:id/unlock", unlockLimit, async (c) => {
   if (!memory) throw new ApiError("not_found", "Memory not found.");
 
   const isOwn = memory.owner_id === userId;
+
+  // --- Content eligibility (SEC-P2-3) ---
+  if (memory.privacy_tier === "private" && memory.owner_id !== userId) {
+    throw new ApiError("forbidden", "This memory is private.");
+  }
+  if (memory.scan_status !== "clear") {
+    throw new ApiError("not_in_range", "Not close enough to unlock this memory.", 423);
+  }
+  if (!isOwn && new Date(memory.discoverable_after) > new Date()) {
+    throw new ApiError("not_in_range", "Not close enough to unlock this memory.", 423);
+  }
 
   // --- Proximity check ---
   const prox = isOwn
@@ -732,6 +752,10 @@ memoriesRoutes.post("/:id/unlock", unlockLimit, async (c) => {
     expires_at,
     position,
   }));
+
+  if (memory.media_type !== "text" && media.length === 0) {
+    throw new ApiError("not_in_range", "Not close enough to unlock this memory.", 423);
+  }
 
   // --- Record Find ---
   await createFind(memoryId, userId);

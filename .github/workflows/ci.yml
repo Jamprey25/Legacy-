@@ -60,6 +60,33 @@ jobs:
       - name: Integration tests
         run: npm run test:integration
 
+      - name: Dependency audit (SEC-P5-8)
+        run: npm audit --audit-level=high
+
+  dashboard:
+    name: Dashboard — build + audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Dependency audit (SEC-P5-8)
+        run: npm audit --audit-level=high
+
   privacy-gate:
     name: Privacy gate — no coordinates in audit_log migrations
     runs-on: ubuntu-latest

@@ -9,6 +9,7 @@ import { generateSignedGetUrl } from "../lib/storage.js";
 import { findNearbyMemories, countNearbyZones } from "../db/memories.js";
 import { validateLocationInput } from "../lib/locationInput.js";
 import { audit } from "../lib/audit.js";
+import { verifyAppAttestForRequest } from "../lib/appAttestRequest.js";
 import { upsertPresencePing, debouncedWarmth, type WarmthBand } from "../db/presencePings.js";
 import { requireAuth, type AuthVars } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
@@ -32,8 +33,12 @@ discoveryRoutes.post("/scan", async (c) => {
     lat: unknown;
     lng: unknown;
     accuracy_m: unknown;
+    attestation?: unknown;
+    challenge_token?: unknown;
   } | null;
   if (!body) throw new ApiError("invalid_request", "Request body must be JSON.");
+
+  await verifyAppAttestForRequest(c, body);
 
   const { lat, lng, accuracyM: accuracy_m } = validateLocationInput(body.lat, body.lng, body.accuracy_m);
 

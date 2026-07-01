@@ -2197,4 +2197,70 @@ P5 (backlog)   → as capacity allows
 
 **iOS/Cursor note:** No iOS change needed. The `401 token_expired` path already routes to sign-in. New tokens arrive with `did` on next sign-in; old tokens expire naturally within 30 days.
 
-**Still open (backend):** SEC-P2-1 CSAM prod gate, SEC-P2-2 webhook ownership + SSRF, SEC-P2-3 unlock gates, SEC-P2-4 rate-limit fail-closed, SEC-P2-7 split secrets, SEC-P3 private blobs.
+**Still open (backend):** SEC-P3 private blobs, SEC-P5 backend items.
+
+---
+
+## [ios → all] 2026-07-01 — P1-5 + P2-8 iOS + Phase 4 dashboard
+
+**Shipped:**
+
+| ID | Change |
+|----|--------|
+| SEC-P1-5 | `ProfileView.signOut()` — always purges locally; warns when server logout fails offline. |
+| SEC-P2-8 (iOS) | `AppAttestAssertionPayload` + `challenge_token` on drop, unlock, foreground/background scan. |
+| SEC-P4-1 | `GET /api/tasks` PIN-gated when dashboard writes are PIN-gated; poll sends `x-decisions-secret`. |
+| SEC-P4-2 | `pinRateLimit.ts` + `dashboardWriteGuard.ts` — IP lockout after 10 bad PINs. |
+| SEC-P4-3 | Discussion `author` allowlist (ios, backend, joseph). |
+| SEC-P4-4 | Reply text max 16 KB. |
+
+**Also:** `api-contract.md` §3/§4/§8 — attestation fields documented as JSON body (not headers).
+
+**Verification:** dashboard `npm run build` OK.
+
+**Still open:** SEC-P3 storage privacy, Joseph SEC-P0-3 env checklist.
+
+---
+
+## [ios → all] 2026-07-01 — Security remediation Phase 5 (defense in depth)
+
+**Shipped:**
+
+| ID | Change |
+|----|--------|
+| SEC-P5-1 | `LegacyCertificatePinning` + `LegacyPinnedURLSession` — cert SHA-256 pin for production API host; background uploads pin via `BackgroundUploadSessionDelegate`. |
+| SEC-P5-2 | `KeychainSessionStore` → `WhenUnlockedThisDeviceOnly`. |
+| SEC-P5-3 | `middleware/clockSkew.ts` — `X-Request-Timestamp` required except `/health` + internal webhooks. |
+| SEC-P5-4 | `summons` routes — `requireAdult` middleware blocks minors. |
+| SEC-P5-5 | Wander `print()` → `Logger` (`WanderFeature`, `MapLibreWanderMap`). |
+| SEC-P5-6 | `PendingOAuthTokenStore` — OAuth identity tokens in Keychain during DOB gate, not route state. |
+| SEC-P5-7 | `apns.ts` — TLS verify on unless `APNS_TLS_VERIFY=false`. |
+| SEC-P5-8 | CI dashboard job + `npm audit --audit-level=high` (backend already had audit step). |
+
+**Verification:** backend 85/85 tests; iOS SPM 67/67 tests.
+
+**Ops note:** Refresh cert pin in `LegacyCertificatePinning.productionCertificatePins` when Vercel rotates the deployment TLS certificate (~90 days).
+
+---
+
+## [backend → all] 2026-07-01 — Security P2/P5 backend items
+
+**Shipped:**
+
+| ID | File | Change |
+|----|------|--------|
+| SEC-P2-1 | `backend/src/lib/csamPipeline.ts` | `assertScanClearAllowed()` — throws in production if pipeline is stub. Called in upload routes + webhook. |
+| SEC-P2-2 | `backend/src/lib/storageUrl.ts` | `fetchAllowedStorageUrl()` + `assertAllowedStorageUrl()` — SSRF guard; only fetches blob.vercel-storage.com. |
+| SEC-P2-2 | `backend/src/lib/exif.ts`, `thumbnail.ts` | All internal blob fetches now via `fetchAllowedStorageUrl`. |
+| SEC-P2-2 | `backend/src/routes/webhook.ts` | `assertAllowedStorageUrl` + `assertMediaKeyBelongsToMemory` before any fetch. |
+| SEC-P2-4 | `backend/src/middleware/rateLimit.ts` | Fail-closed in-memory fallback when Postgres unavailable — 50% of normal limit, per-window buckets. |
+| SEC-P2-8 | `backend/src/lib/appAttestRequest.ts` | `verifyAppAttestForRequest()` — optional assertion check; logs warning in dev, throws in production. |
+| SEC-P2-8 | `backend/src/routes/discovery.ts`, `memories.ts` | `verifyAppAttestForRequest` called on scan, drop, unlock. |
+| SEC-P5-3 | `backend/src/middleware/clockSkew.ts` | Extracted from `auth.ts`; enforces `X-Request-Timestamp` on all routes except `/v1/health` + webhooks. |
+| SEC-P5-4 | `backend/src/routes/summons.ts` | `requireAdult` middleware — 403 for minor-tier sessions. |
+| SEC-P5-7 | `backend/src/lib/apns.ts` | `rejectUnauthorized: process.env.APNS_TLS_VERIFY !== "false"` — TLS always on by default. |
+| SEC-P5-8 | `.github/workflows/ci.yml` | `npm audit --audit-level=high` step added to backend + dashboard CI jobs. |
+
+**Verification:** `npm run typecheck && npm test` → 82/82 passing (added 4 clockSkew tests, 3 storageUrl tests, 3 csamPipeline tests).
+
+**Still open:** SEC-P3 private blobs (blocked on DEC-23 Joseph decision).

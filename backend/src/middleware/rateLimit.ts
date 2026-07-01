@@ -15,6 +15,10 @@ import type { Context, Next } from "hono";
 import { ApiError } from "../lib/errors.js";
 import { incrementAndCount } from "../db/rateLimits.js";
 
+/** In-memory fallback when Postgres counters are unavailable (SEC-P2-4). */
+const fallbackBuckets = new Map<string, { windowStartMs: number; count: number }>();
+const FALLBACK_LIMIT_RATIO = 0.5;
+
 export interface RateLimitOptions {
   /** Short label for the bucket key namespace, e.g. "auth", "scan", "unlock", "drop". */
   name: string;
@@ -39,6 +43,19 @@ function windowStart(windowSec: number, now: number): Date {
   return new Date(Math.floor(now / windowMs) * windowMs);
 }
 
+function incrementFallback(bucketKey: string, windowSec: number): number {
+  const now = Date.now();
+  const windowMs = windowSec * 1000;
+  const windowStartMs = Math.floor(now / windowMs) * windowMs;
+  const existing = fallbackBuckets.get(bucketKey);
+  if (!existing || existing.windowStartMs !== windowStartMs) {
+    fallbackBuckets.set(bucketKey, { windowStartMs, count: 1 });
+    return 1;
+  }
+  existing.count += 1;
+  return existing.count;
+}
+
 export function rateLimit(opts: RateLimitOptions) {
   return async function rateLimitMiddleware(c: Context, next: Next): Promise<void> {
     const userId = c.get("userId") as string | undefined;
@@ -53,7 +70,15 @@ export function rateLimit(opts: RateLimitOptions) {
     try {
       count = await incrementAndCount(bucketKey, start);
     } catch {
-      // Fail-open: a counter store hiccup must not take down the endpoint.
+      // Fail-closed with a conservative in-memory fallback (SEC-P2-4).
+      const fallbackLimit = Math.max(1, Math.floor(opts.limit * FALLBACK_LIMIT_RATIO));
+      count = incrementFallback(bucketKey, opts.windowSec);
+      if (count > fallbackLimit) {
+        const retryAfter = Math.ceil((start.getTime() + opts.windowSec * 1000 - Date.now()) / 1000);
+        throw new ApiError("rate_limited", "Too many requests. Slow down.", 429, {
+          retry_after_s: Math.max(retryAfter, 1),
+        });
+      }
       await next();
       return;
     }

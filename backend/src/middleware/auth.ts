@@ -1,6 +1,5 @@
 // Request middleware:
 //  - requestId: stamp every request for the error envelope + audit log.
-//  - clockSkew: enforce X-Request-Timestamp within ±5 min (contract §1.1).
 //  - requireAuth: validate the bearer session JWT and attach the user to context.
 
 import type { Context, Next } from "hono";
@@ -8,7 +7,7 @@ import { ApiError } from "../lib/errors.js";
 import { verifySession, type SessionClaims } from "../lib/jwt.js";
 import { isSessionRevoked } from "../db/sessions.js";
 
-const SKEW_MS = 5 * 60_000;
+export { clockSkew } from "./clockSkew.js";
 
 export interface AuthVars {
   requestId: string;
@@ -21,18 +20,6 @@ export interface AuthVars {
 export async function requestId(c: Context, next: Next): Promise<void> {
   const id = c.req.header("X-Request-Id") ?? `req_${crypto.randomUUID()}`;
   c.set("requestId", id);
-  await next();
-}
-
-/** Reject requests whose X-Request-Timestamp is outside the allowed clock skew. */
-export async function clockSkew(c: Context, next: Next): Promise<void> {
-  const ts = c.req.header("X-Request-Timestamp");
-  if (ts) {
-    const t = Date.parse(ts);
-    if (Number.isNaN(t) || Math.abs(Date.now() - t) > SKEW_MS) {
-      throw new ApiError("clock_skew", "Your device clock is out of sync.");
-    }
-  }
   await next();
 }
 

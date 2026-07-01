@@ -13,6 +13,7 @@
 // SEC-MED-4.
 
 import { put, del } from "@vercel/blob";
+import { fetchAllowedStorageUrl } from "./storageUrl.js";
 
 // Lazy-loaded so a missing/broken native sharp binary cannot crash app startup.
 // Only the upload webhook path ever loads it.
@@ -63,7 +64,7 @@ export async function stripAndReplaceBlob(
   }
 
   try {
-    const res = await fetch(blobUrl);
+    const res = await fetchAllowedStorageUrl(blobUrl);
     if (!res.ok) return null;
     const original = Buffer.from(await res.arrayBuffer());
 

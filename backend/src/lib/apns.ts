@@ -90,7 +90,8 @@ export async function sendProximityPush(deviceToken: string): Promise<PushResult
     };
 
     const client = http2.connect(`https://${APNS_HOST}`, {
-      rejectUnauthorized: ENV === "production",
+      // SEC-P5-7: TLS verification on by default; set APNS_TLS_VERIFY=false only for local MITM debugging.
+      rejectUnauthorized: process.env.APNS_TLS_VERIFY !== "false",
     });
 
     client.on("error", (err) => {

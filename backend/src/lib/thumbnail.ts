@@ -11,6 +11,7 @@
 // scan_status — the original is already clear.
 
 import { put } from "@vercel/blob";
+import { fetchAllowedStorageUrl } from "./storageUrl.js";
 
 // Lazy-loaded so a missing/broken native sharp binary cannot crash app startup.
 // Only the image-processing path (post-upload webhook) ever loads it.
@@ -49,7 +50,7 @@ export async function generateAndStoreThumbnail(
   }
 
   try {
-    const res = await fetch(sourceUrl);
+    const res = await fetchAllowedStorageUrl(sourceUrl);
     if (!res.ok) return null;
     const input = Buffer.from(await res.arrayBuffer());
 

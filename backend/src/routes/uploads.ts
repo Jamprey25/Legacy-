@@ -25,6 +25,7 @@ import { Hono } from "hono";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { put } from "@vercel/blob";
 import { ApiError } from "../lib/errors.js";
+import { assertScanClearAllowed } from "../lib/csamPipeline.js";
 import { getMemoryByOwner, updateMemoryAfterUpload, setThumbnailKey } from "../db/memories.js";
 import { setMediaAfterUpload, setMediaThumbnail } from "../db/memoryMedia.js";
 import { generateAndStoreThumbnail } from "../lib/thumbnail.js";
@@ -106,6 +107,7 @@ uploadsRoutes.post("/direct", async (c) => {
 
   // Record this photo in the media set. Position 0 is also mirrored onto the memory row
   // (media_key + scan_status → clear) so discovery/proximity keep working off the hero.
+  assertScanClearAllowed();
   await setMediaAfterUpload(memoryId, position, blob.url, mediaType);
   if (position === 0) {
     await updateMemoryAfterUpload(memoryId, blob.url);
@@ -156,6 +158,7 @@ uploadsRoutes.post("/", async (c) => {
     onUploadCompleted: async ({ blob, tokenPayload }) => {
       if (!tokenPayload) return;
       const { memoryId } = JSON.parse(tokenPayload) as { memoryId: string };
+      assertScanClearAllowed();
       // Store the full public blob URL as media_key and flip scan_status → clear.
       // (CSAM pipeline is a separate gate; in prod this is where the real scan hooks in.)
       await updateMemoryAfterUpload(memoryId, blob.url);

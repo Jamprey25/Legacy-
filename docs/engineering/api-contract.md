@@ -20,7 +20,7 @@ Engineering rationale lives in `engineering-plan.md §3`. This file is the preci
 | Header | Value | Notes |
 |---|---|---|
 | `Authorization` | `Bearer <session_token>` | Opaque JWT from `/auth/*`. Stored in Keychain. |
-| `X-Request-Timestamp` | RFC 3339 UTC | Must be within **±5 min** of server clock or request is rejected `401 clock_skew`. |
+| `X-Request-Timestamp` | RFC 3339 UTC | **Required** on all routes except `GET /health` and `POST /internal/webhook/*`. Must be within **±5 min** of server clock or request is rejected `401 clock_skew`. |
 | `X-App-Version` | semver, e.g. `0.1.0` | **Confirmed header name.** iOS sends `CFBundleShortVersionString`. Used for audit + min-version gating. |
 | `X-Device-Id` | stable per-install UUID | Used for App Attest binding + APNs token association. |
 
@@ -133,7 +133,8 @@ Create a memory record and get a signed upload URL. Drop point is set here and i
   "cooldown_hours": 24,           // optional, default 24
   "seal": null,                   // see §6
   "condition": null,              // see §6
-  "attestation": "<app-attest-assertion>"
+  "attestation": "<base64 CBOR assertion>",   // required when APP_ATTEST_REQUIRED=true
+  "challenge_token": "<token from GET /auth/attest/challenge>"  // same token used for clientDataHash
 }
 ```
 
@@ -215,6 +216,8 @@ Submit current location; get teasers for eligible nearby memories. **Location is
 
 **Request** `{ "lat": 37.7749, "lng": -122.4194, "accuracy_m": 8.0 }`
 
+Optional when `APP_ATTEST_REQUIRED=true`: `"attestation"` and `"challenge_token"` (same pair as drop).
+
 **Response `200`**
 ```json
 {
@@ -262,7 +265,9 @@ Submit current location; get teasers for eligible nearby memories. **Location is
 ### `POST /v1/memories/{id}/unlock`
 Attempt to unlock a specific memory. Re-validates proximity, dwell, seals, conditions.
 
-**Request** `{ "lat": 37.7749, "lng": -122.4194, "accuracy_m": 8.0, "attestation": "<assertion>" }`
+**Request** `{ "lat": 37.7749, "lng": -122.4194, "accuracy_m": 8.0, "attestation": "<assertion>", "challenge_token": "<token>" }`
+
+Both attestation fields required when `APP_ATTEST_REQUIRED=true`.
 
 **Response `200`**
 ```json
@@ -547,18 +552,21 @@ Response `200`:
 
 Errors: `403 attestation_invalid` (bad cert chain / nonce / rpIdHash / key_id mismatch).
 
-### Assertion on drop / unlock (M5)
+### Assertion on drop / unlock / scan (M5)
 
-When `APP_ATTEST_REQUIRED=true`, `POST /v1/memories` and `POST /v1/memories/:id/unlock`
-require assertion headers (enforcement middleware added at flag flip):
+When `APP_ATTEST_REQUIRED=true`, `POST /v1/memories`, `POST /v1/memories/:id/unlock`, and
+`POST /v1/discovery/scan` require both fields in the JSON body:
 
+```json
+{
+  "attestation": "<base64 CBOR assertion from DCAppAttestService.generateAssertion>",
+  "challenge_token": "<token from GET /v1/auth/attest/challenge>"
+}
 ```
-X-App-Attest-Assertion: <base64 CBOR assertion from DCAppAttestService.generateAssertion>
-X-App-Attest-Challenge: <challenge_token from GET /challenge>
-```
 
-Simulator: `DCAppAttestService.isSupported` is false → send `null` / omit headers. Backend
-skips verification when `APP_ATTEST_REQUIRED=false`.
+The client must use the same `challenge_token` to compute `clientDataHash` before calling
+`generateAssertion`. Simulator: `DCAppAttestService.isSupported` is false → omit both fields.
+Backend skips verification when `APP_ATTEST_REQUIRED=false`.
 
 ---
 

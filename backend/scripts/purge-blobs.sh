@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 #
-# Dev/maintenance: empty the Vercel Blob store via the guarded purge route
-# (POST /v1/internal/purge-blobs, see src/app.ts).
+# DEPRECATED: POST /v1/internal/purge-blobs was removed (SEC-P0-1 / SEC-P4-5).
+# This script is kept for reference only — it will 404 against current backends.
+# For blob cleanup, use Vercel Blob dashboard or a one-off script with BLOB_READ_WRITE_TOKEN.
+#
+# Previously: empty the Vercel Blob store via the guarded purge route.
 #
 # ⚠️  DESTRUCTIVE: deletes EVERY blob in the store. Use only while testing.
 #     NEVER run this against a store that holds real users' memories, and

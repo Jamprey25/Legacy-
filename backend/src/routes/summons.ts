@@ -1,6 +1,6 @@
 // Phase 2 preview: phone OTP + summons SMS (Twilio when configured, log-only fallback).
 
-import { Hono } from "hono";
+import { Hono, type Context, type Next } from "hono";
 import { ApiError } from "../lib/errors.js";
 import { requireAuth, type AuthVars } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
@@ -16,7 +16,17 @@ import {
 export const summonsRoutes = new Hono<{ Variables: AuthVars }>();
 
 summonsRoutes.use("*", requireAuth);
+summonsRoutes.use("*", requireAdult);
 summonsRoutes.use("*", rateLimit({ name: "summons", limit: 10, windowSec: 3600, keyBy: "user" }));
+
+/** Phase 2 preview: minors cannot send summons until product rules expand (SEC-P5-4). */
+async function requireAdult(c: Context, next: Next): Promise<void> {
+  const tier = c.get("ageTier") as "adult" | "minor" | undefined;
+  if (tier === "minor") {
+    throw new ApiError("age_restricted", "Summons are not available for your account yet.");
+  }
+  await next();
+}
 
 function normalizePhone(raw: string): string {
   const digits = raw.replace(/\D/g, "");
@@ -48,7 +58,7 @@ summonsRoutes.post("/phone/send", async (c) => {
     });
     if (!resp.ok) throw new ApiError("internal_error", "Could not send SMS.", 502);
   } else if (process.env.NODE_ENV !== "production") {
-    console.info(`[summons] dev OTP for ${phone}: ${code}`);
+    console.info(`[summons] dev OTP issued for ${phone}`);
   }
 
   return c.json({ ok: true, expires_in_s: 600 });
