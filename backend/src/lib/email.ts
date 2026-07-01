@@ -7,7 +7,7 @@ export async function sendOtpEmail(email: string, code: string): Promise<void> {
   const from = process.env.OTP_FROM_EMAIL ?? "hello@legacy.app";
 
   if (!apiKey) {
-    console.log(`[dev OTP] ${email} → ${code}`);
+    console.log(`[dev OTP] code issued for ${email}`);
     return;
   }
 

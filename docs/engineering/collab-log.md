@@ -1993,3 +1993,162 @@ Verification:
 **Verification:** `xcodebuild build -scheme WanderFeature` (iOS 26.5 sim) → **BUILD SUCCEEDED**. `swift test --filter OwnMemoryPinCacheTests` → 2/2 passed. Not yet exercised on-device.
 
 **iOS/Cursor action:** Sanity-check on device — fresh install / signed-in account with existing memories should show all own pins on Wander without walking to them. New unit test for `reconcile` (prune + grace window) would be worth adding. Heads-up for shared tree: `git pull` before next iOS session.
+
+**Revision (same day):** The in-app `requestAlwaysAuthorization()` upgrade proved unreliable on-device — iOS presents that prompt at most once per install and can silently defer it, so repeat taps no-op'd ("nothing happens"). Reworked the Location row to be deterministic: fire the one-shot native prompt only from `.notDetermined` (gated by a persisted `legacyHasRequestedAlwaysLocation` flag), and for every other state — including `.authorizedWhenInUse` — deep-link to Settings, which always works. Subtitle for When-In-Use now reads "tap to set Always in Settings." Rebuilt `AuthFeature` → BUILD SUCCEEDED.
+
+---
+
+## [ios → all] 2026-07-01 — Full-repo security audit remediation plan
+
+**Context:** Joseph requested a multi-agent security audit (backend, iOS, dashboard/CI). Six review agents completed 2026-06-30 / 2026-07-01. Recent iOS diff (hydrate own pins, Profile location row, background upload hook, map UX) had **zero medium+** findings. Gaps are mostly **fail-open guards**, **session lifecycle**, **local cross-account data on iOS**, and **Phase 1 storage/CSAM trade-offs** already documented in code (DEC-23).
+
+**Audit summary (medium+ only):**
+
+| Area | CRITICAL | HIGH | MEDIUM |
+|------|----------|------|--------|
+| Backend | 1 | 7 | 8 |
+| iOS | 0 | 2 | 8+ |
+| Dashboard | 1 | 2 | 3 |
+
+**Positive controls (keep):** Parameterized SQL; owner-scoped DB helpers; Apple/Google JWKS verification; OTP hashed + anti-enumeration; DEC-15 coordinate gating on scan; Keychain session tokens; EXIF strip before upload; default ATS (no arbitrary loads).
+
+---
+
+### Phase 0 — Stop-the-bleeding (same session / before next deploy)
+
+| ID | Finding | Owner | Action | Done when |
+|----|---------|-------|--------|-----------|
+| SEC-P0-1 | `POST /v1/internal/purge-blobs` fails open when `WEBHOOK_SECRET` unset (`app.ts:28-43`) | **backend** | Match webhook fail-closed: `if (!WEBHOOK_SECRET \|\| header !== WEBHOOK_SECRET) return 403`. Prefer **remove route** after maintenance. | Unit test: missing env → 403; prod has secret or route gone |
+| SEC-P0-2 | Dashboard writes fail open when `DECISIONS_SECRET` unset but `GITHUB_TOKEN` set (`dashboardAuth.ts:10`) | **ios** (dashboard) | Fail closed when `GITHUB_TOKEN` is set: require non-empty `DECISIONS_SECRET` on all POST write routes. Build-time guard in Vercel. | Deploy fails or writes reject without PIN |
+| SEC-P0-3 | Joseph: verify prod env | **joseph** | Confirm `WEBHOOK_SECRET`, `DECISIONS_SECRET`, `SESSION_JWT_SECRET`, `APP_ATTEST_SECRET` all set on Vercel (backend + dashboard). Rotate if ever exposed. | Checklist ticked in dashboard manual QA |
+
+---
+
+### Phase 1 — Session & account lifecycle (1–2 sessions)
+
+| ID | Finding | Owner | Action | Done when |
+|----|---------|-------|--------|-----------|
+| SEC-P1-1 | JWT ignores DB revocation on logout | **backend** | Add `jti` or session version to JWT; check `sessions.revoked_at` in `requireAuth` (or short-lived access + refresh). Document in `api-contract.md`. | Logout → old token 401; integration test |
+| SEC-P1-2 | iOS sign-out does not purge local user data (H1) | **ios** | New `SessionDataPurge.clearAll()` called from `AppModel.signOut()` and account delete: `OwnMemoryPinCache.clear()`, `WanderScanCache.clear()`, `CoarseZoneCache` clear, place-name cache, widget App Group keys, cancel bg URLSession + delete `tmp/legacy-bg-uploads/`, SwiftData `DropDraft` + files. | Manual QA: User A sign-out → User B sees no A pins/teasers/drafts |
+| SEC-P1-3 | `reconcile()` grace window cross-account leak | **ios** | Scope grace retention to current session (track session-scoped drop IDs) **or** namespace cache key by `userID` from `AccountProfileStore`. Complements SEC-P1-2. | Unit test: reconcile after account switch |
+| SEC-P1-4 | `isAuthenticated` = token presence only | **ios** | Global 401/`token_expired` handler → force sign-out + purge. Optional lightweight `/user` ping on foreground. | Expired token cannot stay in main UI |
+| SEC-P1-5 | Server logout failure still clears local session | **ios** | Surface offline logout failure; queue retry; document "sign out everywhere" limitation until SEC-P1-1 ships. | UX copy + test |
+
+---
+
+### Phase 2 — Backend authorization & pipeline hardening (backend-heavy)
+
+| ID | Finding | Owner | Action | Done when |
+|----|---------|-------|--------|-----------|
+| SEC-P2-1 | Stub CSAM marks content `clear` (`CSAM_PIPELINE=stub` default) | **backend** | Prod: require `CSAM_PIPELINE !== stub` or fail-closed; block discovery/unlock when `scan_status !== clear`. | Prod deploy gate; test pending memory not discoverable |
+| SEC-P2-2 | Storage webhook: no ownership + SSRF via `media_key` | **backend** | Validate `memory_id` exists; allowlist blob hostnames; reject non-HTTPS URLs before `fetch()`. Separate webhook secret from maintenance (SEC-P2-7). | Test: evil URL rejected |
+| SEC-P2-3 | Unlock omits `scan_status`, `discoverable_after`, `privacy_tier` | **backend** | Gate unlock for non-owners; return 423 if hero media not clear; don't `createFind()` on empty unlock. | Integration tests for each gate |
+| SEC-P2-4 | Rate limit fail-open on DB errors | **backend** | Fail-closed or in-memory fallback (conservative limits) when rate_limits table unavailable. | Test with DB mock failure |
+| SEC-P2-5 | Attestation errors leak internals (`attest.ts:57`) | **backend** | Generic client message; log server-side only. | No stack/detail in 4xx body |
+| SEC-P2-6 | OTP/SMS codes in logs (`email.ts`, `summons.ts`) | **backend** | Remove code logging; dev-only secure delivery path. | Grep clean |
+| SEC-P2-7 | Single `WEBHOOK_SECRET` for webhook + purge + scripts | **backend** + **joseph** | Split: `WEBHOOK_SECRET`, `MAINTENANCE_SECRET`; update Vercel + `purge-blobs.sh`. | Docs + env checklist |
+| SEC-P2-8 | App Attest not enforced on drop/unlock/upload/scan | **backend** + **ios** | Backend: middleware when `APP_ATTEST_REQUIRED=true`. iOS: block sensitive actions if assertion nil (M4). | Flag-on integration test |
+
+---
+
+### Phase 3 — Storage & export privacy (DEC-23, pre–public tier)
+
+| ID | Finding | Owner | Action | Done when |
+|----|---------|-------|--------|-----------|
+| SEC-P3-1 | Public blob URLs = permanent bearer capabilities | **backend** | Private blobs + signed GET TTL; migration plan for existing URLs. | DEC-23 thread resolved |
+| SEC-P3-2 | GDPR export uploaded `access: "public"` with email + coords | **backend** | Private blob + short-lived signed URL; min fields. | Export URL expires; not world-fetchable |
+| SEC-P3-3 | iOS upload/export/media URLs without host allowlist | **ios** | Allowlist Vercel Blob + API host for presigned PUT, `AsyncImage`, export share (`MemoryMediaUploader`, `ProfileView`). | Reject unknown host in client |
+| SEC-P3-4 | Own-pin coordinates in plaintext UserDefaults | **ios** | Keychain or CryptoKit-encrypted file; `NSFileProtectionComplete` on drafts/tmp. | Threat model doc updated |
+
+---
+
+### Phase 4 — Dashboard & ops (parallel with Phase 2)
+
+| ID | Finding | Owner | Action | Done when |
+|----|---------|-------|--------|-----------|
+| SEC-P4-1 | Unauthenticated `GET /api/tasks` exposes full `tasks.json` | **ios** (dashboard) + **joseph** | Vercel Deployment Protection **or** middleware auth on read routes; redact sensitive threads from committed JSON. | Dashboard not world-readable without auth |
+| SEC-P4-2 | No rate limit on PIN-gated writes | **ios** (dashboard) | IP rate limit + lockout on failed PIN; long random `DECISIONS_SECRET`. | Brute-force test blocked |
+| SEC-P4-3 | Client-controlled `author` on discussion replies | **ios** (dashboard) | Server allowlist (`ios`, `backend`, `joseph`) or separate actor secrets. | Forged `author: backend` rejected |
+| SEC-P4-4 | Unbounded reply `text` | **ios** (dashboard) | Max length (e.g. 16 KB) before GitHub write. | 413 on oversized body |
+| SEC-P4-5 | Remove `/internal/purge-blobs` after blob maintenance | **backend** | Delete route + script or IP-restrict. | Route absent in prod |
+
+---
+
+### Phase 5 — Defense in depth (backlog, pre–TestFlight hardening)
+
+| ID | Finding | Owner | Action |
+|----|---------|-------|--------|
+| SEC-P5-1 | No TLS / cert pinning on API | **ios** | Pin API host SPKI in `URLSessionDelegate` |
+| SEC-P5-2 | Keychain `AfterFirstUnlock` | **ios** | → `WhenUnlockedThisDeviceOnly` |
+| SEC-P5-3 | Clock skew optional | **backend** | Require `X-Request-Timestamp` on mutating routes |
+| SEC-P5-4 | `age_tier` not enforced | **backend** | Phase 2 minor restrictions when product rules land |
+| SEC-P5-5 | Production `print()` in Wander | **ios** | → `Logger` + `#if DEBUG` |
+| SEC-P5-6 | OAuth identity token in route state during DOB gate | **ios** | Short-lived Keychain buffer |
+| SEC-P5-7 | APNs TLS verify off in sandbox | **backend** | Accept or pin in staging |
+| SEC-P5-8 | `npm audit` in CI for backend + dashboard | **backend** / **ios** | CI step |
+
+---
+
+### Suggested execution order
+
+```
+P0 (today)     → SEC-P0-1, P0-2, P0-3
+P1 (this week) → SEC-P1-2, P1-3, P1-1, P1-4  [iOS purge unblocks shared-device QA]
+P2 (backend)   → SEC-P2-1, P2-2, P2-3, P2-6   [before prod traffic scale]
+P3 (storage)   → SEC-P3-1, P3-2, P3-3         [DEC-23; before public tier]
+P4 (dashboard) → SEC-P4-1, P4-2, P0-2         [parallel]
+P5 (backlog)   → as capacity allows
+```
+
+**Agent routing:**
+- **Cursor (ios):** SEC-P0-2, P1-2–P1-5, P3-3–P3-4, P4-1–P4-4, P5-1–P2, P5-5–P5-6
+- **Claude Code (backend):** SEC-P0-1, P1-1, P2-1–P2-7, P3-1–P3-2, P5-3–P5-4, P5-7–P5-8
+- **Joseph:** SEC-P0-3, P4-1 (Vercel protection), env rotation, QA on shared-device sign-out
+
+**Verification gates (Joseph QA):**
+1. Shared device: sign out → sign in different account → no prior pins, teasers, or drafts.
+2. Dashboard: write APIs reject without PIN; prod has PIN set.
+3. Logout: token invalid within minutes (after P1-1), not 30 days.
+4. Pending-scan memory not visible in discovery (after P2-1).
+
+**Dashboard thread:** Recommend new `decisions[]` id `sec-audit-remediation-2026-07` with phases as checklist — Joseph to confirm priority if Phase 3 storage work should precede TestFlight.
+
+**No code shipped this entry** — plan only. Next iOS session: implement SEC-P1-2 + SEC-P1-3 unless Joseph reprioritizes.
+
+---
+
+## [ios → all] 2026-07-01 — Security remediation Phase 0 + Phase 1 (partial)
+
+**Shipped:**
+
+| ID | Change | Owner |
+|----|--------|-------|
+| SEC-P0-1 | `purge-blobs` fail-closed when `WEBHOOK_SECRET` unset (`backend/src/app.ts`) | backend (minimal fix in shared tree) |
+| SEC-P0-2 | Dashboard writes fail-closed when `GITHUB_TOKEN` set without `DECISIONS_SECRET` (`dashboardAuth.ts` + all POST write routes return 503) | ios |
+| SEC-P1-2 | `SessionDataPurge` on sign-out / invalid session — clears own pins, scan cache, coarse zones, place names, widget App Group, bg-upload temps, SwiftData drop drafts | ios |
+| SEC-P1-3 | `OwnMemoryPinCache.reconcile` grace scoped to current session (`markSessionStart` on sign-in); `clear()` added | ios |
+| SEC-P1-4 | `LegacyAPIClient` `onSessionInvalidated` callback → `AppModel.signOutFromInvalidSession()` on `401` unauthorized/token_expired | ios |
+
+**Files touched:** `SessionDataPurge.swift` (new), `LegacyApp.swift`, `OwnMemoryPinCache.swift`, `RegionRotationPolicy.swift`, `DropDraftStore.swift`, `BackgroundUploadSessionDelegate.swift`, `APIClient.swift`, `ProfileView.swift`, `dashboard/**`, `backend/src/app.ts`, tests in `OwnMemoryPinCacheTests`.
+
+**Still open (next sessions):** SEC-P1-1 JWT revocation (backend), SEC-P2 CSAM/webhook/unlock gates (backend), SEC-P3 private blobs (backend), SEC-P4 dashboard read protection + rate limits, SEC-P5 pinning/Keychain hardening.
+
+**Joseph QA:** Shared-device sign-out → sign-in different account → confirm no prior pins/teasers. Confirm Vercel dashboard has `DECISIONS_SECRET` set when `GITHUB_TOKEN` is present.
+
+---
+
+## [backend → all] 2026-07-01 — Security P0/P2 quick fixes
+
+**Read:** collab-log (last 2 entries) + tasks.json. No open `decisions[]` threads needed backend replies.
+
+**Shipped (SEC-P0-1, SEC-P2-5, SEC-P2-6):**
+
+- **`backend/src/app.ts`** — removed `POST /v1/internal/purge-blobs` entirely (SEC-P0-1 final action). The fail-closed `!secret` guard was already in place; audit recommended deleting the route after maintenance, which is done.
+- **`backend/src/lib/email.ts`** — stripped the OTP code from the dev-fallback log: was `` `[dev OTP] ${email} → ${code}` ``, now `` `[dev OTP] code issued for ${email}` `` (SEC-P2-6). Code is never logged; email only.
+- **`backend/src/routes/attest.ts`** — attestation error no longer echoes the internal `msg` to the API client; `reason` already recorded in audit log. Generic client message: `"Attestation verification failed."` (SEC-P2-5).
+
+**Verification:** `npm run typecheck && npm test` → all 65 tests passing.
+
+**Still open (backend):** SEC-P1-1 JWT revocation, SEC-P2-1 CSAM prod gate, SEC-P2-2 webhook ownership + SSRF, SEC-P2-3 unlock gates, SEC-P2-4 rate-limit fail-closed, SEC-P2-6 (summons already guarded by `NODE_ENV !== "production"`), SEC-P2-7 split webhook/maintenance secret, SEC-P3 private blobs, SEC-P5-3/4/7/8.
+
+**No iOS/Cursor action needed this entry.**

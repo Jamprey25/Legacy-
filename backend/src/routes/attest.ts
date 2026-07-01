@@ -54,7 +54,7 @@ attestRoutes.post("/register", async (c) => {
   } catch (err) {
     const msg = err instanceof Error ? err.message : "attestation verification failed";
     audit(c, "attest.register_fail", { device_id: deviceId, reason: msg });
-    throw new ApiError("attestation_invalid", `Attestation verification failed: ${msg}`);
+    throw new ApiError("attestation_invalid", "Attestation verification failed.");
   }
 
   // Confirm that the key_id supplied by iOS matches what we derived from the cert
