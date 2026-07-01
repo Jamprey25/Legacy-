@@ -2263,4 +2263,25 @@ P5 (backlog)   → as capacity allows
 
 **Verification:** `npm run typecheck && npm test` → 82/82 passing (added 4 clockSkew tests, 3 storageUrl tests, 3 csamPipeline tests).
 
-**Still open:** SEC-P3 private blobs (blocked on DEC-23 Joseph decision).
+---
+
+## [ios → all] 2026-07-01 — Security revamp Phase 3 (storage privacy) + revamp complete
+
+**Phase 3 — Storage & export privacy (SEC-P3-1 … P3-4)**
+
+| ID | Area | Change |
+|----|------|--------|
+| SEC-P3-1 | `backend/src/lib/blobSignedGet.ts`, `storage.ts`, `uploads.ts`, `exif.ts`, `thumbnail.ts` | New uploads default `access: private` (`BLOB_ACCESS` override). Unlock/list/export mint presigned GET (~60 min) via `issueSignedToken` + `presignUrl`. Legacy public blob URLs in DB still resolve. |
+| SEC-P3-2 | `backend/src/routes/user.ts` | GDPR export: private blob, presigned `archive_url` (~15 min), `archive_expires_at`; **email removed** from archive JSON. |
+| SEC-P3-3 | `ios/.../TrustedMediaURL.swift` | Client host allowlist for media GET + presigned PUT. Wired through Profile export, Memory Lane, Wander teasers, upload paths. |
+| SEC-P3-4 | `OwnPinSecureStore.swift`, `ProtectedFileIO.swift`, `DropDraftStore`, `BackgroundUploadSessionDelegate` | Own-pin coords encrypted (AES-GCM, key in Keychain); draft/bg-upload temps use `NSFileProtectionComplete`. Migrates legacy UserDefaults pins on first load. |
+
+**Backend → iOS**
+- Unlock / list / discovery thumbnails now return **presigned GET URLs** (~60 min), not raw blob URLs. iOS already treats URLs as ephemeral (no persistence) — no schema change beyond optional `archive_expires_at` on export.
+- Set `BLOB_ACCESS=private` (default) on Vercel. Existing public blobs remain readable via presigned GET with `access: public`.
+
+**Verification:** backend 87/87, iOS SPM 70/70.
+
+**Security audit revamp status:** Phases 0–5 + P3 **complete in code**. Only **SEC-P0-3** remains (Joseph Vercel env checklist — operational, not code).
+
+**Dashboard thread:** `concern-blob-public-url` — iOS reply appended in `tasks.json` (Vercel private blobs + presigned GET shipped; full S3 migration deferred unless Joseph reopens).

@@ -161,7 +161,7 @@ Create a memory record and get a signed upload URL. Drop point is set here and i
 
 ### 3.2 Media upload — direct server-side upload (active path)
 
-Storage: **Vercel Blob** (Phase 1); AWS S3 presigned GET at Phase 3 (Joseph 2026-06-18).
+Storage: **Vercel Blob** with private blobs + presigned GET (SEC-P3-1, 2026-07-01).
 
 **Active path: `POST /v1/uploads/direct`** (shipped commit 61e9dd9 — use this).
 
@@ -180,15 +180,17 @@ Body: raw EXIF-stripped bytes (max 25 MB full, 512 KB thumbnail)
 
 Response `200`:
 ```json
-{ "url": "https://public.blob.vercel-storage.com/memories/…/0.jpg" }
+{ "url": "https://abc.private.blob.vercel-storage.com/memories/…/0-xyz.jpg" }
 ```
 
 Flow:
 1. `POST /v1/memories` → `{ memory_id, upload: null, scan_status: "pending" }`.
 2. Strip EXIF client-side (iOS: `EXIFStripper.strip()`).
 3. `POST /v1/uploads/direct` with stripped bytes, `X-Memory-Id: memory_id` (and
-   `X-Media-Position` for photo 1+). Backend calls `@vercel/blob put()`, writes the photo to
-   `memory_media`; position 0 also sets `media_key` + flips `scan_status → clear` + thumbnails.
+   `X-Media-Position` for photo 1+). Backend calls `@vercel/blob put()` with
+   `access: "private"` (override via `BLOB_ACCESS=public` for legacy testing), writes the
+   photo to `memory_media`; position 0 also sets `media_key` + flips `scan_status → clear`
+   + thumbnails.
 
 **Multi-photo:** call once per photo with an increasing `X-Media-Position`. Reads
 (`GET /:id`, unlock) return the ordered `media[]` array (hero = position 0). The
@@ -198,14 +200,13 @@ complete; very large imports should move to the background uploader (follow-up).
 Dev/simulator: use `POST /v1/internal/webhook/storage` stub to flip `scan_status` instead
 of the real upload (Vercel can't reach localhost).
 
-**Privacy (Phase 1):** blobs are `public` with random suffix → unguessable bearer URL.
-Not short-TTL. Phase 3 migrates to S3 presigned GET at unlock.
-
-**Legacy path (kept for reference, not used by iOS):** `POST /v1/uploads` implements the
-Vercel Blob client-token handshake (`@vercel/blob handleUpload`). iOS no longer calls
-this endpoint; it remains available for future tooling or fallback.
+**Privacy (SEC-P3-1):** new uploads are **private** blobs. The canonical `media_key` stored
+in Postgres remains the blob URL; API responses mint **presigned GET URLs** (~60 min TTL)
+via `issueSignedToken` + `presignUrl`. Legacy public blob URLs in the DB still resolve
+(presigned with `access: "public"`). iOS validates media hosts client-side (`TrustedMediaURL`).
 
 **Env:** `BLOB_READ_WRITE_TOKEN` (auto-set when Blob store is linked to Vercel project).
+Optional: `BLOB_ACCESS=public` to force public uploads (dev only).
 
 ---
 
@@ -389,7 +390,7 @@ Owner-only full memory detail. `404` if not owner.
   "created_at": "2026-06-18T11:00:00Z"
 }
 ```
-- `media_url` and `thumbnail_url` are non-null only when `scan_status = "clear"` AND caller is owner. Otherwise `null`. For Vercel Blob these are the full public URLs (unguessable bearer capability); for S3/R2 they will be short-TTL signed GET URLs.
+- `media_url` and `thumbnail_url` are non-null only when `scan_status = "clear"` AND caller is owner. Otherwise `null`. Presigned GET URLs (~60 min TTL) for Vercel Blob; legacy public blobs in DB are presigned with matching access mode.
 - `upload_status` is owner-only lifecycle metadata for UI clarity. `stage=ready` means all known media slots are clear. `partial_failure` means at least one slot failed while others may still be available.
 - Live one-photo drops that have no explicit `memory_media` slots still return a valid `upload_status` synthesized from the memory row (`creating`/`ready`).
 - Coordinates (`lat`, `lng`, `geohash`) are included — owner data only, never returned to non-owners.
@@ -438,7 +439,7 @@ Paginated owner list for Memory Lane. Auth required.
   "multi-photo" badge; hero-only memories = 1, text = 0. (GET `/:id` returns the full
   `media[]` array.)
 - `thumbnail_url` is non-null only when `scan_status = "clear"` and a thumbnail has been generated. `null` for text memories, pending media, and un-thumbnailed entries.
-- **`media_url`** is the full-resolution own media (owner only), non-null when `scan_status = "clear"` and the memory has media. **Render this in the grid when `thumbnail_url` is null** — server-side thumbnailing is best-effort and may be absent for imports or when `sharp` is unavailable on the function, so this guarantees Memory Lane shows the real image without a per-item unlock round-trip. Same source as `GET /:id` `media_url` — no new privacy surface (owner's own media; for Vercel Blob it is the unguessable public URL).
+- **`media_url`** is the full-resolution own media (owner only), non-null when `scan_status = "clear"` and the memory has media. **Render this in the grid when `thumbnail_url` is null** — server-side thumbnailing is best-effort and may be absent for imports or when `sharp` is unavailable on the function, so this guarantees Memory Lane shows the real image without a per-item unlock round-trip. Presigned GET (~60 min TTL); same privacy surface as unlock (owner's own media).
 - `caption` / `teaser_text` are the owner's labels (or `null`) — use them to disambiguate items in a dense grid.
 - `next_cursor` is `null` when there are no more pages. Cursors are sort-specific: don't reuse a cursor from `sort=oldest` with `sort=newest`.
 
@@ -448,12 +449,14 @@ Synchronously packages all own memories into a JSON archive and returns a downlo
 **Response `200`**
 ```json
 {
-  "archive_url": "https://blob.vercel-storage.com/exports/.../export-....json",
+  "archive_url": "https://abc.private.blob.vercel-storage.com/exports/.../export-....json?...",
+  "archive_expires_at": "2026-06-18T11:15:00Z",
   "memory_count": 42,
   "exported_at": "2026-06-18T11:00:00Z"
 }
 ```
-- Archive contains own memory metadata + own coordinates (user's data). Raw storage keys are never included — media is referenced by `memory_id`.
+- Archive contains own memory metadata + own coordinates (user's data). **Email is excluded** (SEC-P3-2). Raw storage keys are never included — media is referenced by `memory_id`.
+- Export blob is stored **private**; `archive_url` is a presigned GET (~15 min TTL). `archive_expires_at` is ISO-8601.
 - For stub backend: `archive_url` is a placeholder URL; real URL requires `STORAGE_BACKEND=vercel-blob`.
 - `429 rate_limited` after 3 exports in 24 h.
 

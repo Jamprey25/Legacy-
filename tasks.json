@@ -198,11 +198,11 @@
         },
         {
           "author": "ios",
-          "text": "Acknowledged for Phase 1. Blob client-upload handshake shipped (POST /v1/uploads → PUT vercel.com/api/blob). BLOB_READ_WRITE_TOKEN now set on Vercel. Client mitigations while URLs are bearer-capabilities: (1) never persist unlocked media URLs — AsyncImage / in-memory only; FoundPinsCache stores own pin coords only; (2) no os_log of media_key or signed URLs; (3) no URL caching in UserDefaults. Phase 3 per Joseph: migrate to AWS S3 presigned GET for unlock — iOS will consume whatever unlock returns, no client changes beyond decoding.",
-          "date": "2026-06-18"
+          "text": "SEC-P3 shipped 2026-07-01: Vercel Blob private uploads (BLOB_ACCESS=private default) + presigned GET (~60 min unlock, ~15 min export). Legacy public URLs in DB still work. iOS TrustedMediaURL allowlist + encrypted own-pin store + NSFileProtectionComplete on draft/bg-upload temps. Full AWS S3 migration still optional per Joseph 2026-06-18 — current path closes the bearer-URL leak without backend storage vendor change.",
+          "date": "2026-07-01"
         }
       ],
-      "resolution": "Phase 1: accept Vercel Blob unguessable public URLs for private-tier. Phase 3: migrate media GET to AWS S3 presigned URLs (Joseph 2026-06-18). Revisit trigger remains DEC-23 / public-tier."
+      "resolution": "Phase 1: accept Vercel Blob unguessable public URLs for private-tier. Phase 3 (2026-07-01): private blobs + presigned GET on Vercel; S3 migration remains optional for public-tier."
     },
     {
       "id": "idea-fixture-contract-sync",
