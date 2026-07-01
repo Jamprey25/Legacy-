@@ -7,9 +7,13 @@
 // corresponding credentials. See .env.example for the required vars per backend.
 // Decision pending — leaving stub active until backend is chosen (collab-log.md).
 
+import { blobPutAccess, signedVercelBlobGetUrl, MEDIA_GET_TTL_SECONDS } from "./blobSignedGet.js";
+
 const BACKEND = process.env.STORAGE_BACKEND ?? "stub";
 const PUT_TTL_SECONDS = 15 * 60; // 15-min upload window (api-contract §3.1)
-const GET_TTL_SECONDS = 60 * 60; // 60-min media view window (api-contract §4 unlock)
+const GET_TTL_SECONDS = MEDIA_GET_TTL_SECONDS;
+
+export { blobPutAccess, EXPORT_GET_TTL_SECONDS, MEDIA_GET_TTL_SECONDS } from "./blobSignedGet.js";
 
 export interface SignedPutResult {
   mediaKey: string;
@@ -114,11 +118,8 @@ async function s3PutUrl(mediaKey: string, expiresAt: string): Promise<SignedPutR
 }
 
 async function vercelBlobGetUrl(mediaKey: string, expiresAt: string): Promise<SignedGetResult> {
-  // Vercel Blob upload stores the full public blob URL as media_key (uploads route,
-  // onUploadCompleted). The URL is an unguessable bearer capability (addRandomSuffix),
-  // so we return it directly. NOTE: public blobs do not expire — `expiresAt` is the
-  // client-side view window, not an enforced TTL. Revisit before public-tier (DEC-23).
-  return { signedGetUrl: mediaKey, expiresAt };
+  const { url } = await signedVercelBlobGetUrl(mediaKey, GET_TTL_SECONDS);
+  return { signedGetUrl: url, expiresAt };
 }
 
 async function r2GetUrl(_mediaKey: string, _expiresAt: string): Promise<SignedGetResult> {

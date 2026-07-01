@@ -1,6 +1,7 @@
 // Token verification (Apple/Google identity tokens) + session token issue/verify.
 // External tokens: verified against the provider's published JWKS (RS256). Session
-// tokens: HS256 signed with SESSION_JWT_SECRET, validated statelessly (no DB lookup).
+// tokens: HS256 signed with SESSION_JWT_SECRET; optional `did` claim checked against
+// sessions.revoked_at on each request (SEC-P1-1).
 
 import { SignJWT, jwtVerify, createRemoteJWKSet, type JWTPayload } from "jose";
 import { ApiError } from "./errors.js";

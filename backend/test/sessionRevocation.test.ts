@@ -1,6 +1,4 @@
 // Unit tests for SEC-P1-1: JWT session revocation.
-// Covers: did claim in issued tokens, requireAuth rejects revoked sessions,
-// old tokens without did skip the check.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { signSession, verifySession } from "../src/lib/jwt.js";
@@ -15,13 +13,22 @@ vi.mock("../src/db/sessions.js", () => ({
 import * as sessionsDb from "../src/db/sessions.js";
 const mockIsRevoked = vi.mocked(sessionsDb.isSessionRevoked);
 
-async function runMiddleware(token: string): Promise<{ status: number; body: unknown }> {
+interface MockReqOpts { method?: string; }
+
+async function runMiddleware(token: string, opts: MockReqOpts = {}): Promise<{ status: number; body: unknown }> {
+  const { method = "GET" } = opts;
   let nextCalled = false;
   let userId: string | undefined;
   let deviceId: string | undefined;
 
   const ctx = {
-    req: { header: (name: string) => name === "Authorization" ? `Bearer ${token}` : undefined },
+    req: {
+      method,
+      header: (name: string) => {
+        if (name === "Authorization") return `Bearer ${token}`;
+        return undefined;
+      },
+    },
     set: (k: string, v: unknown) => {
       if (k === "userId") userId = v as string;
       if (k === "deviceId") deviceId = v as string | undefined;
@@ -57,7 +64,7 @@ describe("requireAuth revocation check", () => {
   it("passes when session is active", async () => {
     mockIsRevoked.mockResolvedValueOnce(false);
     const { token } = await signSession("u1", "adult", "d1");
-    const result = await runMiddleware(token);
+    const result = await runMiddleware(token, { method: "GET" });
     expect(result.status).toBe(200);
     expect((result.body as { userId: string }).userId).toBe("u1");
     expect(mockIsRevoked).toHaveBeenCalledWith("u1", "d1");
@@ -73,7 +80,7 @@ describe("requireAuth revocation check", () => {
 
   it("skips revocation check for old tokens without did", async () => {
     const { token } = await signSession("u3", "adult");
-    const result = await runMiddleware(token);
+    const result = await runMiddleware(token, { method: "GET" });
     expect(result.status).toBe(200);
     expect(mockIsRevoked).not.toHaveBeenCalled();
   });

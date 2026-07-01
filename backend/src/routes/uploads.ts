@@ -13,11 +13,7 @@
 // handleUpload() drives a+b and verifies the onUploadCompleted webhook signature, so we
 // never trust the client for the completion event.
 //
-// PRIVACY TRADE-OFF (Phase 1): blobs are uploaded `access: "public"` with
-// addRandomSuffix → the URL is an unguessable bearer capability. This is NOT a
-// short-TTL signed URL; a leaked URL stays valid. Acceptable for Phase 1 private-tier
-// memories; MUST revisit before public-tier / Phase 3 (see architecture-decisions DEC-23).
-//
+// SEC-P3-1: new uploads use private blobs; legacy public URLs still resolve via presigned GET.
 // onUploadCompleted does NOT fire on localhost (Vercel can't reach it). Dev uses the
 // existing POST /internal/webhook/storage stub to flip scan_status instead.
 
@@ -31,6 +27,7 @@ import { setMediaAfterUpload, setMediaThumbnail } from "../db/memoryMedia.js";
 import { generateAndStoreThumbnail } from "../lib/thumbnail.js";
 import { requireAuth, type AuthVars } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
+import { blobPutAccess } from "../lib/blobSignedGet.js";
 import { audit } from "../lib/audit.js";
 
 export const uploadsRoutes = new Hono<{ Variables: AuthVars }>();
@@ -93,7 +90,7 @@ uploadsRoutes.post("/direct", async (c) => {
       ? `memories/${memoryId}/${position}_thumb.${extFor(contentType)}`
       : `memories/${memoryId}/${position}.${extFor(contentType)}`;
   const blob = await put(pathname, body, {
-    access: "public",
+    access: blobPutAccess(),
     addRandomSuffix: true,
     contentType,
   });
