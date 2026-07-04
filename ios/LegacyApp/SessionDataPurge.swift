@@ -9,6 +9,7 @@ import WanderFeature
 #if os(iOS)
 /// Clears user-scoped local caches on sign-out / account delete (SEC-P1-2).
 enum SessionDataPurge {
+    @MainActor
     static func run(modelContext: ModelContext?) {
         OwnMemoryPinCache.clear()
         WanderScanCache.clear()

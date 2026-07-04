@@ -6,7 +6,7 @@ import Security
 ///
 /// Pins SHA-256 hashes of leaf certificate DER. Update `productionCertificatePins`
 /// when Vercel rotates the deployment certificate (typically ~90 days).
-enum LegacyCertificatePinning {
+public enum LegacyCertificatePinning {
     /// Host → allowed base64 SHA-256 certificate DER hashes (any chain cert may match).
     static let productionCertificatePins: [String: Set<String>] = [
         "legacy-backend-jamprey25s-projects.vercel.app": [
@@ -20,7 +20,7 @@ enum LegacyCertificatePinning {
         productionCertificatePins[host] != nil
     }
 
-    static func handle(
+    public static func handle(
         challenge: URLAuthenticationChallenge,
         completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) {

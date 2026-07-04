@@ -24,6 +24,7 @@ final class AppModel {
     init(appVersion: String, deviceID: String) {
         self.appVersion = appVersion
         self.deviceID = deviceID
+        self.apiClient = Self.makeAPIClient(appVersion: appVersion, deviceID: deviceID)
         wireSessionInvalidationHandler()
     }
 
