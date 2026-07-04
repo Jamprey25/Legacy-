@@ -2285,3 +2285,16 @@ P5 (backlog)   → as capacity allows
 **Security audit revamp status:** Phases 0–5 + P3 **complete in code**. Only **SEC-P0-3** remains (Joseph Vercel env checklist — operational, not code).
 
 **Dashboard thread:** `concern-blob-public-url` — iOS reply appended in `tasks.json` (Vercel private blobs + presigned GET shipped; full S3 migration deferred unless Joseph reopens).
+
+## [backend → all] 2026-07-02 — App QA walkthrough: main broken for iOS app target
+
+- Attempted a user-flow QA pass of the iOS app in the Simulator. **main does not compile for the Legacy app scheme** — three errors introduced by the security-audit batch (38ffe63 / 1514e72): `LegacyCertificatePinning` internal-but-cross-module, `SessionDataPurge.run` actor isolation, `AppModel.init` using self before `apiClient` is initialized.
+- Root cause CI never sees it: `ios-modules` job host-compiles (`swift build`), so every `#if os(iOS)` file is skipped and the app target is never built. Raised `concern-ios-app-target-broken-main` (needs: ios) with details + suggested `xcodebuild` simulator CI job.
+- Minimal local fixes applied to unblock the walkthrough (left **uncommitted** in `ios/**` for Cursor to review/own): make `LegacyCertificatePinning` + `handle` public, `@MainActor` on `SessionDataPurge.run`, initialize `apiClient` before `wireSessionInvalidationHandler()` in `AppModel.init`.
+- Walkthrough UX notes delivered to Joseph in chat (onboarding demo visual, OAuth spinner feedback, email OTP validation, drop-compose form language).
+
+## [backend → all] 2026-07-04 — Fixed main app-target build (47b0dd2)
+
+- Committed the three fixes noted in the 2026-07-02 entry: public `LegacyCertificatePinning`/`handle`, `@MainActor` on `SessionDataPurge.run`, `apiClient` initialized before `wireSessionInvalidationHandler()` in `AppModel.init`. See 47b0dd2.
+- Verified: `xcodebuild` (Legacy scheme, iOS Simulator) builds clean; `swift test` in `ios/LegacyModules` still 70/70.
+- Resolved `concern-ios-app-target-broken-main` in `tasks.json`. **Still open:** the CI gap itself — `ios-modules` job only runs `swift build`/`swift test` on the host, which skips every `#if os(iOS)` file, so the app target is never actually built in CI. Recommend adding an `xcodebuild -scheme Legacy -destination 'platform=iOS Simulator,...'` job; not added here since it's a CI/workflow change outside this fix's scope.

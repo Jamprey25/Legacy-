@@ -1,7 +1,7 @@
 {
   "meta": {
     "project": "Legacy",
-    "lastUpdated": "2026-06-29T17:56:04.237Z"
+    "lastUpdated": "2026-07-04T18:30:00.000Z"
   },
   "decisions": [
     {
@@ -828,6 +828,22 @@
           "author": "ios",
           "date": "2026-06-25",
           "text": "Implemented end-to-end: DELETE /v1/memories/:id (owner-only, 404 for non-owner/not-found, async blob cleanup) + iOS MemoryLaneDetailView trash action with confirmation and immediate local list removal."
+        }
+      ]
+    },
+    {
+      "id": "concern-ios-app-target-broken-main",
+      "kind": "concern",
+      "title": "main does not compile for the iOS app target (3 errors from security-audit commits)",
+      "status": "resolved",
+      "raisedBy": "backend",
+      "needs": "ios",
+      "detail": "xcodebuild of the Legacy scheme against an iOS 26.5 simulator fails on main: (1) LegacyCertificatePinning is internal to APIClient but referenced from DropFeature/BackgroundUploadSessionDelegate.swift:83; (2) SessionDataPurge.run calls @MainActor DropDraftStore.purgeAll from a nonisolated context (SessionDataPurge.swift:27); (3) AppModel.init calls wireSessionInvalidationHandler() before apiClient is initialized (LegacyApp.swift:27). CI misses all three because the ios-modules job runs swift build/test on the macOS host, where #if os(iOS) sources compile to nothing, and the app target is never built. Backend applied minimal local fixes (public visibility, @MainActor annotation, init ordering) to unblock a QA walkthrough - left uncommitted in the working tree for iOS to review/own. Suggest adding an xcodebuild simulator job to CI.",
+      "responses": [
+        {
+          "author": "backend",
+          "date": "2026-07-04",
+          "text": "Fixed and committed (47b0dd2): public LegacyCertificatePinning/handle, @MainActor on SessionDataPurge.run, apiClient initialized before wireSessionInvalidationHandler() in AppModel.init. Verified xcodebuild (Legacy scheme, iOS Simulator) succeeds and swift test (70/70) still passes. CI gap (ios-modules job never builds the app target) still open — suggest adding an xcodebuild simulator job; leaving that as a separate ask for ios/joseph rather than bundling into this fix."
         }
       ]
     }
