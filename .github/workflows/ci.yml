@@ -49,8 +49,17 @@ jobs:
         # Block scalar: the inline JS contains ": " sequences that break YAML plain
         # scalars — as an unquoted `run:` value this killed the whole workflow parse
         # (CI silently dead 2026-06-22 → 07-06, every run an instant "failure").
+        # On failure the error is surfaced as a ::error:: annotation, which is
+        # readable via the public checks API (run logs require admin auth).
         run: |
-          node -e "import('sharp').then(m => m.default({ create: { width: 1, height: 1, channels: 3, background: '#000' } }).webp().toBuffer()).then(() => console.log('sharp OK')).catch(e => { console.error('sharp FAILED:', e); process.exit(1); })"
+          set +e
+          OUT=$(node -e "import('sharp').then(m => m.default({ create: { width: 1, height: 1, channels: 3, background: '#000' } }).webp().toBuffer()).then(() => console.log('sharp OK')).catch(e => { console.error(e); process.exit(1); })" 2>&1)
+          CODE=$?
+          echo "$OUT"
+          if [ $CODE -ne 0 ]; then
+            echo "::error title=sharp canary failed::${OUT//$'\n'/ }"
+          fi
+          exit $CODE
 
       - name: Typecheck
         run: npm run typecheck
