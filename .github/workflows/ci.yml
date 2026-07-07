@@ -46,7 +46,11 @@ jobs:
       - run: npm ci
 
       - name: Verify sharp native bindings (Linux CI)
-        run: node -e "import('sharp').then(m => m.default({ create: { width: 1, height: 1, channels: 3, background: '#000' } }).webp().toBuffer()).then(() => console.log('sharp OK'))"
+        # Block scalar: the inline JS contains ": " sequences that break YAML plain
+        # scalars — as an unquoted `run:` value this killed the whole workflow parse
+        # (CI silently dead 2026-06-22 → 07-06, every run an instant "failure").
+        run: |
+          node -e "import('sharp').then(m => m.default({ create: { width: 1, height: 1, channels: 3, background: '#000' } }).webp().toBuffer()).then(() => console.log('sharp OK'))"
 
       - name: Typecheck
         run: npm run typecheck
@@ -130,3 +134,32 @@ jobs:
 
       - name: SPM unit tests
         run: swift test
+
+  ios-app:
+    name: iOS app — simulator build
+    # The host-side `swift test` above skips every `#if os(iOS)` file, so the app
+    # target must be compiled for a real iOS destination or breakage ships silently.
+    # main broke three times this way (see collab-log 2026-07-02 / 07-04 / 07-06).
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: ios
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache SPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+          key: spm-${{ runner.os }}-${{ hashFiles('ios/Legacy.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: Build app target (iOS Simulator)
+        run: |
+          xcodebuild \
+            -project Legacy.xcodeproj \
+            -scheme Legacy \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            build
