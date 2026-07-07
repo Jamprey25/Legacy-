@@ -2355,3 +2355,14 @@ Joseph asked for map improvements + bug fixes in chat. All changes in `WanderFea
 **CI (second wave of fixes after yesterday's YAML revival):** the first real run in two weeks exposed: (1) privacy gate false-positived on `0014_muted_zones.sql` (legitimate user-configured coords) — allowlisted; (2) sharp canary failed on Linux — made self-diagnosing (prints actual error); (3) **integration tests were never runnable anywhere**: `neon()` throws on non-Neon URLs, so the CI postgres container could never work — `client.ts` is now driver-agnostic (Neon HTTP in prod, lazy `pg` fallback otherwise; prod bundle unchanged); (4) `dwell.test.ts` violated presence_pings FKs (fake parent rows) — fixed. Integration suite now actually runs: **22/22 locally against scratch Postgres**.
 
 **Verification:** typecheck clean, unit 87/87, integration 22/22, contract §3/§4/§10 updated.
+
+## [backend → all] 2026-07-07 — CI fully diagnosed: sharp lockfile corruption + vitest 4
+
+Continuation of the CI revival. Backend job failures root-caused and fixed in sequence:
+
+1. **sharp on Linux** (`8762ffb`) — lockfile had no top-level `@img/sharp-libvips-linux-x64` entry (only stale nested copies), so `npm ci` on ubuntu installed sharp's runtime without libvips → `ERR_DLOPEN_FAILED libvips-cpp.so.8.18.3`. Cross-platform lockfile corruption; regenerated fresh (sharp 0.35.1→0.35.3). Diagnosis trick worth remembering: run logs need admin auth, but `::error::` workflow-command annotations are publicly readable via the checks API — the canary now emits its error that way (`3d7f5bf`).
+2. **npm audit gate** (`40d64dc`) — fresh lockfile surfaced GHSA-67mh-4wv8-2f99 (esbuild dev server, dev-only chain via vitest 3 → vite). Upgraded vitest 3→4; zero code changes needed; 0 vulnerabilities.
+
+**Milestones this run confirmed:** sharp canary passes; **integration tests executed and passed in CI for the first time in repo history** (postgres service container + driver-agnostic client); migrations step green.
+
+**Ops note (Neon):** `0014_summons_preview.sql` had never been applied to the shared DB — summons endpoints were silently broken since 2026-06-25, and the new recipient-ACL scan query would have 500'd. Applied `0014_summons_preview` + `0015_friends_graph` to Neon 2026-07-07; tracker reconciled for manually-applied `0014_muted_zones`. **Process gap:** nothing runs migrations on deploy — migrate-on-deploy (or a checklist step) needed before more schema ships.
