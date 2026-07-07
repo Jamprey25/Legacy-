@@ -45,7 +45,11 @@ public enum WanderScanCache {
                 dropDate: dropDate,
                 ownerDisplay: ownerDisplay,
                 isOwn: isOwn,
-                inRange: inRange,
+                // Never restore in-range from cache: the user has likely moved since the
+                // last scan, and a stale `true` surfaces "unlock now" UI (teaser tray,
+                // pin halos) that the server will reject. The cache exists for offline
+                // warmth (DEC-29); range eligibility must come from a live scan.
+                inRange: false,
                 warmth: warmth,
                 scanStatus: scanStatus
             )

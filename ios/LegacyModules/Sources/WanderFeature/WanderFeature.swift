@@ -53,6 +53,9 @@ public final class WanderCoordinator {
     public private(set) var unlockedReturnCount: Int = 0
     public private(set) var unlockedDropDate: String?
     public private(set) var dwellRemainingSeconds: Int?
+    /// Pin the map should fly to before the media sheet opens. Cleared on dismiss.
+    public private(set) var unlockFlyTarget: CLLocationCoordinate2D?
+    public private(set) var unlockFlyMemoryID: String?
 
     /// Active dwell countdown task — cancelled when unlock succeeds or user dismisses.
     private var dwellCountdownTask: Task<Void, Never>?
@@ -74,10 +77,19 @@ public final class WanderCoordinator {
         cachedOwnPins = OwnMemoryPinCache.load()
     }
 
+    /// Last successful hydrate — throttles the full-list pagination to once per interval
+    /// so tab switches don't re-fetch every memory page each time Wander appears.
+    private var lastHydratedAt: Date?
+    private static let hydrateInterval: TimeInterval = 5 * 60
+
     /// Seed the map from the authoritative owner list so *every* memory is always visible —
     /// even on a fresh install or new device, where the local drop/unlock cache is empty.
     /// Owner coordinates are returned by `GET /v1/memories`; DEC-15 governs others' pins only.
-    public func hydrateOwnPins() async {
+    public func hydrateOwnPins(force: Bool = false) async {
+        if !force, let last = lastHydratedAt,
+           Date().timeIntervalSince(last) < Self.hydrateInterval {
+            return
+        }
         var collected: [CachedOwnPin] = []
         var cursor: String?
         var pagesRemaining = 20  // defensive cap (~1000 memories at limit 50)
@@ -107,6 +119,7 @@ public final class WanderCoordinator {
         }
         OwnMemoryPinCache.reconcile(serverPins: collected)
         cachedOwnPins = OwnMemoryPinCache.load()
+        lastHydratedAt = Date()
     }
 
     public func setMapPinFilter(_ ids: Set<String>?) {
@@ -155,17 +168,24 @@ public final class WanderCoordinator {
         isOffline && WanderScanPolicy.maxWarmthLevel(from: teasers) != .none
     }
 
-    public var isShowingUnlockedMedia: Bool { !unlockedMedia.isEmpty }
+    /// Sheet presentation is driven by unlock success, not media presence — a V4 note
+    /// (media_type "text") legitimately has zero media and must still show its caption.
+    public private(set) var hasUnlockedMemory = false
+
+    public var isShowingUnlockedMedia: Bool { hasUnlockedMemory }
 
     public func dismissUnlockedMedia() {
         dwellCountdownTask?.cancel()
         dwellCountdownTask = nil
         dwellRemainingSeconds = nil
         pendingDwellTeaser = nil
+        hasUnlockedMemory = false
         unlockedMedia = []
         unlockedCaption = nil
         unlockedReturnCount = 0
         unlockedDropDate = nil
+        unlockFlyTarget = nil
+        unlockFlyMemoryID = nil
     }
 
     /// Movement-gated foreground scan. Safe to call on appear and after significant movement.
@@ -250,6 +270,15 @@ public final class WanderCoordinator {
         defer { isUnlocking = false }
 
         do {
+            // Capture pin coordinate before any async work — used to fly the map camera
+            // to the exact pin location before the media sheet opens.
+            let flyCoord: CLLocationCoordinate2D? = cachedOwnPins
+                .first(where: { $0.memoryID == teaser.memoryID })
+                .map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng) }
+                ?? revealedOthersPins
+                .first(where: { $0.memoryID == teaser.memoryID })
+                .map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng) }
+
             let fix = try await locationEngine.acquireFix()
             let appAttest = await AppAttestBridge.currentAssertion()
             let body = LocationRequest(
@@ -261,6 +290,22 @@ public final class WanderCoordinator {
             )
             let response = try await apiClient.unlock(memoryID: teaser.memoryID, body)
 
+            unlockedCaption = response.caption
+            unlockedReturnCount = response.returnCount
+            unlockedDropDate = response.dropDate
+            statusMessage = nil
+            pendingDwellTeaser = nil
+
+            LegacyHaptics.unlockCeremony(isFirstReturn: response.returnCount <= 1)
+
+            // Signal map to fly to the pin; a brief window lets the camera animation
+            // begin before SwiftUI presents the full-screen media sheet.
+            if let coord = flyCoord {
+                unlockFlyTarget = coord
+                unlockFlyMemoryID = teaser.memoryID
+                try? await Task.sleep(for: .milliseconds(750))
+            }
+
             unlockedMedia = response.media.enumerated().map { index, item in
                 MemoryMediaItem(
                     url: item.url,
@@ -270,13 +315,7 @@ public final class WanderCoordinator {
                 )
             }
             .sorted { $0.position < $1.position }
-            unlockedCaption = response.caption
-            unlockedReturnCount = response.returnCount
-            unlockedDropDate = response.dropDate
-            statusMessage = nil
-            pendingDwellTeaser = nil
-
-            LegacyHaptics.unlockCeremony(isFirstReturn: response.returnCount <= 1)
+            hasUnlockedMemory = true
 
             if teaser.isOwn {
                 cacheOwnPin(
@@ -461,7 +500,10 @@ public struct WanderFeatureRootView: View {
                     zoneGlows: coordinator.zoneGlows,
                     mutedZones: mutedZones,
                     inRangeMemoryIDs: coordinator.inRangeMemoryIDs,
-                    isFollowingUser: $isFollowingUser
+                    isFollowingUser: $isFollowingUser,
+                    onLongPress: onStartDropping,
+                    unlockFlyMemoryID: coordinator.unlockFlyMemoryID,
+                    unlockFlyTarget: coordinator.unlockFlyTarget
                 )
                 .ignoresSafeArea()
             } else {
@@ -643,14 +685,12 @@ public struct WanderFeatureRootView: View {
             get: { coordinator.isShowingUnlockedMedia },
             set: { if !$0 { coordinator.dismissUnlockedMedia() } }
         )) {
-            if !coordinator.unlockedMedia.isEmpty {
-                UnlockedMemorySheet(
-                    photos: coordinator.unlockedMedia,
-                    caption: coordinator.unlockedCaption,
-                    returnCount: coordinator.unlockedReturnCount,
-                    dropDate: coordinator.unlockedDropDate
-                )
-            }
+            UnlockedMemorySheet(
+                photos: coordinator.unlockedMedia,
+                caption: coordinator.unlockedCaption,
+                returnCount: coordinator.unlockedReturnCount,
+                dropDate: coordinator.unlockedDropDate
+            )
         }
         #endif
     }
@@ -999,10 +1039,13 @@ private struct UnlockedMemorySheet: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
-                    MemoryPhotoGallery(photos: photos)
-                        .opacity(revealProgress ? 1 : 0.6)
-                        .scaleEffect(revealProgress ? 1 : 0.97)
-                        .animation(LegacyMotion.animation(.easeOut(duration: 0.55)), value: revealProgress)
+                    // V4 notes (media_type "text") have no photos — caption carries the memory.
+                    if !photos.isEmpty {
+                        MemoryPhotoGallery(photos: photos)
+                            .opacity(revealProgress ? 1 : 0.6)
+                            .scaleEffect(revealProgress ? 1 : 0.97)
+                            .animation(LegacyMotion.animation(.easeOut(duration: 0.55)), value: revealProgress)
+                    }
 
                     if let caption, !caption.isEmpty {
                         Text(caption)

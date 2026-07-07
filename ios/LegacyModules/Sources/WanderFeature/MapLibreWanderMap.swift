@@ -28,6 +28,11 @@ struct MapLibreWanderMap: UIViewRepresentable {
     let mutedZones: [MutedZone]
     let inRangeMemoryIDs: Set<String>
     @Binding var isFollowingUser: Bool
+    /// Long-press on the map surface triggers a V1 drop at the user's current location.
+    var onLongPress: (() -> Void)?
+    /// Memory ID of the pin the coordinator wants the map to fly to before the sheet opens.
+    var unlockFlyMemoryID: String?
+    var unlockFlyTarget: CLLocationCoordinate2D?
 
     // MARK: UIViewRepresentable
 
@@ -47,6 +52,14 @@ struct MapLibreWanderMap: UIViewRepresentable {
         mapView.compassView.compassVisibility = .adaptive
         mapView.allowsRotating = true
         mapView.allowsTilting = true
+
+        // Long-press anywhere on the map surface → V1 "I'm here" drop at current location.
+        let longPress = UILongPressGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.handleMapLongPress(_:))
+        )
+        longPress.minimumPressDuration = 0.65
+        mapView.addGestureRecognizer(longPress)
 
         context.coordinator.pendingInitialPitch = WanderMapStyle.pitch
         return mapView
@@ -71,6 +84,33 @@ struct MapLibreWanderMap: UIViewRepresentable {
             revealed: revealedOthersPins,
             on: mapView
         )
+        context.coordinator.onLongPress = onLongPress
+
+        // Seed an offline tile pack for the current neighbourhood once per session.
+        context.coordinator.scheduleOfflineCacheIfNeeded(for: coordinate)
+
+        // Fly the camera to the unlocked pin location before the media sheet opens.
+        if let memID = unlockFlyMemoryID,
+           memID != context.coordinator.lastFlyMemoryID,
+           let target = unlockFlyTarget {
+            context.coordinator.lastFlyMemoryID = memID
+            // Release the follow camera first — otherwise the next location update
+            // snaps the camera back to the user mid-flight. The idle relock timer
+            // (armed by the tracking-mode change) restores follow afterwards.
+            if mapView.userTrackingMode != .none {
+                mapView.setUserTrackingMode(.none, animated: false)
+            }
+            let flyCamera = MLNMapCamera(
+                lookingAtCenter: target,
+                altitude: 300,
+                pitch: WanderMapStyle.pitch,
+                heading: mapView.camera.heading
+            )
+            mapView.fly(to: flyCamera, withDuration: 0.85, peakAltitude: 400, completionHandler: nil)
+        }
+        if unlockFlyMemoryID == nil {
+            context.coordinator.lastFlyMemoryID = nil
+        }
     }
 
     static func dismantleUIView(_ mapView: MLNMapView, coordinator: Coordinator) {
@@ -87,6 +127,9 @@ struct MapLibreWanderMap: UIViewRepresentable {
         var inRangeMemoryIDs: Set<String> = []
         var onTrackingLost: (() -> Void)?
         var onRelock: (() -> Void)?
+        var onLongPress: (() -> Void)?
+        var lastFlyMemoryID: String?
+        private var hasScheduledOfflinePack = false
         private var relockTimer: Timer?
         private var lastInteractionTime: CFTimeInterval = 0
         private static let relockAfterIdle: TimeInterval = 6
@@ -94,10 +137,17 @@ struct MapLibreWanderMap: UIViewRepresentable {
         private var zoneSource: MLNShapeSource?
         private var mutedZoneSource: MLNShapeSource?
         private var inRangeSource: MLNShapeSource?
+        private var inRangeFillLayer: MLNFillStyleLayer?
+        private var inRangeRingLayer: MLNLineStyleLayer?
+        private var heatmapSource: MLNShapeSource?
         private var renderedZoneIDs: [String] = []
         private var renderedMutedZoneIDs: [String] = []
         private var renderedInRangeKey = ""
+        private var renderedHeatmapPinIDs: [String] = []
         private var renderedPinStates: [PinRenderState] = []
+        /// Live annotations keyed by memory ID — enables in-place diffing so a state
+        /// change on one pin no longer churns every annotation view on the map.
+        private var pinAnnotationsByID: [String: PinAnnotation] = [:]
         private var pulseTimer: Timer?
         private var pulsePhase: CGFloat = 0
 
@@ -119,6 +169,8 @@ struct MapLibreWanderMap: UIViewRepresentable {
         private static let inRangeSourceID = "legacy.inrange"
         private static let inRangeFillLayerID = "legacy.inrange.fill"
         private static let inRangeRingLayerID = "legacy.inrange.ring"
+        private static let heatmapSourceID = "legacy.heatmap"
+        private static let heatmapLayerID = "legacy.heatmap.density"
 
         private struct PinRenderState: Equatable {
             let memoryID: String
@@ -134,6 +186,82 @@ struct MapLibreWanderMap: UIViewRepresentable {
         func stopPulse() {
             pulseTimer?.invalidate()
             pulseTimer = nil
+        }
+
+        // MARK: Long-press drop
+
+        @objc func handleMapLongPress(_ gesture: UILongPressGestureRecognizer) {
+            guard gesture.state == .began else { return }
+            // Gesture recognizers always call back on the main thread.
+            MainActor.assumeIsolated {
+                LegacyHaptics.selection()
+            }
+            onLongPress?()
+        }
+
+        // MARK: Offline tile cache
+
+        /// Downloads vector tiles for a ~1.5 km radius around the user's first known
+        /// location each session. Subsequent offline Wander visits render the basemap
+        /// without a network connection (hiking / travel drops).
+        ///
+        /// Skips the download when an existing pack already covers the coordinate, and
+        /// caps total stored packs (evicting oldest first) so storage stays bounded.
+        private static let maxOfflinePacks = 6
+
+        func scheduleOfflineCacheIfNeeded(for coordinate: CLLocationCoordinate2D) {
+            guard !hasScheduledOfflinePack else { return }
+            // `packs` is nil until MLNOfflineStorage finishes its async load — leave the
+            // flag unset so a later updateUIView retries once the inventory is available.
+            guard let existingPacks = MLNOfflineStorage.shared.packs else { return }
+            hasScheduledOfflinePack = true
+
+            // Already covered by a previous session's pack for this style? Done.
+            for pack in existingPacks {
+                if let region = pack.region as? MLNTilePyramidOfflineRegion,
+                   region.styleURL == WanderMapStyle.current,
+                   region.bounds.sw.latitude <= coordinate.latitude,
+                   coordinate.latitude <= region.bounds.ne.latitude,
+                   region.bounds.sw.longitude <= coordinate.longitude,
+                   coordinate.longitude <= region.bounds.ne.longitude {
+                    return
+                }
+            }
+
+            // Evict oldest packs (context stores creation date) to stay under the cap.
+            let dated = existingPacks.map { pack -> (MLNOfflinePack, Date) in
+                let date = (try? JSONDecoder().decode(Date.self, from: pack.context)) ?? .distantPast
+                return (pack, date)
+            }
+            .sorted { $0.1 < $1.1 }
+            let excess = dated.count - (Self.maxOfflinePacks - 1)
+            if excess > 0 {
+                for (pack, _) in dated.prefix(excess) {
+                    MLNOfflineStorage.shared.removePack(pack, withCompletionHandler: nil)
+                }
+            }
+
+            let deg: CLLocationDegrees = 0.013  // ≈ 1.5 km
+            let bounds = MLNCoordinateBounds(
+                sw: CLLocationCoordinate2D(
+                    latitude: coordinate.latitude - deg,
+                    longitude: coordinate.longitude - deg * 1.4
+                ),
+                ne: CLLocationCoordinate2D(
+                    latitude: coordinate.latitude + deg,
+                    longitude: coordinate.longitude + deg * 1.4
+                )
+            )
+            let region = MLNTilePyramidOfflineRegion(
+                styleURL: WanderMapStyle.current,
+                bounds: bounds,
+                fromZoomLevel: 12,
+                toZoomLevel: 17
+            )
+            let context = (try? JSONEncoder().encode(Date())) ?? Data()
+            MLNOfflineStorage.shared.addPack(for: region, withContext: context) { pack, _ in
+                pack?.resume()
+            }
         }
 
         // MARK: Auto-relock (re-follow after the user goes idle)
@@ -191,6 +319,7 @@ struct MapLibreWanderMap: UIViewRepresentable {
                 pendingInitialPitch = nil
             }
             resetOverlaySources()
+            ensureHeatmapLayer(on: style)    // first = below all other custom layers
             ensureZoneLayer(on: style)
             ensureMutedZoneLayer(on: style)
             ensureInRangeLayer(on: style)
@@ -243,10 +372,16 @@ struct MapLibreWanderMap: UIViewRepresentable {
             zoneSource = nil
             mutedZoneSource = nil
             inRangeSource = nil
+            inRangeFillLayer = nil
+            inRangeRingLayer = nil
+            heatmapSource = nil
             renderedZoneIDs = []
             renderedMutedZoneIDs = []
             renderedInRangeKey = ""
-            renderedPinStates = []
+            renderedHeatmapPinIDs = []
+            // Pin annotations are map-level (not style-level) — they survive a style
+            // reload, so their diff state must NOT be reset here or the next sync
+            // would double-add every pin.
             stopPulse()
         }
 
@@ -328,28 +463,39 @@ struct MapLibreWanderMap: UIViewRepresentable {
         // MARK: In-range halos (visible even when the pin sits under the user puck)
 
         private func ensureInRangeLayer(on style: MLNStyle) {
+            // Source — capture existing or create fresh.
             if let existing = style.source(withIdentifier: Self.inRangeSourceID) as? MLNShapeSource {
                 inRangeSource = existing
-                return
+            } else {
+                let source = MLNShapeSource(identifier: Self.inRangeSourceID, shape: nil, options: nil)
+                style.addSource(source)
+                inRangeSource = source
             }
-            let source = MLNShapeSource(identifier: Self.inRangeSourceID, shape: nil, options: nil)
-            style.addSource(source)
-            inRangeSource = source
 
-            guard style.layer(withIdentifier: Self.inRangeFillLayerID) == nil else { return }
-            let fill = MLNFillStyleLayer(identifier: Self.inRangeFillLayerID, source: source)
-            fill.fillColor = NSExpression(forConstantValue: UIColor(LegacyColor.accent))
-            fill.fillOpacity = NSExpression(forKeyPath: "opacity")
-            style.addLayer(fill)
+            // Fill layer — capture existing or create fresh. Opacity is set per-frame by
+            // `tickInRangePulse` directly on the layer, so no per-feature attribute needed.
+            if let existing = style.layer(withIdentifier: Self.inRangeFillLayerID) as? MLNFillStyleLayer {
+                inRangeFillLayer = existing
+            } else if let source = inRangeSource {
+                let fill = MLNFillStyleLayer(identifier: Self.inRangeFillLayerID, source: source)
+                fill.fillColor = NSExpression(forConstantValue: UIColor(LegacyColor.accent))
+                fill.fillOpacity = NSExpression(forConstantValue: 0.28)
+                style.addLayer(fill)
+                inRangeFillLayer = fill
+            }
 
-            // Crisp pulsing ring at the catchment edge — the PoGo "you've stepped into
-            // range" bloom. Drawn on the same source so it tracks the soft glow's circle.
-            let ring = MLNLineStyleLayer(identifier: Self.inRangeRingLayerID, source: source)
-            ring.lineColor = NSExpression(forConstantValue: UIColor(LegacyColor.accent))
-            ring.lineWidth = NSExpression(forConstantValue: 2.5)
-            ring.lineOpacity = NSExpression(forKeyPath: "ringOpacity")
-            ring.lineCap = NSExpression(forConstantValue: "round")
-            style.addLayer(ring)
+            // Ring layer — crisp catchment-edge ring; opacity also driven by the pulse tick.
+            if let existing = style.layer(withIdentifier: Self.inRangeRingLayerID) as? MLNLineStyleLayer {
+                inRangeRingLayer = existing
+            } else if let source = inRangeSource {
+                let ring = MLNLineStyleLayer(identifier: Self.inRangeRingLayerID, source: source)
+                ring.lineColor = NSExpression(forConstantValue: UIColor(LegacyColor.accent))
+                ring.lineWidth = NSExpression(forConstantValue: 2.5)
+                ring.lineOpacity = NSExpression(forConstantValue: 0.7)
+                ring.lineCap = NSExpression(forConstantValue: "round")
+                style.addLayer(ring)
+                inRangeRingLayer = ring
+            }
         }
 
         func syncInRangeHalos(ownPins: [CachedOwnPin], on mapView: MLNMapView) {
@@ -362,9 +508,9 @@ struct MapLibreWanderMap: UIViewRepresentable {
             let polygons: [MLNPolygonFeature] = inRangeOwn.map { pin in
                 let center = CLLocationCoordinate2D(latitude: pin.lat, longitude: pin.lng)
                 var ring = Self.geodesicCircle(center: center, radiusMeters: Self.inRangeHaloRadiusMeters)
-                let polygon = MLNPolygonFeature(coordinates: &ring, count: UInt(ring.count))
-                polygon.attributes = ["opacity": 0.34, "ringOpacity": 0.7]
-                return polygon
+                // No per-feature opacity attributes — pulse tick drives the layer property
+                // directly (O(1) vs O(n) shape-collection rebuild every 60 ms).
+                return MLNPolygonFeature(coordinates: &ring, count: UInt(ring.count))
             }
             source.shape = MLNShapeCollectionFeature(shapes: polygons)
 
@@ -377,6 +523,12 @@ struct MapLibreWanderMap: UIViewRepresentable {
 
         private func startPulseIfNeeded() {
             guard pulseTimer == nil else { return }
+            // Reduce Motion: hold the halo at a steady mid-brightness instead of breathing.
+            guard !LegacyMotion.isReduced else {
+                inRangeFillLayer?.fillOpacity = NSExpression(forConstantValue: 0.28)
+                inRangeRingLayer?.lineOpacity = NSExpression(forConstantValue: 0.7)
+                return
+            }
             let timer = Timer(timeInterval: 0.06, repeats: true) { [weak self] _ in
                 DispatchQueue.main.async {
                     self?.tickInRangePulse()
@@ -389,21 +541,109 @@ struct MapLibreWanderMap: UIViewRepresentable {
         private func tickInRangePulse() {
             pulsePhase += 0.07
             let wave = 0.5 + 0.5 * sin(pulsePhase)
-            let opacity = 0.18 + 0.22 * wave        // soft interior glow
-            let ringOpacity = 0.55 + 0.30 * wave    // crisp catchment ring, breathes brighter
-            guard let source = inRangeSource,
-                  let collection = source.shape as? MLNShapeCollectionFeature else { return }
-            for case let polygon as MLNPolygonFeature in collection.shapes ?? [] {
-                polygon.attributes = ["opacity": opacity, "ringOpacity": ringOpacity]
+            // Write directly to the live style layer — one property assignment per tick
+            // instead of rebuilding and re-uploading the entire GeoJSON shape collection.
+            inRangeFillLayer?.fillOpacity = NSExpression(
+                forConstantValue: Float(0.18 + 0.22 * wave)
+            )
+            inRangeRingLayer?.lineOpacity = NSExpression(
+                forConstantValue: Float(0.55 + 0.30 * wave)
+            )
+        }
+
+        // MARK: Density heatmap
+
+        /// Heatmap layer visible only when zoomed out — the "your life, from above" view.
+        /// Uses all own pins (not just in-range) so the full personal density is always visible.
+        /// Fades to invisible at street zoom where individual pins take over.
+        private func ensureHeatmapLayer(on style: MLNStyle) {
+            if let existing = style.source(withIdentifier: Self.heatmapSourceID) as? MLNShapeSource {
+                heatmapSource = existing
+                return
             }
-            source.shape = collection
+            let source = MLNShapeSource(identifier: Self.heatmapSourceID, shape: nil, options: nil)
+            style.addSource(source)
+            heatmapSource = source
+
+            guard style.layer(withIdentifier: Self.heatmapLayerID) == nil else { return }
+            let layer = MLNHeatmapStyleLayer(identifier: Self.heatmapLayerID, source: source)
+
+            // Warm amber palette — continuous with the memory beacon hue so the density
+            // cloud reads as "memories, concentrated here."
+            layer.heatmapColor = NSExpression(
+                forMLNInterpolating: NSExpression(forKeyPath: "$heatmapDensity"),
+                curveType: .linear,
+                parameters: nil,
+                stops: NSExpression(forConstantValue: [
+                    0.0 as NSNumber: UIColor.clear,
+                    0.3 as NSNumber: UIColor(red: 0.95, green: 0.65, blue: 0.20, alpha: 0.0),
+                    0.6 as NSNumber: UIColor(red: 0.95, green: 0.60, blue: 0.15, alpha: 0.55),
+                    1.0 as NSNumber: UIColor(red: 0.95, green: 0.45, blue: 0.10, alpha: 0.85),
+                ])
+            )
+
+            // Generous pixel radius — sparse pins still form coherent blobs.
+            layer.heatmapRadius = NSExpression(
+                forMLNInterpolating: NSExpression(forKeyPath: "$zoomLevel"),
+                curveType: .linear,
+                parameters: nil,
+                stops: NSExpression(forConstantValue: [
+                    10.0 as NSNumber: 20.0 as NSNumber,
+                    14.0 as NSNumber: 70.0 as NSNumber,
+                ])
+            )
+
+            // Fade out as street zoom approaches — pins take over the narrative.
+            layer.heatmapOpacity = NSExpression(
+                forMLNInterpolating: NSExpression(forKeyPath: "$zoomLevel"),
+                curveType: .linear,
+                parameters: nil,
+                stops: NSExpression(forConstantValue: [
+                    WanderMapStyle.flatPitchZoom as NSNumber: 0.80 as NSNumber,
+                    WanderMapStyle.fullPitchZoom as NSNumber: 0.0 as NSNumber,
+                ])
+            )
+
+            style.addLayer(layer)
+        }
+
+        func syncHeatmap(ownPins: [CachedOwnPin], on mapView: MLNMapView) {
+            let ids = ownPins.map(\.memoryID).sorted()
+            guard ids != renderedHeatmapPinIDs, let source = heatmapSource else { return }
+            renderedHeatmapPinIDs = ids
+            let features: [MLNPointFeature] = ownPins.map { pin in
+                let f = MLNPointFeature()
+                f.coordinate = CLLocationCoordinate2D(latitude: pin.lat, longitude: pin.lng)
+                return f
+            }
+            source.shape = MLNShapeCollectionFeature(shapes: features)
         }
 
         // MARK: Memory pins
 
+        /// Wire format is ISO 8601 full-date ("2024-09-01"); date-time kept as fallback.
+        /// ISO8601DateFormatter is thread-safe, so shared statics are fine.
+        private static let fullDateParser: ISO8601DateFormatter = {
+            let f = ISO8601DateFormatter()
+            f.formatOptions = [.withFullDate]
+            return f
+        }()
+        private static let dateTimeParser = ISO8601DateFormatter()
+
+        /// Parse a drop-date string and return elapsed years.
+        private static func pinAgeYears(from dropDate: String) -> Double {
+            guard let d = fullDateParser.date(from: dropDate)
+                ?? dateTimeParser.date(from: dropDate) else { return 0 }
+            return max(0, -d.timeIntervalSinceNow) / (365.25 * 24 * 3600)
+        }
+
         func syncPins(own: [CachedOwnPin], revealed: [RevealedMemoryPin], on mapView: MLNMapView) {
             latestOwnPins = own
             latestRevealedPins = revealed
+
+            // Keep the heatmap in sync — same pin list, different visual.
+            syncHeatmap(ownPins: own, on: mapView)
+
             var nextStates: [PinRenderState] = []
             nextStates.reserveCapacity(own.count + revealed.count)
             for pin in own {
@@ -425,38 +665,79 @@ struct MapLibreWanderMap: UIViewRepresentable {
                 )
             }
             guard nextStates != renderedPinStates else { return }
-
-            let previousIDs = Set(renderedPinStates.map(\.memoryID))
             renderedPinStates = nextStates
 
-            let existingPins = (mapView.annotations ?? []).compactMap { $0 as? PinAnnotation }
-            mapView.removeAnnotations(existingPins)
-
-            var annotations: [PinAnnotation] = []
-            annotations.reserveCapacity(own.count + revealed.count)
+            // Diff against live annotations: remove stale, add new, restyle changed
+            // in place. One pin stepping in/out of range no longer rebuilds the map.
+            struct DesiredPin {
+                let style: PinAnnotation.Style
+                let inRange: Bool
+                let coordinate: CLLocationCoordinate2D
+                let ageYears: Double
+                let title: String
+            }
+            var desired: [String: DesiredPin] = [:]
+            desired.reserveCapacity(own.count + revealed.count)
             for pin in own {
-                let annotation = PinAnnotation(
-                    memoryID: pin.memoryID,
+                desired[pin.memoryID] = DesiredPin(
                     style: .own,
                     inRange: inRangeMemoryIDs.contains(pin.memoryID),
-                    shouldAnimateDrop: !previousIDs.contains(pin.memoryID)
+                    coordinate: CLLocationCoordinate2D(latitude: pin.lat, longitude: pin.lng),
+                    ageYears: Self.pinAgeYears(from: pin.dropDate),
+                    title: "Your memory"
                 )
-                annotation.coordinate = CLLocationCoordinate2D(latitude: pin.lat, longitude: pin.lng)
-                annotation.title = "Your memory"
-                annotations.append(annotation)
             }
-            for pin in revealed {
-                let annotation = PinAnnotation(
-                    memoryID: pin.memoryID,
+            for pin in revealed where desired[pin.memoryID] == nil {
+                desired[pin.memoryID] = DesiredPin(
                     style: .revealed,
                     inRange: inRangeMemoryIDs.contains(pin.memoryID),
-                    shouldAnimateDrop: !previousIDs.contains(pin.memoryID)
+                    coordinate: CLLocationCoordinate2D(latitude: pin.lat, longitude: pin.lng),
+                    ageYears: 0,  // revealed pins carry no drop-date client-side
+                    title: "Memory nearby"
                 )
-                annotation.coordinate = CLLocationCoordinate2D(latitude: pin.lat, longitude: pin.lng)
-                annotation.title = "Memory nearby"
-                annotations.append(annotation)
             }
-            mapView.addAnnotations(annotations)
+
+            let staleIDs = pinAnnotationsByID.keys.filter { desired[$0] == nil }
+            if !staleIDs.isEmpty {
+                let stale = staleIDs.compactMap { pinAnnotationsByID.removeValue(forKey: $0) }
+                mapView.removeAnnotations(stale)
+            }
+
+            var additions: [PinAnnotation] = []
+            for (memoryID, want) in desired {
+                if let existing = pinAnnotationsByID[memoryID] {
+                    if existing.coordinate.latitude != want.coordinate.latitude
+                        || existing.coordinate.longitude != want.coordinate.longitude {
+                        existing.coordinate = want.coordinate
+                    }
+                    if existing.inRange != want.inRange {
+                        existing.inRange = want.inRange
+                        if let view = mapView.view(for: existing) as? LegacyPinAnnotationView {
+                            view.configure(
+                                style: existing.style,
+                                inRange: want.inRange,
+                                ageYears: existing.ageYears
+                            )
+                            view.syncInRangePulse(active: want.inRange)
+                        }
+                    }
+                } else {
+                    let annotation = PinAnnotation(
+                        memoryID: memoryID,
+                        style: want.style,
+                        inRange: want.inRange,
+                        ageYears: want.ageYears,
+                        shouldAnimateDrop: true
+                    )
+                    annotation.coordinate = want.coordinate
+                    annotation.title = want.title
+                    pinAnnotationsByID[memoryID] = annotation
+                    additions.append(annotation)
+                }
+            }
+            if !additions.isEmpty {
+                mapView.addAnnotations(additions)
+            }
         }
 
         func mapView(_ mapView: MLNMapView, viewFor annotation: MLNAnnotation) -> MLNAnnotationView? {
@@ -470,7 +751,7 @@ struct MapLibreWanderMap: UIViewRepresentable {
             let reuseID = pin.style == .own ? Self.ownReuseID : Self.revealedReuseID
             let view = mapView.dequeueReusableAnnotationView(withIdentifier: reuseID) as? LegacyPinAnnotationView
                 ?? LegacyPinAnnotationView(reuseIdentifier: reuseID)
-            view.configure(style: pin.style, inRange: pin.inRange)
+            view.configure(style: pin.style, inRange: pin.inRange, ageYears: pin.ageYears)
             if pin.shouldAnimateDrop {
                 view.playDropAnimation()
                 pin.shouldAnimateDrop = false
@@ -515,12 +796,14 @@ private final class PinAnnotation: MLNPointAnnotation {
     let memoryID: String
     let style: Style
     var inRange: Bool
+    let ageYears: Double
     var shouldAnimateDrop: Bool
 
-    init(memoryID: String, style: Style, inRange: Bool, shouldAnimateDrop: Bool) {
+    init(memoryID: String, style: Style, inRange: Bool, ageYears: Double, shouldAnimateDrop: Bool) {
         self.memoryID = memoryID
         self.style = style
         self.inRange = inRange
+        self.ageYears = ageYears
         self.shouldAnimateDrop = shouldAnimateDrop
         super.init()
     }
@@ -550,9 +833,9 @@ private final class LegacyPinAnnotationView: MLNAnnotationView {
         imageView.frame = bounds
     }
 
-    func configure(style: PinAnnotation.Style, inRange: Bool) {
+    func configure(style: PinAnnotation.Style, inRange: Bool, ageYears: Double) {
         self.isInRange = inRange
-        imageView.image = LegacyMemoryPinArt.image(style: style, inRange: inRange)
+        imageView.image = LegacyMemoryPinArt.image(style: style, inRange: inRange, ageYears: ageYears)
     }
 
     func playDropAnimation() {
@@ -757,7 +1040,7 @@ private enum LegacyUserPuckArt {
 
 /// Custom pin artwork — warm beacon orbs instead of stock SF Symbol map pins.
 private enum LegacyMemoryPinArt {
-    static func image(style: PinAnnotation.Style, inRange: Bool) -> UIImage {
+    static func image(style: PinAnnotation.Style, inRange: Bool, ageYears: Double) -> UIImage {
         let size = CGSize(width: 52, height: 58)
         let renderer = UIGraphicsImageRenderer(size: size)
         return renderer.image { ctx in
@@ -765,6 +1048,11 @@ private enum LegacyMemoryPinArt {
             let accentDeep = UIColor(LegacyColor.accentDeep)
             let center = CGPoint(x: size.width / 2, y: 22)
             let orbRadius: CGFloat = inRange ? 15 : (style == .own ? 13 : 11)
+
+            // Patina: own pins fade gently with age — a faded-photograph aesthetic.
+            // In-range and others' pins are always fully saturated.
+            let patina = min(ageYears / 3.0, 1.0)
+            let pinAlpha: CGFloat = (style == .own && !inRange) ? max(0.68, 1.0 - patina * 0.32) : 1.0
 
             if inRange {
                 ctx.cgContext.setShadow(
@@ -793,9 +1081,20 @@ private enum LegacyMemoryPinArt {
                 width: orbRadius * 2,
                 height: orbRadius * 2
             )
-            let colors = style == .own || inRange
-                ? [accent.cgColor, accentDeep.cgColor]
-                : [accent.withAlphaComponent(0.75).cgColor, accentDeep.withAlphaComponent(0.65).cgColor]
+            let colors: [CGColor]
+            if inRange {
+                colors = [accent.cgColor, accentDeep.cgColor]
+            } else if style == .own {
+                colors = [
+                    accent.withAlphaComponent(pinAlpha).cgColor,
+                    accentDeep.withAlphaComponent(pinAlpha * 0.9).cgColor,
+                ]
+            } else {
+                colors = [
+                    accent.withAlphaComponent(0.75).cgColor,
+                    accentDeep.withAlphaComponent(0.65).cgColor,
+                ]
+            }
             if let gradient = CGGradient(
                 colorsSpace: CGColorSpaceCreateDeviceRGB(),
                 colors: colors as CFArray,
@@ -812,7 +1111,7 @@ private enum LegacyMemoryPinArt {
             }
             ctx.cgContext.setShadow(offset: .zero, blur: 0, color: nil)
 
-            ctx.cgContext.setStrokeColor(UIColor.white.withAlphaComponent(0.85).cgColor)
+            ctx.cgContext.setStrokeColor(UIColor.white.withAlphaComponent(0.85 * pinAlpha).cgColor)
             ctx.cgContext.setLineWidth(2)
             ctx.cgContext.strokeEllipse(in: orbRect.insetBy(dx: 0.5, dy: 0.5))
 
@@ -820,7 +1119,10 @@ private enum LegacyMemoryPinArt {
             let symbolSize: CGFloat = inRange ? 13 : (style == .own ? 11 : 9)
             let config = UIImage.SymbolConfiguration(pointSize: symbolSize, weight: .bold)
             if let symbol = UIImage(systemName: symbolName, withConfiguration: config)?
-                .withTintColor(UIColor(LegacyColor.textOnAccent), renderingMode: .alwaysOriginal) {
+                .withTintColor(
+                    UIColor(LegacyColor.textOnAccent).withAlphaComponent(pinAlpha),
+                    renderingMode: .alwaysOriginal
+                ) {
                 symbol.draw(at: CGPoint(
                     x: center.x - symbol.size.width / 2,
                     y: center.y - symbol.size.height / 2
@@ -828,7 +1130,7 @@ private enum LegacyMemoryPinArt {
             }
 
             // Ground anchor — ties the orb to the map surface.
-            ctx.cgContext.setFillColor(UIColor.black.withAlphaComponent(0.35).cgColor)
+            ctx.cgContext.setFillColor(UIColor.black.withAlphaComponent(0.35 * pinAlpha).cgColor)
             ctx.cgContext.fillEllipse(in: CGRect(x: center.x - 4, y: center.y + orbRadius + 2, width: 8, height: 3))
         }
     }
@@ -861,9 +1163,11 @@ enum WanderMapStyle {
     }
 
     /// Retheme the stock vector style toward Legacy's warm, memory-atlas palette.
+    /// Canvas and water shift subtly with the time of day: dawn is blue-cool, golden hour
+    /// leans amber, night is the default deep dark.
     static func applyLegacyTheme(to style: MLNStyle) {
-        let canvas = UIColor(red: 0.07, green: 0.06, blue: 0.09, alpha: 1)
-        let water = UIColor(red: 0.09, green: 0.08, blue: 0.13, alpha: 1)
+        let hour = Calendar.current.component(.hour, from: Date())
+        let (canvas, water) = timeOfDayCanvas(hour: hour)
         let building = UIColor(red: 0.14, green: 0.11, blue: 0.16, alpha: 0.72)
         let roadWarm = UIColor(red: 0.15, green: 0.13, blue: 0.18, alpha: 0.60)
         let roadMajor = UIColor(red: 0.21, green: 0.19, blue: 0.24, alpha: 0.75)
@@ -905,6 +1209,71 @@ enum WanderMapStyle {
         for id in hiddenLayers {
             style.layer(withIdentifier: id)?.isVisible = false
         }
+
+        addBuildingExtrusions(to: style)
+    }
+
+    /// Canvas (map background) and water colors keyed by hour of day.
+    private static func timeOfDayCanvas(hour: Int) -> (canvas: UIColor, water: UIColor) {
+        switch hour {
+        case 5..<8:   // pre-dawn / dawn — cool blue tint
+            return (UIColor(red: 0.07, green: 0.07, blue: 0.11, alpha: 1),
+                    UIColor(red: 0.08, green: 0.09, blue: 0.15, alpha: 1))
+        case 8..<17:  // day — slightly lighter, more neutral
+            return (UIColor(red: 0.09, green: 0.08, blue: 0.11, alpha: 1),
+                    UIColor(red: 0.11, green: 0.10, blue: 0.14, alpha: 1))
+        case 17..<21: // golden hour / dusk — amber warmth
+            return (UIColor(red: 0.10, green: 0.07, blue: 0.07, alpha: 1),
+                    UIColor(red: 0.12, green: 0.08, blue: 0.10, alpha: 1))
+        default:      // night (21–5) — deep cool dark (base palette)
+            return (UIColor(red: 0.07, green: 0.06, blue: 0.09, alpha: 1),
+                    UIColor(red: 0.09, green: 0.08, blue: 0.13, alpha: 1))
+        }
+    }
+
+    /// Adds 3D building extrusions using OpenMapTiles render_height data.
+    /// Fades in above zoom 14 where the 58° pitch makes depth meaningful.
+    /// Falls back gracefully if the building layer or vector source isn't in the style.
+    private static func addBuildingExtrusions(to style: MLNStyle) {
+        let layerID = "legacy.building.extrusion"
+        guard style.layer(withIdentifier: layerID) == nil,
+              let buildingFill = style.layer(withIdentifier: "building") as? MLNFillStyleLayer,
+              let sourceID = buildingFill.sourceIdentifier,
+              let vectorSource = style.source(withIdentifier: sourceID)
+        else { return }
+
+        let extrusion = MLNFillExtrusionStyleLayer(identifier: layerID, source: vectorSource)
+        extrusion.sourceLayerIdentifier = buildingFill.sourceLayerIdentifier ?? "building"
+
+        // Slightly lighter than the flat building fill so faces catch implied light.
+        extrusion.fillExtrusionColor = NSExpression(
+            forConstantValue: UIColor(red: 0.18, green: 0.15, blue: 0.22, alpha: 1)
+        )
+
+        // OpenMapTiles schema: render_height / render_min_height. Default to 4 m flat roof.
+        extrusion.fillExtrusionHeight = NSExpression(
+            forConditional: NSPredicate(format: "render_height != nil"),
+            trueExpression: NSExpression(forKeyPath: "render_height"),
+            falseExpression: NSExpression(forConstantValue: 4.0)
+        )
+        extrusion.fillExtrusionBase = NSExpression(
+            forConditional: NSPredicate(format: "render_min_height != nil"),
+            trueExpression: NSExpression(forKeyPath: "render_min_height"),
+            falseExpression: NSExpression(forConstantValue: 0.0)
+        )
+
+        // Fade in at street zoom — invisible at region scale where pitch is flat anyway.
+        extrusion.fillExtrusionOpacity = NSExpression(
+            forMLNInterpolating: NSExpression(forKeyPath: "$zoomLevel"),
+            curveType: .linear,
+            parameters: nil,
+            stops: NSExpression(forConstantValue: [
+                14.0 as NSNumber: 0.0 as NSNumber,
+                15.5 as NSNumber: 0.65 as NSNumber,
+            ])
+        )
+
+        style.insertLayer(extrusion, above: buildingFill)
     }
 
     private static func setFillColor(_ color: UIColor, on style: MLNStyle, layerIDs: [String]) {
