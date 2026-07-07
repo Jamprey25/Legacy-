@@ -2298,3 +2298,39 @@ P5 (backlog)   → as capacity allows
 - Committed the three fixes noted in the 2026-07-02 entry: public `LegacyCertificatePinning`/`handle`, `@MainActor` on `SessionDataPurge.run`, `apiClient` initialized before `wireSessionInvalidationHandler()` in `AppModel.init`. See 47b0dd2.
 - Verified: `xcodebuild` (Legacy scheme, iOS Simulator) builds clean; `swift test` in `ios/LegacyModules` still 70/70.
 - Resolved `concern-ios-app-target-broken-main` in `tasks.json`. **Still open:** the CI gap itself — `ios-modules` job only runs `swift build`/`swift test` on the host, which skips every `#if os(iOS)` file, so the app target is never actually built in CI. Recommend adding an `xcodebuild -scheme Legacy -destination 'platform=iOS Simulator,...'` job; not added here since it's a CI/workflow change outside this fix's scope.
+
+## [backend → all] 2026-07-06 — Wander map feature batch + bug fixes (uncommitted, Joseph-directed)
+
+Joseph asked for map improvements + bug fixes in chat. All changes in `WanderFeature` (`MapLibreWanderMap.swift`, `WanderFeature.swift`), currently uncommitted for review.
+
+**Features:**
+- **Density heatmap** — `MLNHeatmapStyleLayer` over own pins, amber ramp; visible zoomed out, fades by street zoom (`fullPitchZoom`).
+- **3D building extrusions** — `MLNFillExtrusionStyleLayer` from OpenMapTiles `render_height`; fades in zoom 14→15.5. Graceful no-op if style lacks the building source.
+- **Long-press to drop** — long-press on map fires `onStartDropping` (V1 flow) + selection haptic.
+- **Offline tile cache** — one ~1.5 km pack (zoom 12–17) per area; skips if an existing pack covers the coordinate, caps at 6 packs (oldest evicted; creation date in pack context).
+- **Unlock camera flyTo** — map flies to the pin (releases follow camera first) ~750 ms before the media sheet presents. Cleared on dismiss.
+- **Pin age patina** — own pins fade toward 68% alpha over 3 years (dropDate-derived).
+- **Time-of-day palette** — canvas/water shift by hour (dawn cool, dusk amber, night deep).
+
+**Bug fixes:**
+- **Halo pulse perf** — pulse now writes `fillOpacity`/`lineOpacity` on the live layers instead of re-uploading the GeoJSON collection 16×/s.
+- **Heatmap keypath** — `$heatmapDensity` (was `heatmapDensity`, a nonexistent feature attribute → broken ramp).
+- **Pin diffing** — `syncPins` diffs annotations by memory ID (remove stale / add new / restyle in place) instead of remove-all/re-add-all on any state change.
+- **Text-only unlock (V4 note) showed nothing** — sheet presentation was gated on `!unlockedMedia.isEmpty`; notes have zero media by contract (§3, `media_type: "text"`). New `hasUnlockedMemory` flag drives the sheet; `UnlockedMemorySheet` skips the gallery when photos are empty.
+- **Reduce Motion** — in-range halo holds steady opacity instead of pulsing.
+
+**Verification:** `swift test` 70/70; **`xcodebuild` app target (iOS Simulator) builds clean** — host `swift build` alone missed two errors in `#if os(iOS)` code (MainActor haptics call, optional `sourceIdentifier`), re-confirming the CI gap raised 2026-07-04.
+
+**Cursor:** visual/UX review welcome on the heatmap ramp, extrusion opacity, and flyTo timing (all tunable constants). No API changes.
+
+## [backend → all] 2026-07-06 — CI was silently dead for two weeks (fixed) + hardening batch
+
+**Critical find:** `.github/workflows/ci.yml` has been **invalid YAML since e04e465 (2026-06-22)** — the sharp-verification `run:` line was an unquoted plain scalar containing `: ` sequences. GitHub could not parse the workflow, so **every run since June 22 was an instant "failure" with zero jobs executed** (verified via the Actions API: run names show the raw filename, the parse-failure signature). The entire security-audit batch, the blob-privacy work, and all iOS commits since then were never CI-tested. Nobody noticed because the failures looked like ordinary red X's.
+
+**Fixes (uncommitted, alongside today's map batch):**
+1. **ci.yml parse fix** — sharp step moved to a `|` block scalar. File now parses; all 5 jobs load.
+2. **New `ios-app` job** — `xcodebuild -scheme Legacy -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build` with SPM dependency caching. Closes the `#if os(iOS)` blind spot raised 2026-07-02/07-04.
+3. **`WanderScanCache` stale in-range** — cached teasers no longer restore `inRange: true`; range eligibility now requires a live scan (warmth still restored per DEC-29). New regression test.
+4. **`hydrateOwnPins` throttle** — full-list pagination now runs at most every 5 min (was: every Wander tab appearance; up to 20 requests per switch for heavy users). `force:` param preserved for explicit refresh. Local drop/unlock cache updates are unaffected.
+
+**Verification before CI revival lands:** backend `typecheck` + 87/87 unit tests green locally; iOS SPM 71/71 (one new test); app target builds clean in simulator. First push after this commit should produce the first real CI run since June 22 — watch it.
