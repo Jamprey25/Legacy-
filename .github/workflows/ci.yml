@@ -50,7 +50,7 @@ jobs:
         # scalars — as an unquoted `run:` value this killed the whole workflow parse
         # (CI silently dead 2026-06-22 → 07-06, every run an instant "failure").
         run: |
-          node -e "import('sharp').then(m => m.default({ create: { width: 1, height: 1, channels: 3, background: '#000' } }).webp().toBuffer()).then(() => console.log('sharp OK'))"
+          node -e "import('sharp').then(m => m.default({ create: { width: 1, height: 1, channels: 3, background: '#000' } }).webp().toBuffer()).then(() => console.log('sharp OK')).catch(e => { console.error('sharp FAILED:', e); process.exit(1); })"
 
       - name: Typecheck
         run: npm run typecheck
@@ -111,10 +111,15 @@ jobs:
         # isn't the memories table (which is allowed and expected).
         run: |
           # Find SQL files that add lat/lng columns to non-memories tables.
+          # Allowed exceptions:
+          #   0002_memories.sql    — the drop point (the one persisted location)
+          #   0014_muted_zones.sql — user-configured notification-silence zones;
+          #                          deliberate coordinates, not a movement log
+          #                          (reviewed in the 2026-06-30 security audit)
           HITS=$(grep -rn --include="*.sql" \
             -E "^\s+(lat|lng)\s+(double|float|numeric|real)" \
             backend/migrations/ \
-            | grep -v "0002_memories.sql" || true)
+            | grep -v -e "0002_memories.sql" -e "0014_muted_zones.sql" || true)
           if [ -n "$HITS" ]; then
             echo "FAIL: coordinate columns found in unexpected migration:"
             echo "$HITS"
