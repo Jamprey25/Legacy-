@@ -2351,38 +2351,38 @@
     {
       "id": "schema-phone-verification",
       "title": "DB schema: phone_verifications table + recipients column on memories + friends_graph (user_a, user_b, status)",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 2,
       "milestone": "M6",
       "blockedBy": [
         "testflight-beta"
       ],
-      "notes": ""
+      "notes": "Completed 2026-07-07: phone_verifications + memory_recipients pre-existed (0014_summons_preview.sql); 0015_friends_graph.sql adds friends_graph (canonical user_a<user_b, status pending/accepted/rejected) + recipient phone index. blockedBy testflight-beta overridden per Joseph chat direction 2026-07-06 (no Apple Developer account; backend built ahead)."
     },
     {
       "id": "phone-verification-backend",
       "title": "Backend: Phone verification — send OTP via Twilio SMS, verify, store E.164 number on user record",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 2,
       "milestone": "M6",
       "blockedBy": [
         "schema-phone-verification"
       ],
-      "notes": ""
+      "notes": "Completed 2026-07-07 (shipped 2026-06-25 as summons preview): POST /v1/summons/phone/send + /verify, OTP hashed, verified E.164 stored on users.phone_e164."
     },
     {
       "id": "recipient-acl-backend",
       "title": "Backend: Recipient ACL — enforce at /scan and /unlock that recipient's verified phone matches memory's recipient list",
-      "status": "todo",
+      "status": "done",
       "owner": "backend",
       "phase": 2,
       "milestone": "M6",
       "blockedBy": [
         "phone-verification-backend"
       ],
-      "notes": ""
+      "notes": "Completed 2026-07-07: scan (findNearbyMemories/countNearbyZones) + unlock enforce verified-phone recipient membership. Drops accept privacy_tier recipients. Summons lifts private->recipients (422 cannot_elevate_import for V3). SEC fix: zone counts previously leaked others PRIVATE memories (no tier filter). Integration tests: test/integration/recipientAcl.test.ts (12)."
     },
     {
       "id": "summons-flow-backend",

@@ -2334,3 +2334,24 @@ Joseph asked for map improvements + bug fixes in chat. All changes in `WanderFea
 4. **`hydrateOwnPins` throttle** — full-list pagination now runs at most every 5 min (was: every Wander tab appearance; up to 20 requests per switch for heavy users). `force:` param preserved for explicit refresh. Local drop/unlock cache updates are unaffected.
 
 **Verification before CI revival lands:** backend `typecheck` + 87/87 unit tests green locally; iOS SPM 71/71 (one new test); app target builds clean in simulator. First push after this commit should produce the first real CI run since June 22 — watch it.
+
+## [backend → all] 2026-07-07 — Recipient ACL live + zone-count privacy fix + CI truths
+
+**Privacy fix (SEC):** `countNearbyZones` had **no privacy filter** — it counted every non-owned memory, leaking existence + ~150m geohash cell of other users' *private* memories into Wander zone glows. (Its doc comment claimed "0 rows until Phase 2" — false.) Now only recipient-eligible memories count. Regression test included.
+
+**Recipient ACL shipped (recipient-acl-backend, schema-phone-verification, phone-verification-backend → done):**
+- `0015_friends_graph.sql` — friends_graph table (endpoints later) + memory_recipients phone index.
+- Scan: recipients-tier memories now appear in teasers/zones for users whose **verified** phone (`users.phone_e164`) is on the recipient list. Others' private memories never appear.
+- Unlock: non-owners of a recipients-tier memory must pass the membership check → else `403` "not shared with you". friends/public deny for non-owners. Memory-ID possession (summons link) is never sufficient.
+- Drop: `privacy_tier: "recipients"` now accepted (friends/public still 422).
+- Summons: lifts private→recipients on live memories; `422 cannot_elevate_import` for V3 imports.
+- Note: these tasks were `blockedBy: testflight-beta`; overridden per Joseph's direct chat instruction (2026-07-06) — building Phase 2 backend ahead while Apple Developer is unavailable.
+
+**Backend → iOS:**
+- `/scan` can now return teasers with `is_own: false` for summoned recipients (previously own-only in practice). Wander already renders these (PinRevealPolicy) — worth a QA pass.
+- Unlock of others' memories can newly return `403 forbidden` ("not shared with you") — iOS should show a graceful message (currently likely falls into the generic error branch).
+- Drop compose can offer "Recipients" privacy once recipient UI ships (`ios-recipient-ui`).
+
+**CI (second wave of fixes after yesterday's YAML revival):** the first real run in two weeks exposed: (1) privacy gate false-positived on `0014_muted_zones.sql` (legitimate user-configured coords) — allowlisted; (2) sharp canary failed on Linux — made self-diagnosing (prints actual error); (3) **integration tests were never runnable anywhere**: `neon()` throws on non-Neon URLs, so the CI postgres container could never work — `client.ts` is now driver-agnostic (Neon HTTP in prod, lazy `pg` fallback otherwise; prod bundle unchanged); (4) `dwell.test.ts` violated presence_pings FKs (fake parent rows) — fixed. Integration suite now actually runs: **22/22 locally against scratch Postgres**.
+
+**Verification:** typecheck clean, unit 87/87, integration 22/22, contract §3/§4/§10 updated.
