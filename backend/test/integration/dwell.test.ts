@@ -20,10 +20,26 @@ beforeAll(async () => {
   if (skip) return;
   pgClient = new pg.Client({ connectionString: DB_URL });
   await pgClient.connect();
+
+  // presence_pings has FKs to memories/users — the ping rows need real parents.
+  // (Never surfaced before 2026-07-07: this suite predates the first CI run.)
+  await pgClient.query(
+    `INSERT INTO users (id, dob, email) VALUES ($1, '1990-01-01', 'dwell@test.legacy')
+     ON CONFLICT (id) DO NOTHING`,
+    [USER],
+  );
+  await pgClient.query(
+    `INSERT INTO memories (id, owner_id, lat, lng, geohash, media_type, discoverable_after)
+     VALUES ($1, $2, 40.7, -74.0, 'dr5regw3p', 'text', now())
+     ON CONFLICT (id) DO NOTHING`,
+    [MEM, USER],
+  );
 });
 
 afterAll(async () => {
   if (skip) return;
+  await pgClient.query("DELETE FROM memories WHERE id = $1", [MEM]);
+  await pgClient.query("DELETE FROM users WHERE id = $1", [USER]);
   await pgClient.end();
 });
 

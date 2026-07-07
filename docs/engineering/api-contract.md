@@ -128,7 +128,7 @@ Create a memory record and get a signed upload URL. Drop point is set here and i
   "accuracy_m": 8.0,
   "media_type": "photo",          // "photo" | "text"
   "drop_method": "pin",           // "pin" | "treasure_chest" | "note_bottle"
-  "privacy_tier": "private",      // Phase 1: "private" only; 422 otherwise
+  "privacy_tier": "private",      // "private" | "recipients" (2026-07-07); friends/public still 422
   "teaser_text": null,
   "cooldown_hours": 24,           // optional, default 24
   "seal": null,                   // see §6
@@ -295,6 +295,8 @@ Both attestation fields required when `APP_ATTEST_REQUIRED=true`.
 
 - For **others'** memories, `not_in_range` is returned identically whether the user is genuinely out of range OR their `accuracy_m > 50`. The client cannot distinguish — by design.
 - Own memories skip the dwell requirement.
+
+**Recipient ACL (2026-07-07):** non-owners unlocking a `recipients`-tier memory must have a **verified phone** (`/summons/phone/verify`) matching the memory's recipient list — otherwise `403 forbidden` ("This memory is not shared with you."). Possession of the memory ID (e.g. from a summons link) is never sufficient. `friends`/`public` tiers return `403` for all non-owners until their gates ship. Scan (§4) applies the same eligibility: recipients-tier memories appear in teasers and zone counts **only** for verified listed recipients; others' private memories never appear anywhere (SEC fix 2026-07-07 — zone counts previously ignored privacy tier).
 
 ---
 
@@ -650,7 +652,9 @@ Owner-only. Body: `{ "recipients": ["+1…"], "place_label": "Dolores Park" }`
 Response: `{ "memory_id", "summons": [{ "phone", "status" }] }`  
 Statuses: `sent` | `preview_logged` | `failed`
 
-Migration: `0014_summons_preview.sql`
+**Since 2026-07-07:** summoning a `private` live memory lifts it to `privacy_tier: "recipients"` (explicit share intent). Imported (V3) memories return `422 cannot_elevate_import` — they can never be shared without a live re-drop (privacy invariant, DB-enforced).
+
+Migrations: `0014_summons_preview.sql`, `0015_friends_graph.sql` (friends_graph table + recipient phone index; friends endpoints not yet exposed)
 
 ---
 

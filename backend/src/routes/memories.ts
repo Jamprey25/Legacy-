@@ -25,6 +25,7 @@ import { validateLocationInput } from "../lib/locationInput.js";
 import { audit } from "../lib/audit.js";
 import { verifyAppAttestForRequest } from "../lib/appAttestRequest.js";
 import { storeImportResult, findImportByKey } from "../db/imports.js";
+import { isRecipientOfMemory } from "../db/summons.js";
 import {
   createMediaSlots,
   getMemoryUploadCounts,
@@ -141,7 +142,9 @@ type MediaType = (typeof VALID_MEDIA_TYPES)[number];
 const VALID_DROP_METHODS = ["pin", "treasure_chest", "note_bottle"] as const;
 type DropMethod = (typeof VALID_DROP_METHODS)[number];
 
-const PHASE1_PRIVACY = new Set(["private"]);
+// Phase 2 (recipient ACL): drops may now target the recipients tier. Friends and
+// public stay rejected until their discovery gates ship.
+const ALLOWED_PRIVACY = new Set(["private", "recipients"]);
 
 function parseSeal(raw: unknown): { sealType: SealType; config: Record<string, unknown> } | null {
   if (raw == null) return null;
@@ -261,8 +264,8 @@ memoriesRoutes.post("/", dropLimit, async (c) => {
   if (typeof privacyRaw !== "string") {
     throw new ApiError("invalid_request", "privacy_tier must be a string.");
   }
-  if (!PHASE1_PRIVACY.has(privacyRaw)) {
-    throw new ApiError("invalid_request", "Phase 1 only supports privacy_tier: private.");
+  if (!ALLOWED_PRIVACY.has(privacyRaw)) {
+    throw new ApiError("invalid_request", "privacy_tier must be one of: private, recipients.");
   }
 
   const teaserText =
@@ -661,9 +664,23 @@ memoriesRoutes.post("/:id/unlock", unlockLimit, async (c) => {
 
   const isOwn = memory.owner_id === userId;
 
-  // --- Content eligibility (SEC-P2-3) ---
-  if (memory.privacy_tier === "private" && memory.owner_id !== userId) {
-    throw new ApiError("forbidden", "This memory is private.");
+  // --- Content eligibility (SEC-P2-3 + recipient ACL) ---
+  // Non-owners must pass the tier gate. A summons deep link exposes the memory ID,
+  // so possession of the ID must never be sufficient — membership is checked here.
+  if (!isOwn) {
+    switch (memory.privacy_tier) {
+      case "recipients": {
+        const allowed = await isRecipientOfMemory(memoryId, userId);
+        if (!allowed) {
+          throw new ApiError("forbidden", "This memory is not shared with you.");
+        }
+        break;
+      }
+      // friends/public: discovery gates not shipped — nothing is shared at these
+      // tiers yet, and drops at them are rejected. Deny defensively regardless.
+      default:
+        throw new ApiError("forbidden", "This memory is private.");
+    }
   }
   if (memory.scan_status !== "clear") {
     throw new ApiError("not_in_range", "Not close enough to unlock this memory.", 423);

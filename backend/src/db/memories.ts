@@ -280,6 +280,11 @@ export async function findNearbyMemories(
 ): Promise<NearbyMemory[]> {
   // Truncate memory geohash to precision 5 for zone matching.
   const zoneHashes = [coarseHash, ...neighbourHashes];
+  // Eligibility (recipient ACL, Phase 2):
+  //   - own memories, any tier; or
+  //   - recipients-tier memories where the requester's *verified* phone
+  //     (users.phone_e164, set only by verifyPhoneCode) is on the recipient list.
+  // Friends/public tiers stay undiscoverable until their gates ship.
   const rows = await sql`
     SELECT m.*,
            s.seal_type,
@@ -288,7 +293,19 @@ export async function findNearbyMemories(
     FROM memories m
     LEFT JOIN seals s ON s.memory_id = m.id
     LEFT JOIN conditions c ON c.memory_id = m.id
-    WHERE m.owner_id = ${requestingUserId}
+    WHERE (
+        m.owner_id = ${requestingUserId}
+        OR (
+          m.privacy_tier = 'recipients'
+          AND EXISTS (
+            SELECT 1 FROM memory_recipients mr
+            JOIN users u ON u.id = ${requestingUserId}
+            WHERE mr.memory_id = m.id
+              AND u.phone_e164 IS NOT NULL
+              AND mr.phone_e164 = u.phone_e164
+          )
+        )
+      )
       AND m.scan_status = 'clear'
       AND m.discoverable_after <= now()
       AND left(m.geohash, 5) = ANY(${zoneHashes})
@@ -304,8 +321,14 @@ export interface CoarseZoneCount {
 /**
  * Count others' eligible memories by precision-7 geohash prefix within the coarse zone.
  * Returns cell prefixes + counts only — never coordinates or identity (DEC-15).
- * Phase 1: privacy_tier = 'private', so this will return 0 rows until Phase 2 social.
- * Kept now so iOS can wire the rendering; will light up naturally when social ships.
+ *
+ * "Eligible" means the requesting user could actually discover it: currently
+ * recipients-tier memories whose recipient list contains the requester's verified
+ * phone. Friends/public join this predicate when those gates ship.
+ *
+ * SEC fix 2026-07-06: this previously counted ALL non-owned memories with no
+ * privacy filter, leaking existence + ~150m cell of other users' PRIVATE
+ * memories into zone glows (the doc comment claimed 0 rows in Phase 1 — false).
  */
 export async function countNearbyZones(
   coarseHash: string,
@@ -314,14 +337,22 @@ export async function countNearbyZones(
 ): Promise<CoarseZoneCount[]> {
   const zoneHashes = [coarseHash, ...neighbourHashes];
   const rows = await sql`
-    SELECT left(geohash, 7) AS geohash_prefix,
-           count(*)::int    AS count
-    FROM memories
-    WHERE owner_id != ${requestingUserId}
-      AND scan_status = 'clear'
-      AND discoverable_after <= now()
-      AND left(geohash, 5) = ANY(${zoneHashes})
-    GROUP BY left(geohash, 7)
+    SELECT left(m.geohash, 7) AS geohash_prefix,
+           count(*)::int      AS count
+    FROM memories m
+    WHERE m.owner_id != ${requestingUserId}
+      AND m.scan_status = 'clear'
+      AND m.discoverable_after <= now()
+      AND left(m.geohash, 5) = ANY(${zoneHashes})
+      AND m.privacy_tier = 'recipients'
+      AND EXISTS (
+        SELECT 1 FROM memory_recipients mr
+        JOIN users u ON u.id = ${requestingUserId}
+        WHERE mr.memory_id = m.id
+          AND u.phone_e164 IS NOT NULL
+          AND mr.phone_e164 = u.phone_e164
+      )
+    GROUP BY left(m.geohash, 7)
   `;
   return rows as unknown as CoarseZoneCount[];
 }

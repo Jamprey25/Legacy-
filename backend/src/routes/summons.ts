@@ -83,6 +83,15 @@ summonsRoutes.post("/memories/:id/summons", async (c) => {
 
   const memory = await getMemoryByOwner(memoryId, userId);
   if (!memory) throw new ApiError("not_found", "Memory not found.");
+  // V3 imports can never be elevated past private (imported_is_private constraint) —
+  // a summons on one would text a link the recipient can never open. Reject clearly.
+  if (memory.source === "imported") {
+    throw new ApiError(
+      "cannot_elevate_import",
+      "Imported memories can't be shared. Re-drop it live at the same place first.",
+      422,
+    );
+  }
 
   await setMemoryRecipients(memoryId, recipients);
   const placeLabel = body.place_label?.trim() || "a place that matters";
